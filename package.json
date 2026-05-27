@@ -1,0 +1,16 @@
+{
+  "name": "oh-my-experience",
+  "version": "0.0.0",
+  "description": "Turn AI coding sessions into a self-improving experience library.",
+  "type": "module",
+  "bin": {
+    "ome": "bin/ome.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rennzhang/oh-my-experience.git"
+  },
+  "author": "Zhang Ren <zhangren.aidev@gmail.com>",
+  "license": "MIT"
+}
+
