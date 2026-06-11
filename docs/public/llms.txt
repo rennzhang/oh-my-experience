@@ -1,0 +1,34 @@
+# Oh My Experience
+
+Oh My Experience is a local-first experience layer for AI coding agents. It turns real Codex and Claude work into reviewed experience cards, then recalls the right lessons at prompt time through local hooks.
+
+## Start here
+
+- Overview: /
+- Quickstart: /guides/quickstart
+- Setup: /guides/setup
+- Codex hook: /guides/codex
+- Claude hook: /guides/claude
+
+## Core concepts
+
+- Experience card lifecycle: candidate -> draft -> active -> archived.
+- Prompt-time recall happens through Codex and Claude UserPromptSubmit hooks.
+- Retrospectives create candidates; they do not directly create active cards.
+- Review stays Markdown-first; candidates do not become active without explicit approval.
+- OME is local-first. Hook runtime does not call an LLM.
+
+## Reference
+
+- CLI: /reference/cli
+- Config: /reference/config
+- Experience card schema: /reference/card-schema
+- Hook events: /reference/hook-events
+- Retrieval API: /reference/retrieval-api
+
+## Architecture
+
+- Overview: /architecture/
+- Data model: /architecture/data-model
+- Hook runtime: /architecture/hook-runtime
+- Retrieval engine: /architecture/retrieval-engine

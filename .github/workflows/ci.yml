@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm run check
+      - run: npm test
+      - name: Console browser smoke
+        run: npm run test:console
+      - name: Recall eval gate
+        run: node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 8 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json
+      - name: Hook eval gate
+        run: |
+          node bin/ome.js eval hook --provider codex --json
+          node bin/ome.js eval hook --provider claude --json
+      - run: npm run build:binary:bun
+      - name: Bun binary smoke
+        run: |
+          DATA_DIR="$(mktemp -d)"
+          CONFIG_HOME="$(mktemp -d)"
+          OH_MY_EXPERIENCE_CONFIG_HOME="$CONFIG_HOME" ./build/ome init --data-dir "$DATA_DIR" --json
+          OH_MY_EXPERIENCE_CONFIG_HOME="$CONFIG_HOME" ./build/ome doctor --data-dir "$DATA_DIR" --json
+      - run: npm pack --dry-run
+      - name: Tarball install smoke
+        run: |
+          TARBALL="$(npm pack --silent)"
+          SMOKE_DIR="$(mktemp -d)"
+          DATA_DIR="$(mktemp -d)"
+          CONFIG_HOME="$(mktemp -d)"
+          npm install "$PWD/$TARBALL" --prefix "$SMOKE_DIR"
+          OH_MY_EXPERIENCE_CONFIG_HOME="$CONFIG_HOME" npx --prefix "$SMOKE_DIR" oh-my-experience init --data-dir "$DATA_DIR" --json
+          OH_MY_EXPERIENCE_CONFIG_HOME="$CONFIG_HOME" npx --prefix "$SMOKE_DIR" ome doctor --data-dir "$DATA_DIR" --json
+          OH_MY_EXPERIENCE_CONFIG_HOME="$CONFIG_HOME" npx --prefix "$SMOKE_DIR" ome config preview privacy.saveRawPrompt true --data-dir "$DATA_DIR" --json

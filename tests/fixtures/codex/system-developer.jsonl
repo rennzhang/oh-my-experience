@@ -1,0 +1,4 @@
+{"timestamp":"2026-05-28T03:00:00.000Z","role":"developer","content":"Do not import this harness instruction.","cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T03:00:01.000Z","role":"system","content":"System prompt should not become review evidence.","cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T03:00:02.000Z","role":"user","content":"请总结真实执行经验。","cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T03:00:03.000Z","role":"assistant","content":"只保留用户和助手可见内容。","cwd":"/tmp/example"}

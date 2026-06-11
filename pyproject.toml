@@ -1,6 +1,6 @@
 [project]
 name = "oh-my-experience"
-version = "0.0.0"
+version = "0.1.0"
 description = "Turn AI coding sessions into a self-improving experience library."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -12,4 +12,3 @@ authors = [
 [project.urls]
 Homepage = "https://github.com/rennzhang/oh-my-experience"
 Repository = "https://github.com/rennzhang/oh-my-experience"
-

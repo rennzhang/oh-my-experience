@@ -1,0 +1,33 @@
+# Oh My Experience Full Documentation Map
+
+Use this file to choose the smallest relevant document before reading the full
+site.
+
+## High priority
+
+- /guides/quickstart - install, initialize, check health, verify recall.
+- /guides/setup - data directory, hook install, skill install, uninstall.
+- /guides/codex - Codex prompt-time recall setup and status checks.
+- /guides/claude - Claude prompt-time recall setup and status checks.
+- /guides/reflect-review - candidate -> draft -> active review loop.
+
+## Medium priority
+
+- /guides/import-sources - Codex session import and optional Spool source import.
+- /guides/evaluation - deterministic recall evaluation and hook evaluation.
+- /reference/cli - complete CLI command surface.
+- /reference/config - configuration schema and data directory behavior.
+- /reference/card-schema - experience card fields and lifecycle.
+- /reference/hook-events - hook event log shape.
+
+## Deep dives
+
+- /architecture/ - concept overview.
+- /architecture/data-model - storage model and lifecycle directories.
+- /architecture/hook-runtime - prompt-time runtime path.
+- /architecture/retrieval-engine - matching and scoring behavior.
+- /architecture/console - local UI architecture.
+- /architecture/evaluation-harness - eval internals.
+- /architecture/applicability-flow - project applicability flow.
+- /architecture/category-flow - category flow.
+- /architecture/i18n - language behavior.

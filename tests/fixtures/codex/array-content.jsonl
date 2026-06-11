@@ -1,0 +1,2 @@
+{"timestamp":"2026-05-28T02:00:00.000Z","type":"response_item","payload":{"role":"user","content":[{"type":"input_text","text":"请修复 dataDir 配置，并验证 Codex importer。"}]},"cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T02:00:10.000Z","type":"response_item","payload":{"role":"assistant","content":[{"type":"output_text","text":"我会读取真实 JSONL schema，补充 fixture，并跑端到端验证。"}]},"cwd":"/tmp/example"}

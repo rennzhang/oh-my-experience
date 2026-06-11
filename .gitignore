@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+.DS_Store
+tmp/
+coverage/
+docs/internal/
+docs/sources/user-voice/
+docs/.vitepress/cache/
+docs/.vitepress/dist/

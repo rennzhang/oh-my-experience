@@ -1,0 +1,72 @@
+---
+title: 配置参考
+status: active
+---
+
+# 配置参考
+
+
+## 格式
+
+可写配置使用 JSON。
+
+默认路径：
+
+```text
+<dataDir>/config.json
+```
+
+## 建议结构
+
+```json
+{
+  "dataDir": "/Users/example/.oh-my-experience",
+  "privacy": {
+    "saveRawPrompt": false
+  },
+  "retrieval": {
+    "maxCards": 8,
+    "minScore": 40,
+    "additionalContextMaxChars": 6000,
+    "hookTimeoutMs": 4000
+  },
+  "hooks": {
+    "providers": {
+      "codex": {
+        "enabled": false
+      },
+      "claude": {
+        "enabled": false
+      }
+    }
+  },
+  "sessions": {
+    "store": "pointer",
+    "retainDays": 30,
+    "keepAppliedEvidence": true
+  }
+}
+```
+
+`sessions.store` 控制导入来源 session 的保留姿态：
+
+- `pointer`：优先保留来源引用和轻量索引。
+- `recent`：为 source-aware workflow 预留的保留姿态。
+- `full`：为明确的离线迁移 workflow 预留的保留姿态。
+
+修改 store mode 不会创建 transcript cache。普通用户不需要单独的存储维护命令；
+诊断经验库健康时使用 `ome doctor`。
+
+## 编辑规则
+
+用户应优先使用：
+
+```bash
+ome config preview <key> <value>
+ome config set <key> <value>
+```
+
+修改 `dataDir` 应该先走 `ome config preview`，再应用新值。这可以避免一次误操作就在没有
+可见 diff 的情况下移动可写库位置。
+
+语言不写入配置。CLI 人类输出默认英文，`OME_LANGUAGE=zh-CN` 是显式覆盖。

@@ -1,0 +1,270 @@
+{
+  "name": "core",
+  "experiencesFile": "./core.cards.json",
+  "cases": [
+    {
+      "id": "browser-validation",
+      "difficulty": "easy",
+      "prompt": "Fix a frontend UI bug and validate the result in a real browser.",
+      "expectedCards": [
+        "browser-validation"
+      ],
+      "unexpectedCards": [
+        "git-commit-safety",
+        "secret-management"
+      ],
+      "tags": [
+        "frontend",
+        "browser",
+        "en"
+      ]
+    },
+    {
+      "id": "git-scope",
+      "difficulty": "easy",
+      "prompt": "Before commit, run git status and keep unrelated dirty files out of the staged diff.",
+      "expectedCards": [
+        "git-commit-safety"
+      ],
+      "unexpectedCards": [
+        "browser-validation"
+      ],
+      "tags": [
+        "git",
+        "en"
+      ]
+    },
+    {
+      "id": "mixed-config-migration",
+      "difficulty": "medium",
+      "prompt": "把 dataDir 迁移到 Obsidian 子目录，必须 preview、backup、doctor 验证，不能误写真实根目录。",
+      "expectedCards": [
+        "config-migration-safety"
+      ],
+      "unexpectedCards": [
+        "secret-management"
+      ],
+      "tags": [
+        "storage",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "long-import-review",
+      "difficulty": "medium",
+      "prompt": "用户给了一大段复盘需求，里面包含 Codex 会话导入、Spool 可选导入、retrospective apply、active card 召回、hook 日志和 stats。核心风险是不要把 system/developer harness 指令当成经验材料。",
+      "expectedCards": [
+        "codex-importer-filtering"
+      ],
+      "unexpectedCards": [
+        "goal-lifecycle-deferred"
+      ],
+      "tags": [
+        "long-prompt",
+        "codex",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "claude-hook",
+      "difficulty": "medium",
+      "prompt": "Support Claude UserPromptSubmit hook through the same provider-neutral runtime; do not fork retrieval logic.",
+      "expectedCards": [
+        "provider-adapter-boundary"
+      ],
+      "unexpectedCards": [
+        "package-install-smoke"
+      ],
+      "tags": [
+        "hook",
+        "claude",
+        "en"
+      ]
+    },
+    {
+      "id": "package-smoke",
+      "difficulty": "medium",
+      "prompt": "Before claiming release readiness, run npm pack and install the tarball into a clean temp project.",
+      "expectedCards": [
+        "package-install-smoke"
+      ],
+      "tags": [
+        "package",
+        "release",
+        "en"
+      ]
+    },
+    {
+      "id": "no-hit",
+      "difficulty": "easy",
+      "prompt": "Write a short cooking recipe for tomato soup with no software engineering context.",
+      "expectedCards": [],
+      "expectNoMatches": true,
+      "tags": [
+        "negative",
+        "en"
+      ]
+    },
+    {
+      "id": "goal-deferred",
+      "difficulty": "medium",
+      "prompt": "用户提到了 goal.start 和 precomplete 检查，但本期明确 goal lifecycle 先不做。",
+      "expectedCards": [
+        "goal-lifecycle-deferred"
+      ],
+      "unexpectedCards": [
+        "provider-adapter-boundary"
+      ],
+      "tags": [
+        "goal",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "cli-docs-language",
+      "difficulty": "medium",
+      "prompt": "语言策略不进入持久配置：CLI 默认英文，只允许 OME_LANGUAGE 显式切中文；公开文档使用 /zh/ 路径式双语；不要暴露经验语言、卡片默认语言或 hook additionalContext 语言；hook frame 固定英文。",
+      "expectedCards": [
+        "cli-docs-i18n"
+      ],
+      "tags": [
+        "i18n",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "business-goal-codex-discussion",
+      "difficulty": "hard",
+      "prompt": "我们公司今年的目标是拿下400万用户，老板要求大家先用起来并用好 Codex，认为这是我们的加速器。我想了解这个判断的好处坏处。",
+      "expectedCards": [],
+      "unexpectedCards": [
+        "agent-goal-execution",
+        "codex-importer-filtering"
+      ],
+      "expectNoMatches": true,
+      "tags": [
+        "goal",
+        "codex",
+        "negative",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "agent-goal-execution-start",
+      "difficulty": "medium",
+      "prompt": "创建目标开干：把 OME 召回优化做完，所有计划内功能都要完整闭环，自己验证。",
+      "expectedCards": [
+        "agent-goal-execution"
+      ],
+      "unexpectedCards": [
+        "codex-importer-filtering"
+      ],
+      "tags": [
+        "goal",
+        "execute",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "goal-explain-only",
+      "difficulty": "medium",
+      "prompt": "我想知道 Codex goal 的原理是什么，只是解释一下，不要开始执行。",
+      "expectedCards": [],
+      "unexpectedCards": [
+        "agent-goal-execution"
+      ],
+      "expectNoMatches": true,
+      "tags": [
+        "goal",
+        "explain",
+        "negative",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "hard-noisy-release-git-package",
+      "difficulty": "hard",
+      "prompt": "我准备把一个本地-first agent 工具做成 public alpha：不要发布，但必须打包 npm tarball，在临时目录安装验证，再检查 git status，确保 unrelated dirty files 不进发布 diff。这个提示里还有 UI、hook、docs、Claude、Codex 等噪声，但真正的发布前阻塞是 package install smoke 和 git commit scope。",
+      "expectedCards": [
+        "package-install-smoke",
+        "git-commit-safety"
+      ],
+      "unexpectedCards": [
+        "goal-lifecycle-deferred"
+      ],
+      "tags": [
+        "hard",
+        "release",
+        "git",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "hard-secret-over-package",
+      "difficulty": "hard",
+      "prompt": "用户说刚下载了 PyPI recovery code 和 token，需要放到 secret 管理里。这里不是 npm pack，也不是 clean temp project；重点是凭据不要进日志、review summary、公开 docs 或 tarball。",
+      "expectedCards": [
+        "secret-management"
+      ],
+      "unexpectedCards": [
+        "package-install-smoke"
+      ],
+      "tags": [
+        "hard",
+        "security",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "hard-doc-source-sync",
+      "difficulty": "hard",
+      "prompt": "Roadmap 已经迁到 docs，source/user-voice 里有用户原话，后来设计被 AI 纠正过。现在实现方向变化了，需要同步 roadmap、architecture、reference docs，并保留 source notes 作为溯源，不要只改一个 README。",
+      "expectedCards": [
+        "roadmap-doc-sync"
+      ],
+      "unexpectedCards": [
+        "browser-validation"
+      ],
+      "tags": [
+        "hard",
+        "docs",
+        "source-notes",
+        "en",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "hard-cjk-goal-deferred",
+      "difficulty": "hard",
+      "prompt": "用户说 goal 可以以后再做，本轮先不实现 autonomous goal lifecycle，也不要做 precomplete 自动检查；这不是 provider adapter、hook、Claude 或 Codex 边界任务。即使任务里出现 prompt-time recall，也应该记住 goal.start 这条线已经 deferred。",
+      "expectedCards": [
+        "goal-lifecycle-deferred"
+      ],
+      "unexpectedCards": [
+        "provider-adapter-boundary"
+      ],
+      "tags": [
+        "hard",
+        "goal",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "hard-provider-no-fork",
+      "difficulty": "hard",
+      "prompt": "Claude Code 的 UserPromptSubmit、Codex hook 和 future agents 都要走同一个 additionalContext 召回运行时；adapter 可以安装和映射 provider 输入，但绝不能 fork retrieval scoring。",
+      "expectedCards": [
+        "provider-adapter-boundary"
+      ],
+      "unexpectedCards": [
+        "cli-docs-i18n"
+      ],
+      "tags": [
+        "hard",
+        "hook",
+        "provider",
+        "mixed"
+      ]
+    }
+  ]
+}

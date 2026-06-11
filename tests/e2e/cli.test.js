@@ -3,8 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import net from "node:net";
-import { spawnSync, spawn } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
 const bin = path.join(root, "bin", "ome.js");
@@ -47,17 +46,6 @@ function completeAudit(overrides = {}) {
   };
 }
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.listen(0, "127.0.0.1", () => {
-      const port = server.address().port;
-      server.close(() => resolve(port));
-    });
-    server.on("error", reject);
-  });
-}
-
 test("CLI full lifecycle runs in temporary dataDir", () => {
   const dataDir = tmpDir("full");
   const init = json(run(["init", "--data-dir", dataDir, "--json"]));
@@ -67,17 +55,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const sessionIndex = JSON.parse(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8"));
   assert.equal(sessionIndex.storage, "sources");
   assert.equal("messages" in sessionIndex.sessions[0], false);
-  const storageAudit = json(run(["storage", "audit", "--data-dir", dataDir, "--json"]));
-  assert.equal(storageAudit.ok, true);
-  const compactDryRun = json(run(["compact", "--dry-run", "--data-dir", dataDir, "--json"]));
-  assert.equal(compactDryRun.dryRun, true);
-  assert.ok(compactDryRun.actions.some((action) => action.reason.includes("source catalog")));
-  const sessionsCompact = json(run(["source", "compact-index", "--data-dir", dataDir, "--json"]));
-  assert.equal(sessionsCompact.index.storage, "sources");
-  const sessionMode = json(run(["source", "set-mode", "recent", "--retain-days", "45", "--data-dir", dataDir, "--json"]));
-  assert.equal(sessionMode.sessions.store, "recent");
-  assert.equal(sessionMode.sessions.retainDays, 45);
-  const retrospective = json(run(["create-reflect", "--data-dir", dataDir, "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
   const input = JSON.parse(fs.readFileSync(path.join(retrospective.runDir, "input.json"), "utf8"));
   assert.equal(fs.existsSync(path.join(retrospective.runDir, "prompt.md")), false);
   assert.equal(input.focus, "");
@@ -106,7 +84,6 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   assert.equal(candidates.candidates[0].evidence.length, 1);
   assert.equal(candidates.candidates[0].category, "测试验收");
   assert.equal(candidates.reviewFile, path.join(dataDir, "retrospectives", retrospective.runId, "retrospective.md"));
-  assert.equal(candidates.consoleCommand, "ome serve");
   assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /经验复盘/);
   assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /审计：coverage=all-accessible \/ focus=fixture focus \/ sources=1 \/ gaps=0/);
   assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /### 经验总结/);
@@ -116,8 +93,6 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const humanShow = run(["reflect", "show", retrospective.runId, "--data-dir", dataDir]);
   assert.equal(humanShow.status, 0, `${humanShow.stderr}\n${humanShow.stdout}`);
   assert.match(humanShow.stdout, /Approval file:/);
-  assert.match(humanShow.stdout, /Console approval: ome serve/);
-  json(run(["category", "create", "Git 操作", "--data-dir", dataDir, "--json"]));
   const added = json(run(["reflect", "add", retrospective.runId, "--title", "Git diff scope", "--category", "Git 操作", "--summary", "Unrelated files were mixed", "--rule", "Keep the diff scoped", "--triggers", "git status,commit", "--topics", "git", "--data-dir", dataDir, "--json"]));
   assert.equal(added.candidates.length, 2);
   json(run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--category", "产品与 UI", "--data-dir", dataDir, "--json"]));
@@ -138,12 +113,17 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const draftCards = json(run(["experience", "list", "--status", "draft", "--data-dir", dataDir, "--json"])).experiences;
   const draftCard = draftCards.find((card) => card.title === "UI browser validation");
   assert.ok(draftCard);
+  const compactDrafts = json(run(["experience", "list", "--status", "draft", "--compact", "--data-dir", dataDir, "--json"]));
+  assert.equal(compactDrafts.compact, true);
+  assert.equal(compactDrafts.total, 1);
+  assert.deepEqual(Object.keys(compactDrafts.experiences[0]).sort(), ["category", "id", "status", "title", "updatedAt"]);
+  assert.equal(compactDrafts.experiences[0].title, "UI browser validation");
   const cardId = draftCard.id;
   assert.equal(draftCard.category, "产品与 UI");
   const ruleShow = run(["experience", "show", cardId, "--section", "rule", "--data-dir", dataDir]);
   assert.equal(ruleShow.status, 0, `${ruleShow.stderr}\n${ruleShow.stdout}`);
   assert.match(ruleShow.stdout, /Use browser validation and console check/);
-  json(run(["experience", "approve", cardId, "--data-dir", dataDir, "--json"]));
+  json(run(["experience", "promote", cardId, "--data-dir", dataDir, "--json"]));
   const match = json(run(["match", "修复 UI 并做 浏览器验证", "--data-dir", dataDir, "--json"]));
   assert.equal(match.matches.length, 1);
   const explained = json(run(["match", "修复 UI 并做 浏览器验证", "--explain", "--data-dir", dataDir, "--json"]));
@@ -159,12 +139,9 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const afterReport = path.join(dataDir, "after-report.json");
   fs.writeFileSync(beforeReport, JSON.stringify(evalReport), "utf8");
   fs.writeFileSync(afterReport, JSON.stringify(evalReport), "utf8");
-  const compare = json(run(["eval", "compare", "--base", beforeReport, "--next", afterReport, "--data-dir", dataDir, "--json"]));
+  const compare = json(run(["eval", "recall", "--compare", beforeReport, afterReport, "--data-dir", dataDir, "--json"]));
   assert.equal(compare.ok, true);
   assert.equal(compare.metrics.recallAtK.delta, 0);
-  const hookEval = json(run(["eval", "hook", "--provider", "claude", "--data-dir", dataDir, "--json"]));
-  assert.equal(hookEval.ok, true);
-  assert.equal(hookEval.assertions.doesNotStoreRawPrompt, true);
   const hook = json(run(["hook", "run", "--data-dir", dataDir, "--json"], { input: JSON.stringify({ prompt: "修复 UI 并做 浏览器验证", session_id: "s1", turn_id: "t1" }) }));
   assert.ok(hook.hookSpecificOutput.additionalContext.includes("UI browser validation"));
   const stats = json(run(["stats", "--data-dir", dataDir, "--json"]));
@@ -175,7 +152,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
 test("reflect candidates rejects missing source audit unless explicitly overridden", () => {
   const dataDir = tmpDir("audit-gate");
   json(run(["init", "--data-dir", dataDir, "--json"]));
-  const retrospective = json(run(["create-reflect", "--data-dir", dataDir, "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
   const candidatesFile = path.join(dataDir, "auditless-candidates.json");
   fs.writeFileSync(candidatesFile, JSON.stringify({
     candidates: [{
@@ -215,7 +192,7 @@ test("retrospective run creation rejects session-scoped CLI design", () => {
   assert.match(error.error.message, /does not accept --from-session/);
 });
 
-test("reflect run creation has no compatibility command names", () => {
+test("reflect run creation uses the progressive reflect entrypoint", () => {
   for (const command of ["review", "retrospective", "prepare"]) {
     const result = run([command, "--json"]);
     assert.notEqual(result.status, 0, command);
@@ -223,11 +200,11 @@ test("reflect run creation has no compatibility command names", () => {
     assert.match(error.error.message, new RegExp(`unknown command: ${command}`));
   }
 
-  const reflect = run(["reflect", "--json"]);
-  assert.notEqual(reflect.status, 0);
-  const error = JSON.parse(reflect.stdout);
-  assert.match(error.error.message, /manages an existing reflect run/);
-  assert.match(error.error.message, /ome create-reflect/);
+  const dataDir = tmpDir("reflect-start");
+  const bareReflect = json(run(["reflect", "--data-dir", dataDir, "--json"]));
+  assert.match(bareReflect.runId, /manual$/);
+  const explicitStart = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
+  assert.match(explicitStart.runId, /manual$/);
 });
 
 test("subcommand help is read-only and never initializes real state", () => {
@@ -242,7 +219,7 @@ test("subcommand help is read-only and never initializes real state", () => {
   });
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
   assert.match(result.stdout, /ome init/);
-  assert.match(result.stdout, /ome create-reflect/);
+  assert.match(result.stdout, /ome reflect start/);
   assert.match(result.stdout, /ome reflect list\|show\|add\|candidates\|decide\|apply\|resume/);
   assert.doesNotMatch(result.stdout, /ome prepare/);
   assert.doesNotMatch(result.stdout, /ome retrospective/);
@@ -618,7 +595,7 @@ test("codex importer parses real response_item content arrays", () => {
   assert.equal(filtered.sessionFile, "");
 });
 
-test("global hook installs and uninstalls without project setup", () => {
+test("init installs and uninstall removes global hook without project setup", () => {
   const dataDir = path.join(tmpDir("hook weird"), "data dir $(bad)");
   const localCodexHome = tmpDir("codex-home");
   fs.mkdirSync(localCodexHome, { recursive: true });
@@ -633,12 +610,14 @@ test("global hook installs and uninstalls without project setup", () => {
       }],
     },
   }, null, 2));
-  json(run(["init", "--data-dir", dataDir, "--no-hook", "--json"]));
-  const dryRun = json(run(["hook", "install", "--codex-home", localCodexHome, "--dry-run", "--data-dir", dataDir, "--json"]));
+  const dryRun = json(run(["init", "--codex-home", localCodexHome, "--dry-run", "--data-dir", dataDir, "--json"]));
   assert.equal(dryRun.dryRun, true);
-  const installed = json(run(["hook", "install", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
-  assert.equal(installed.installed, true);
-  assert.equal(installed.installTarget, "global");
+  assert.equal(dryRun.hooks[0].provider, "codex");
+  assert.equal(dryRun.hooks[0].installTarget, "global");
+  assert.equal(dryRun.skill.dryRun, true);
+  const installed = json(run(["init", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  assert.equal(installed.hooks[0].installed, true);
+  assert.equal(installed.hooks[0].installTarget, "global");
   const hooksJson = JSON.parse(fs.readFileSync(path.join(localCodexHome, "hooks.json"), "utf8"));
   const commands = hooksJson.hooks.UserPromptSubmit.flatMap((entry) => entry.hooks).map((hook) => hook.command);
   assert.equal(commands.filter((command) => command.includes("ome hook run")).length, 1);
@@ -647,7 +626,7 @@ test("global hook installs and uninstalls without project setup", () => {
   assert.match(commands.find((command) => command.includes("ome hook run")), /--data-dir '.*\$\(bad\)'/);
   const status = json(run(["hook", "status", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
   assert.equal(status.installed, true);
-  json(run(["hook", "uninstall", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  json(run(["uninstall", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
   const uninstalledHooksJson = JSON.parse(fs.readFileSync(path.join(localCodexHome, "hooks.json"), "utf8"));
   const remainingCommands = uninstalledHooksJson.hooks.UserPromptSubmit.flatMap((entry) => entry.hooks).map((hook) => hook.command);
   assert.equal(remainingCommands.some((command) => command.includes("ome hook run")), false);
@@ -658,29 +637,28 @@ test("global hook installs and uninstalls without project setup", () => {
 
 test("skill lifecycle protects user-owned targets", () => {
   const localCodexHome = tmpDir("skill-codex-home");
+  const dataDir = tmpDir("skill-data");
   const skillDir = path.join(localCodexHome, "skills", "oh-my-experience");
-  const installed = json(run(["skill", "install", "--codex-home", localCodexHome, "--json"]));
-  assert.equal(installed.installed, true);
-  assert.equal(installed.owned, true);
+  const installed = json(run(["init", "--data-dir", dataDir, "--codex-home", localCodexHome, "--no-hook", "--json"]));
+  assert.equal(installed.skill.installed, true);
+  assert.equal(installed.skill.owned, true);
   assert.equal(fs.existsSync(path.join(skillDir, "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(skillDir, ".ome-skill.json")), true);
-  const status = json(run(["skill", "status", "--codex-home", localCodexHome, "--json"]));
-  assert.equal(status.installed, true);
-  assert.equal(status.owned, true);
-  const removed = json(run(["skill", "uninstall", "--codex-home", localCodexHome, "--json"]));
-  assert.equal(removed.uninstalled, true);
+  const removed = json(run(["uninstall", "--data-dir", dataDir, "--codex-home", localCodexHome, "--keep-hooks", "--json"]));
+  assert.equal(removed.skill.uninstalled, true);
   assert.equal(fs.existsSync(skillDir), false);
 
   const conflictHome = tmpDir("skill-conflict-home");
+  const conflictDataDir = tmpDir("skill-conflict-data");
   const conflictDir = path.join(conflictHome, "skills", "oh-my-experience");
   fs.mkdirSync(conflictDir, { recursive: true });
   fs.writeFileSync(path.join(conflictDir, "SKILL.md"), "---\nname: custom-skill\n---\n", "utf8");
-  const conflict = run(["skill", "install", "--codex-home", conflictHome, "--json"]);
+  const conflict = run(["init", "--data-dir", conflictDataDir, "--codex-home", conflictHome, "--no-hook", "--json"]);
   assert.notEqual(conflict.status, 0);
   assert.match(JSON.parse(conflict.stdout).error.message, /not owned by OME/);
   assert.equal(fs.readFileSync(path.join(conflictDir, "SKILL.md"), "utf8").includes("custom-skill"), true);
-  const forced = json(run(["skill", "install", "--codex-home", conflictHome, "--force", "--json"]));
-  assert.equal(forced.installed, true);
+  const forced = json(run(["init", "--data-dir", conflictDataDir, "--codex-home", conflictHome, "--no-hook", "--force", "--json"]));
+  assert.equal(forced.skill.installed, true);
   assert.equal(fs.existsSync(path.join(conflictDir, ".ome-skill.json")), true);
 });
 
@@ -710,9 +688,10 @@ test("uninstall removes local entry points and keeps library unless explicitly d
   assert.equal(fs.existsSync(dataDir), false);
 });
 
-test("claude hook installs through the same runtime command", () => {
+test("init installs claude hook through the same runtime command", () => {
   const dataDir = tmpDir("claude-hook");
   const claudeHome = tmpDir("claude-home");
+  const localCodexHome = tmpDir("claude-skill-home");
   fs.mkdirSync(claudeHome, { recursive: true });
   fs.writeFileSync(path.join(claudeHome, "settings.json"), JSON.stringify({
     hooks: {
@@ -724,11 +703,10 @@ test("claude hook installs through the same runtime command", () => {
       }],
     },
   }, null, 2));
-  json(run(["init", "--data-dir", dataDir, "--no-hook", "--json"]));
-  const installed = json(run(["hook", "install", "--provider", "claude", "--claude-home", claudeHome, "--data-dir", dataDir, "--json"]));
-  assert.equal(installed.provider, "claude");
-  assert.equal(installed.installed, true);
-  assert.equal(installed.installTarget, "global");
+  const installed = json(run(["init", "--provider", "claude", "--claude-home", claudeHome, "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  assert.equal(installed.hooks[0].provider, "claude");
+  assert.equal(installed.hooks[0].installed, true);
+  assert.equal(installed.hooks[0].installTarget, "global");
   const settings = JSON.parse(fs.readFileSync(path.join(claudeHome, "settings.json"), "utf8"));
   const commands = settings.hooks.UserPromptSubmit.flatMap((entry) => entry.hooks).map((hook) => hook.command);
   assert.equal(commands.filter((command) => command.includes("ome hook run")).length, 1);
@@ -754,7 +732,7 @@ test("hook run applies project applicability from real cwd payload", () => {
   fs.mkdirSync(otherDir, { recursive: true });
   fs.writeFileSync(path.join(projectDir, "package.json"), JSON.stringify({ name: "@eval/project" }), "utf8");
   json(run(["init", "--data-dir", dataDir, "--no-hook", "--json"]));
-  const retrospective = json(run(["create-reflect", "--data-dir", dataDir, "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
   const candidate = json(run([
     "reflect", "add", retrospective.runId,
     "--title", "Project cwd browser card",
@@ -794,39 +772,11 @@ test("hook log does not persist raw prompt by default", () => {
   assert.equal(log.includes("private raw prompt abc"), false);
 });
 
-test("serve uses configured default UI port", async () => {
-  const dataDir = tmpDir("serve-port");
-  const port = await freePort();
-  json(run(["init", "--data-dir", dataDir, "--no-hook", "--json"]));
-  json(run(["config", "set", "ui.port", String(port), "--data-dir", dataDir, "--json"]));
-  const child = spawn(process.execPath, [bin, "serve", "--data-dir", dataDir], {
-    cwd: root,
-    env: { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  try {
-    const url = await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("server timeout")), 5000);
-      child.stdout.on("data", (chunk) => {
-        const match = String(chunk).match(/http:\/\/127\.0\.0\.1:(\d+)/);
-        if (match) {
-          clearTimeout(timer);
-          resolve(match[0]);
-        }
-      });
-      child.stderr.on("data", (chunk) => reject(new Error(String(chunk))));
-    });
-    assert.equal(new URL(url).port, String(port));
-  } finally {
-    child.kill();
-  }
-});
-
 test("config can point to a custom data directory", () => {
   const dataDir = tmpDir("config-a");
   const nextDir = path.join(os.tmpdir(), `ome-e2e-config-b-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   json(run(["init", "--data-dir", dataDir, "--json"]));
-  const retrospective = json(run(["create-reflect", "--data-dir", dataDir, "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
   const candidatesFile = path.join(dataDir, "data-dir-candidates.json");
   fs.writeFileSync(candidatesFile, JSON.stringify({ audit: completeAudit(), candidates: [{ title: "Data directory card", summary: "P", rule: "C", triggers: ["switch config"], topics: ["config"], evidence: ["test"] }] }), "utf8");
   const candidates = json(run(["reflect", "candidates", retrospective.runId, "--from-file", candidatesFile, "--data-dir", dataDir, "--json"]));
@@ -879,69 +829,4 @@ process.exit(1);
   assert.deepEqual(result.imported, ["spool-1"]);
   const sessions = JSON.parse(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8")).sessions;
   assert.equal(sessions[0].provider, "spool:claude");
-});
-
-test("server and console expose local API", async () => {
-  const dataDir = tmpDir("server");
-  json(run(["init", "--data-dir", dataDir, "--json"]));
-  const child = spawn(process.execPath, [bin, "serve", "--data-dir", dataDir, "--port", "0"], {
-    cwd: root,
-    env: { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const url = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("server timeout")), 5000);
-    child.stdout.on("data", (chunk) => {
-      const match = String(chunk).match(/http:\/\/127\.0\.0\.1:\d+/);
-      if (match) {
-        clearTimeout(timer);
-        resolve(match[0]);
-      }
-    });
-    child.stderr.on("data", (chunk) => reject(new Error(String(chunk))));
-  });
-  try {
-    const health = await fetch(`${url}/api/health`).then((res) => res.json());
-    assert.equal(health.ok, true);
-    const blocked = await fetch(`${url}/api/config`, {
-      method: "PUT",
-      headers: { "content-type": "application/json", origin: "https://evil.example" },
-      body: JSON.stringify({ key: "privacy.saveRawPrompt", value: true }),
-    });
-    assert.equal(blocked.status, 403);
-    const preview = await fetch(`${url}/api/config`, {
-      method: "PUT",
-      headers: { "content-type": "application/json", origin: url },
-      body: JSON.stringify({ preview: true, key: "privacy.saveRawPrompt", value: true }),
-    }).then((res) => res.json());
-    assert.equal(preview.next, true);
-    const nextDir = tmpDir("server-next");
-    const blockedDataDir = await fetch(`${url}/api/config`, {
-      method: "PUT",
-      headers: { "content-type": "application/json", origin: url },
-      body: JSON.stringify({ dataDir: nextDir }),
-    });
-    assert.equal(blockedDataDir.status, 409);
-    const blockedKey = await fetch(`${url}/api/config`, {
-      method: "PUT",
-      headers: { "content-type": "application/json", origin: url },
-      body: JSON.stringify({ key: "dataDir", value: nextDir }),
-    });
-    assert.equal(blockedKey.status, 409);
-    const dataDirPreview = await fetch(`${url}/api/config`, {
-      method: "PUT",
-      headers: { "content-type": "application/json", origin: url },
-      body: JSON.stringify({ preview: true, dataDir: nextDir }),
-    }).then((res) => res.json());
-    const applied = await fetch(`${url}/api/config`, {
-      method: "PUT",
-      headers: { "content-type": "application/json", origin: url },
-      body: JSON.stringify({ dataDir: nextDir, previewToken: dataDirPreview.previewToken }),
-    }).then((res) => res.json());
-    assert.equal(applied.next, nextDir);
-    const page = await fetch(url).then((res) => res.text());
-    assert.match(page, /审批|Experience Approval/);
-  } finally {
-    child.kill();
-  }
 });

@@ -1,16 +1,77 @@
 {
   "name": "oh-my-experience",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Turn AI coding sessions into a self-improving experience library.",
   "type": "module",
+  "keywords": [
+    "ai",
+    "coding-agents",
+    "codex",
+    "claude-code",
+    "hooks",
+    "retrieval",
+    "experience"
+  ],
   "bin": {
-    "ome": "bin/ome.js"
+    "ome": "bin/ome.js",
+    "oh-my-experience": "bin/ome.js"
+  },
+  "exports": {
+    ".": "./dist/packages/core/src/index.js",
+    "./cli": "./dist/packages/cli/src/main.js",
+    "./hook-runtime": "./dist/packages/hook-runtime/src/run.js"
+  },
+  "types": "./dist/packages/core/src/index.d.ts",
+  "files": [
+    "bin/",
+    "dist/",
+    "skills/",
+    "templates/",
+    "examples/",
+    "docs/",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "build:binary:bun": "npm run build && mkdir -p build && bun build --compile bin/ome.js --outfile build/ome",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/*.test.js tests/e2e/*.test.js",
+    "test:unit": "npm run build && node --test tests/*.test.js",
+    "test:e2e": "npm run build && node --test tests/e2e/*.test.js",
+    "check": "npm run typecheck && node --check bin/ome.js",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "validate:dogfood": "node scripts/validate-dogfood.mjs",
+    "validate:release": "node scripts/validate-dogfood.mjs",
+    "prepack": "npm run build"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rennzhang/oh-my-experience.git"
   },
+  "homepage": "https://github.com/rennzhang/oh-my-experience#readme",
+  "bugs": {
+    "url": "https://github.com/rennzhang/oh-my-experience/issues"
+  },
   "author": "Zhang Ren <zhangren.aidev@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@sit-onyx/vitepress-theme": "^1.0.0",
+    "@types/node": "^25.9.1",
+    "sass": "^1.100.0",
+    "sit-onyx": "^1.14.0",
+    "typescript": "^6.0.3",
+    "vitepress": "^1.6.4"
+  }
 }
-
