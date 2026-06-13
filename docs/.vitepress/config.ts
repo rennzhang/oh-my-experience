@@ -251,6 +251,7 @@ export default defineConfig({
   title: "Oh My Experience",
   description: "A local-first experience layer for AI coding agents.",
   cleanUrls: true,
+  srcExclude: ["internal/**"],
   lastUpdated: true,
   ignoreDeadLinks: [
     /^https?:\/\/localhost/,
