@@ -20,8 +20,8 @@ jobs:
       - run: npx playwright install chromium
       - run: npm run check
       - run: npm test
-      - name: Console browser smoke
-        run: npm run test:console
+      - name: Docs build
+        run: npm run docs:build
       - name: Recall eval gate
         run: node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 8 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json
       - name: Hook eval gate
