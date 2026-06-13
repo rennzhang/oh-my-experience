@@ -36,11 +36,25 @@ Experience fixture file:
       "id": "browser-validation",
       "status": "active",
       "title": "Browser Validation",
-      "triggers": ["browser validation", "浏览器验证"],
-      "topics": ["frontend", "test"],
-      "applicability": { "level": "global" },
-      "recallPolicy": "must",
-      "body": "Open the real browser after UI changes."
+      "category": "测试验收",
+      "summary": "UI changes need real browser validation, while backend-only or documentation-only work should not recall this card.",
+      "criteria": {
+        "use_when": ["frontend visible change", "real browser validation"],
+        "ignore_when": ["backend-only migration", "documentation-only example"]
+      },
+      "engine_hints": {
+        "positive": ["UI browser validation"],
+        "negative": ["backend-only migration"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["browser validation", "浏览器验证"],
+        "topics": ["frontend", "test"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Open the real browser after UI changes."
     }
   ]
 }

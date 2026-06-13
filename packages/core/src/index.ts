@@ -5,6 +5,7 @@ export * from "./doctor.js";
 export * from "./eval.js";
 export * from "./i18n.js";
 export { detectIntentModes, detectRuleSignals } from "./intent-rules.js";
+export * from "./library-stack.js";
 export * from "./matcher.js";
 export * from "./maintenance.js";
 export * from "./project-context.js";

@@ -25,7 +25,7 @@ ome eval recall --suite my-suite.json --use-current-library
 `overRecallRate`、`noHitRate` 和 context size，因为过度召回最容易污染 hook
 context。
 
-## Hook Smoke
+## Hook Runtime Validation
 
 ```bash
 printf '{"prompt":"fix UI and validate in browser"}' | ome hook run --json
@@ -33,4 +33,6 @@ npm test
 ```
 
 修改 provider adapters 或 hook runtime behavior 前应运行这些检查。fixture 检查
-优先使用隔离 dataDir，provider-specific adapter 覆盖交给项目测试套件。
+优先使用隔离 dataDir，provider-specific adapter 覆盖交给项目测试套件。有效的
+hook 结果必须包含 `hookSpecificOutput.additionalContext`、候选经验卡链接，以及提示 Agent
+最终只披露实际使用卡片的说明。

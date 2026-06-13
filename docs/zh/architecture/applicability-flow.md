@@ -6,19 +6,19 @@ status: active
 # 适用范围流程
 
 
-`applicability` 控制一张卡片允许在哪些场景出现。通用经验保持通用，项目相关
+`scope` 控制一张卡片允许在哪些场景出现。通用经验保持通用，项目相关
 经验保持收敛。
 
 ## 端到端路径
 
 ```text
 session/import/retrospective
-  -> candidate.applicability
-  -> reflect decision can override applicability
-  -> draft preserves applicability
-  -> active index stores applicability
+  -> candidate.scope
+  -> reflect decision can override scope
+  -> draft preserves scope
+  -> active index stores scope
   -> hook runtime detects projectContext
-  -> retrieval filters by applicability
+  -> retrieval filters by scope
   -> scoring and context rendering
 ```
 

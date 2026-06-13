@@ -21,8 +21,15 @@ Codex App 可能还需要在界面中手动信任 hook。
 
 **让 Agent 帮你：**
 
-> 帮我安装 Oh My Experience 的 Codex hook。先 ome init --provider codex --dry-run
-> 预览，确认无误后 ome init --provider codex，最后 ome hook status 确认。
+```text
+帮我安装 Oh My Experience 的 Codex hook。
+
+1. 先运行 `ome init --provider codex --dry-run`，预览会写入哪些配置。
+2. 如果预览没有风险，再运行 `ome init --provider codex`。
+3. 最后运行 `ome hook status --provider codex`，确认 hook 已启用。
+
+如果 Codex App 要求信任 hook，请停下来提醒我在界面里确认。
+```
 
 ## 导入 Codex 会话
 
@@ -32,8 +39,12 @@ ome import codex --sessions ~/.codex/sessions
 
 **让 Agent 帮你：**
 
-> 帮我导入 Codex 会话到 OME。运行 ome import codex --sessions ~/.codex/sessions，
-> 告诉我导入了多少条、跳过多少条。
+```text
+帮我导入 Codex 会话到 OME。
+
+运行 `ome import codex --sessions ~/.codex/sessions`，然后告诉我导入了多少条、
+跳过多少条，以及是否有解析失败的会话。
+```
 
 ## 用 Codex Agent 做复盘
 
@@ -41,14 +52,14 @@ Codex Agent 可以独立完成整个 reflect 流程。
 
 **完整复盘 prompt，复制使用：**
 
-```
+```text
 帮我对最近编码会话做一次 OME reflect 复盘扫描。
 
 1. 先 ome reflect start --focus "最近纠正过的执行错误"
 2. 检查 ~/.codex/sessions 中的近期会话和当前对话
 3. 找到我纠正过你的地方（跳过验证、掩盖错误、混入无关改动等）
-4. 生成 ≤5 条候选经验，每条包含：问题、反模式、正确做法、触发条件、抑制条件
-5. 写入候选文件后 ome reflect candidates RUN_ID --from-file FILE
+4. 生成 ≤5 条 当前 OME 候选 JSON：包含 audit，以及 summary、criteria.use_when、criteria.ignore_when、recall、可选 engine_hints、scope、rule
+5. 写入 candidates.json 后运行 ome reflect candidates RUN_ID --from-file candidates.json
 6. ome reflect show RUN_ID 展示，等我逐条审批
 
 只提取真正能复用的执行判断。不要把一次性上下文写成经验卡。

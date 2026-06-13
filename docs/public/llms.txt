@@ -6,13 +6,17 @@ Oh My Experience is a local-first experience layer for AI coding agents. It turn
 
 - Overview: /
 - Quickstart: /guides/quickstart
+- Examples: /guides/examples
 - Setup: /guides/setup
+- Global and project libraries: /guides/project-libraries
 - Codex hook: /guides/codex
 - Claude hook: /guides/claude
 
 ## Core concepts
 
 - Experience card lifecycle: candidate -> draft -> active -> archived.
+- `dataDir` is the global library; optional project libraries live at `<project-root>/.oh-my-experience/`.
+- Global cards can still be scoped by project metadata without adding files to a repository.
 - Prompt-time recall happens through Codex and Claude UserPromptSubmit hooks.
 - Retrospectives create candidates; they do not directly create active cards.
 - Review stays Markdown-first; candidates do not become active without explicit approval.

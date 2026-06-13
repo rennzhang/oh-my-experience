@@ -64,9 +64,10 @@ Checks:
 - output schema is provider-correct;
 - raw prompt is not stored by default;
 - additional context is present when a fixture card matches;
+- candidate-card links are present and the final usage-disclosure instruction is clear;
 - hook logs include recall evidence.
 
-Smoke path:
+Runtime validation path:
 
 ```bash
 printf '{"prompt":"fix UI and validate in browser"}' | ome hook run --json
@@ -75,5 +76,5 @@ npm test
 
 Hook runtime coverage should use isolated fixture data, real `ome hook run`,
 and provider adapter tests. It must check output schema, matched-card evidence,
-prompt hashing, and raw-prompt privacy without installing hooks or touching the
-user's configured dataDir.
+candidate-card links, final usage-disclosure guidance, prompt hashing, and raw-prompt privacy without
+installing hooks or touching the user's configured dataDir.

@@ -12,7 +12,6 @@ export interface SimilaritySubject {
   summary?: string;
   rule?: string;
   body?: string;
-  bodyExcerpt?: string;
 }
 
 export interface SimilarCardHint {
@@ -89,7 +88,6 @@ function normalizeCardLike(card: CardIndexEntry | ExperienceCard): SimilaritySub
     summary: "summary" in card ? card.summary : undefined,
     rule: "rule" in card ? card.rule : undefined,
     body: "body" in card ? card.body : undefined,
-    bodyExcerpt: "bodyExcerpt" in card ? card.bodyExcerpt : undefined,
   };
 }
 
@@ -105,7 +103,6 @@ function lessonTokens(subject: SimilaritySubject): string[] {
   return unique([
     ...tokens(subject.summary),
     ...tokens(subject.rule),
-    ...tokens(subject.bodyExcerpt),
     ...tokens(subject.body),
   ]).slice(0, 120);
 }

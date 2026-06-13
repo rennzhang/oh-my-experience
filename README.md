@@ -1,8 +1,16 @@
-# Oh My Experience
+<p align="center">
+  <img src="assets/brand/ome-logo-lockup.png" alt="Oh My Experience (OME)" width="560">
+</p>
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+<h1 align="center">Oh My Experience</h1>
 
-Stop teaching your agent the same lesson twice.
+<p align="center"><strong>Stop teaching your agent the same lesson twice.</strong></p>
+
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="docs/index.md">Documentation</a>
+</p>
 
 Oh My Experience is a local-first experience layer for AI coding agents. It
 turns real Codex and Claude sessions into reviewed experience cards, then
@@ -88,9 +96,10 @@ cards, not because you keep making one giant rule file.
 ## What You Get
 
 - A local Markdown library of reviewed experience cards.
+- Optional project libraries at `<project-root>/.oh-my-experience/`.
 - Codex and Claude hooks that recall relevant lessons at prompt time.
 - Project-aware matching from one local hook.
-- Negative triggers for overloaded words like "goal", "review", or "release".
+- Explicit ignore criteria for overloaded words like "goal", "review", or "release".
 - Explainable recall: matched cards, scores, reasons, and rendered context.
 - A Markdown-first review loop for candidate lessons before they become active.
 - Isolated evaluation so retrieval changes can be tested without polluting your real library.
@@ -130,7 +139,7 @@ recallable.
 ### 4. Recall at prompt time
 
 When a prompt enters Codex or Claude, the hook builds a small task envelope,
-matches active experiences, filters by project applicability, and injects a compact
+matches active experiences, filters by project scope, and injects a compact
 additional context block.
 
 ```bash
@@ -139,6 +148,35 @@ ome match "fix UI and validate in browser" --explain
 
 The hook path is local, fast, and fail-open. It does not call an LLM or write
 new active cards.
+
+## Example: `/goal` Recall In Practice
+
+When you tell an agent:
+
+```text
+创建目标，开干，把这个功能完整做完并自己验证
+```
+
+OME can match a reviewed goal-execution card and mount this compact context
+before the agent starts work:
+
+```text
+OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
+Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
+1. [high risk][must] 创建目标时进入完整闭环交付模式 (创建目标时进入完整闭环交付模式-40383753)
+   Summary: 当用户用 /goal、创建目标或开干启动真实长任务时，常见误判是只建目标或做局部切片；应进入完整闭环交付，并排除文档示例、概念解释和业务目标讨论。
+   Scope: global
+   Use if: /goal 开始执行; 创建目标开干; 使用 goal 跑长任务
+   Ignore if: 文档或案例里展示 /goal; 解释 goal 功能但不执行
+   Matched by: task looks like a real goal-execution start
+   Rule: ome experience show 创建目标时进入完整闭环交付模式-40383753 --section rule
+   Final link if used: [创建目标时进入完整闭环交付模式](<~/.oh-my-experience/experiences/active/创建目标时进入完整闭环交付模式-40383753.md>)
+```
+
+The agent then reads the full card rule and treats `/goal` as an execution
+startup protocol: define scope, complete the planned work, validate through real
+paths, and fail closed until evidence is clear. See
+[Examples](docs/guides/examples.md) for the full walkthrough.
 
 ## Install
 
@@ -174,6 +212,23 @@ scan and create your own candidates. Remove the starter lessons later with
 normal `ome experience archive` governance if they are no longer useful.
 Interactive init may offer the optional Spool CLI stage; scripted init never installs it. For optional Spool imports, see
 [Import Sources](docs/guides/import-sources.md).
+
+## Global And Project Libraries
+
+`dataDir` is your global library. It can stay in the default location or move to
+a dedicated local folder such as an Obsidian subfolder.
+
+When a repository should carry its own reviewed cards, initialize a project
+library:
+
+```bash
+ome project init
+ome project status
+```
+
+OME reads both layers at prompt time. Global project-scoped cards still work
+without adding repository files; use `.oh-my-experience/` only when the lesson
+should travel with the project.
 
 ## Manage Agent Hooks
 
@@ -219,7 +274,9 @@ prompt logging is opt-in.
 ## Documentation
 
 - [Quickstart](docs/guides/quickstart.md)
+- [Examples](docs/guides/examples.md)
 - [Setup](docs/guides/setup.md)
+- [Global and project libraries](docs/guides/project-libraries.md)
 - [CLI Reference](docs/reference/cli.md)
 - [Retrieval Engine](docs/architecture/retrieval-engine.md)
 - [Documentation](docs/index.md)

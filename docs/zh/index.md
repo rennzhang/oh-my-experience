@@ -5,6 +5,9 @@ hero:
   name: Oh My Experience
   text: 别再把同一条教训讲第二遍。
   tagline: 把真实编码中踩过的坑沉淀为经验卡，在 prompt 阶段自动召回——只在用得上的时候出现。
+  image:
+    src: /ome-logo.png
+    alt: Oh My Experience logo
   actions:
     - theme: brand
       text: 开始了解

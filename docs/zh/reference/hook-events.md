@@ -25,18 +25,51 @@ Provider 映射：
 | Codex | Codex hook input | `prompt.submit` |
 | Claude | `UserPromptSubmit` | `prompt.submit` |
 
-Payload：
+Hook 日志事件：
 
 ```json
 {
+  "id": "uuid",
+  "kind": "hook",
   "event": "prompt.submit",
   "provider": "codex",
   "sessionId": "optional-session-id",
   "turnId": "optional-turn-id",
-  "cwd": "/path/to/project",
-  "prompt": "raw prompt if provided by hook input",
   "promptHash": "sha256",
-  "timestamp": "2026-05-28T00:00:00.000Z"
+  "taskEnvelope": {
+    "summaryHash": "sha256",
+    "taskTypes": ["ui"],
+    "files": ["hashed-file-token"],
+    "commands": ["hashed-command-token"],
+    "risks": ["hashed-risk-token"],
+    "surfaces": ["hashed-surface-token"],
+    "keywords": ["hashed-keyword-token"],
+    "length": 30
+  },
+  "projectContext": {
+    "projectKey": "github.com/example/app",
+    "modulePath": "apps/web",
+    "source": "git"
+  },
+  "libraries": [
+    { "scope": "global", "exists": true, "readable": true, "warningCount": 0 },
+    { "scope": "project", "exists": true, "readable": true, "warningCount": 0 }
+  ],
+  "queryVariants": ["hashed-query-variant"],
+  "matchedCards": [
+    {
+      "id": "browser-validation",
+      "score": 80,
+      "reasons": [
+        { "field": "ruleSignals", "term": "ui_surface", "weight": 14, "kind": "UI, browser, or frontend validation wording" }
+      ]
+    }
+  ],
+  "injected": true,
+  "durationMs": 42,
+  "budgetUsedChars": 860,
+  "error": null,
+  "createdAt": "2026-05-28T00:00:00.000Z"
 }
 ```
 
@@ -45,7 +78,13 @@ Payload：
 - `event`
 - `provider`
 - `promptHash`
-- `timestamp`
+- `taskEnvelope`
+- `matchedCards`
+- `createdAt`
 
-`prompt` 只在运行时管线内可用。除非显式启用 raw prompt storage，否则不能写入
-hook 日志。
+原始 prompt 只在运行时管线内可用。Hook 日志只保存 hash、脱敏 task envelope、
+hashed query variants 和命中卡片证据。除非显式启用 raw prompt storage 做调试，否则
+不能写入原始 prompt 文本。
+
+Hook 日志写入全局 `dataDir`。项目经验库只参与召回读取，prompt-time match 和 hook
+路径不会写项目 events。

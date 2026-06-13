@@ -40,6 +40,8 @@ Agent 收到以下指令时执行本指南：
 以下原则对所有主题通用，不可降级：
 
 - **主题聚焦不改扫描范围**：`focusLens` 只改变分析镜头，不缩小 `sourceCoverage`。关注"浏览器验证"也必须扫描全部可访问会话。
+- **先全盘扫描，再按主题提炼**：关键词搜索只是索引入口，不是复盘本身。不得只扫几条命中的 session 就产出候选；必须覆盖所有可访问来源，或明确写出不可访问来源和剩余风险。
+- **Base 规则不可被用户倾向覆盖**：用户提示词里的偏好、主题或怀疑点只能作为附加 lens，用来提高审计敏感度；不能绕过来源覆盖、噪声过滤、原话验证、active 重叠检查和正反例验证。
 - **memory 和 summary 只做线索**：rollout summary、对话记忆只能辅助定位，不能作为写入候选卡的证据。
 - **无来源审计不得写候选**：`sourceCoverage` 为 `unknown` 时禁止生成候选卡。
 - **证据不足标不完整**：剩余证据缺口存在时如实标注。
@@ -71,6 +73,8 @@ Agent 收到以下指令时执行本指南：
 - 正确：`focusLens: "浏览器验证"`
 - 正确：`focusLens: ""`
 - 错误：因为 `focusLens` 不空就只扫几个相关会话
+
+`focusLens` 的作用是增加问题意识：优先看哪些失败模式、正反例、用户纠正和相邻卡冲突。它不改变 Base 规则，也不替代全盘扫描。
 
 ### 默认来源清单
 
@@ -122,8 +126,11 @@ focusLens: <用户指定，无则 "">
 
 ### 步骤 6：搜索证据和反例
 
+- 先用关键词、session id、路径、标题和用户原话片段建立索引
+- 再扩展到所有可访问来源，避免只看最先命中的几条记录
 - 搜索匹配 `focusLens` 的用户消息
 - 同时搜索反例：用户对类似场景给出不同处理方式的情况
+- 专门搜索近似噪声：文档案例、解释讨论、工具名只是资料来源、业务概念和非执行场景
 
 ### 步骤 7：原始记录验证
 
@@ -166,12 +173,63 @@ focusLens: <用户指定，无则 "">
 
 ### 输出约束
 
-- 语气强度、重复次数、适用边界写入 `risk`、`recallPolicy`、`evidence`、`negativeTriggers`、`conflicts` 字段，不写为单独章节。
+- 语气强度、重复次数、适用边界写入 `recall.risk`、`recall.policy`、`evidence`、`criteria.ignore_when`、`conflicts` 字段，不写为单独章节。
 - 候选卡只能从**可复用规则**派生，不得从最新提示词、单条记忆或零星命中直接生成。
 - `rule` 必须写成未来 Agent 可直接执行的 Markdown。单步规则可以是一句话；多步骤、执行协议、验收清单或 MUST/MUST NOT 约束必须用有序列表或分段列表，不得写成一整段长文。
 - 执行协议类 `rule` 优先用 Markdown 有序列表：每一项只表达一个动作、判断或验收点，能被 Agent 逐项执行和检查。
 - `rule` 字段本体只保存未来要压入 Agent 上下文的纯规则正文，不要包含外层代码块 fence。Review/worksheet 展示层应把 `rule` 包在 `agent-rule` fenced code block 里，让用户一眼看出这段会被复用；draft、active card、`ome experience show --section rule` 和 hook 注入仍使用去 fence 的纯规则正文。
 - 复盘结论先产出，候选卡后生成。
+
+---
+
+## 召回字段写法
+
+候选卡的召回字段要帮助模型判断“该不该用”，不能只堆关键词。
+
+### 字段原则
+
+| 字段 | 写法 |
+|---|---|
+| `summary` | 写成一整句判断依据：触发场景 + 常见误判或失败 + 正确动作 + 必要的不适用边界。它不是标题复述，也不是来源审计摘要。 |
+| `criteria.use_when` | 写用户真正需要这条经验时会说的自然工作流入口，例如 `commit 前检查 git status`、`浏览器验证 UI`。不要只写 `git`、`goal`、`Spool` 这类泛词。 |
+| `criteria.ignore_when` | 写近似但不该触发的场景，例如文档案例、只解释、不实际执行、业务目标、工具只是资料来源。优先用自然语言，让模型能理解意图差异。 |
+| `recall.triggers` | matcher 使用的紧凑触发锚点，通常从 `criteria.use_when` 中选最短、最自然的 3-5 条；高风险卡可以略多，但必须仍然是任务入口。 |
+| `recall.topics` | 写宽分类，例如 `git`、`frontend`、`runtime`。它只辅助召回，不替代 trigger。 |
+| `engine_hints.positive` | 内部召回启发式。只有当这类 hint 能明显减少误召回时才写，例如 `goal_execute`、`worktree_diff_operation`、`historical_session_lookup`、`architecture_quality`。路由型 positive hint 是严格门槛，不命中就不召回。 |
+| `engine_hints.negative` | 内部负向启发式，例如 `goal_example_discussion`、`business_goal_discussion`、`explain_only`、`ui_surface_noise`。 |
+| `rule` | 写未来 Agent 能直接执行的规则正文。不要写历史来源、为什么产生、候选说明或外层代码块 fence。 |
+
+### summary 写法
+
+合格的 `summary` 应该让模型在只看到索引时就能初步判断是否相关：
+
+- 包含触发场景：用户在什么执行工作流里会需要这张卡。
+- 包含失败模式：不使用这张卡会犯什么错。
+- 包含正确动作：Agent 应该怎么处理。
+- 必要时包含边界：哪些相近场景不要用。
+
+示例：
+
+```text
+当用户要求启动 /goal、创建目标或明确说开干时，Agent 应进入完整闭环交付模式，先明确目标和真实完成标准，再实现、验证和汇报；如果只是解释 goal 功能、写文档案例或讨论业务目标，则不要使用。
+```
+
+### 常见边界
+
+- `/goal`、`创建目标`：只有用户真的要启动 Agent 目标执行时才是 `goal_execute`；文档、README、案例、解释里的 `/goal` 是 `goal_example_discussion`。
+- `高内聚/低耦合/根因修复`：只有用户要求整理核心逻辑、重构召回引擎、清理 fallback 或提升实现质量时才是 `architecture_quality`；普通文案润色或只讨论概念不触发。
+- `git`：只有 commit、push、diff、stage、worktree 等真实操作才是 `git_operation`；GitHub 作为资料来源不是 Git 操作。
+- `Spool`：只有查历史会话、session UUID、turn/message 证据时才是 `historical_session_lookup`；说明 Spool 是可选导入来源不触发。
+- `UI/browser`：真实页面、浏览器、视口、前端验收才是 `ui_surface`；用户明确说 UI 只是噪声时用 `ui_surface_noise`。
+
+### 自检
+
+- [ ] 触发词读起来像真实任务入口，而不是卡片关键词列表。
+- [ ] `summary` 是一整句判断依据，包含场景、失败模式、动作和必要边界。
+- [ ] 至少写了一个“不该触发”的近似场景，且模型读得懂为什么不触发。
+- [ ] 泛词卡、must 卡和高风险卡写清自然语言 `criteria`；必要时才补 `engine_hints`。
+- [ ] 被用户纠正过的误解写入了 `criteria.ignore_when`，必要时补 `engine_hints.negative`。
+- [ ] `summary` 和 `rule` 用人话说明适用和不适用边界。
 
 ---
 
@@ -221,10 +279,13 @@ focusLens: <用户指定，无则 "">
 
 | 字段 | 内容 |
 |---|---|
-| `summary` | 来源覆盖 + 主题镜头 + 核心结论 |
+| `summary` | 一整句判断依据：触发场景 + 失败模式 + 正确动作 + 必要边界 |
 | `evidence` | 来源审计 + 证据聚类 + 用户纠正 + active 卡检查 + 限制 |
-| `negativeTriggers` | 不触发边界 |
-| `applicability.rationale` | 适用范围理由 |
+| `criteria.use_when` | 自然语言使用标准，描述真实执行入口 |
+| `criteria.ignore_when` | 不触发边界 |
+| `recall.triggers` | 从使用标准中抽出的短锚点 |
+| `engine_hints` | 只有确实能减少误召回或漏召回时填写 |
+| `scope` | 适用范围；项目限定写 `level`、`project_key`、`module_path` |
 | `conflicts` | 近似卡、被否定解释、取舍 |
 
 ---
@@ -236,6 +297,23 @@ focusLens: <用户指定，无则 "">
 「可复用规则」段落是展示层，必须先写一句提示语，然后用 `agent-rule` fenced code block 展示 `rule` 正文。不要把 fence 写回候选卡字段；审批、草稿、active 卡和 prompt-time recall 使用的仍是纯规则正文。
 
 来源审计、语气强度、适用性分析和证据细节写入候选卡字段，不新增可见章节。
+
+## 交付输出
+
+复盘完成后，面向用户的结果必须给出可点击的 Markdown 链接，方便直接打开审批表 Review。
+
+- CLI 人类输出的链接目标应相对当前命令工作目录；不要用相对 OME `dataDir` 的路径冒充可点击链接。
+- 至少包含审批表：`[retrospective.md](<relative-path-from-current-cwd>)`。
+- 如有候选 JSON、审计 JSON 或补充材料，也给同一基准的 Markdown 链接。
+- 链接文本保持短，例如 `retrospective.md`、`candidates.json`。
+- 对话回复里如无法保证相对路径点击解析，补充真实文件链接；不能只给会跳错的相对路径。
+
+示例：
+
+```markdown
+Review 文件：[retrospective.md](../../../../ren-vault/数字资产/AI系统/OME/retrospectives/2026-06-13T04-39-32-344Z-manual/retrospective.md)
+候选数据：[candidates.json](../../../../ren-vault/数字资产/AI系统/OME/retrospectives/2026-06-13T04-39-32-344Z-manual/candidates.json)
+```
 
 ---
 

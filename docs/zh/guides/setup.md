@@ -7,26 +7,33 @@ status: active
 
 首次使用优先阅读 [快速开始](quickstart.md)。本指南集中说明安装和配置细节。
 
-## 安装
+## 安装 CLI
 
 ```bash
 npm install -g oh-my-experience
 ome init
 ```
 
-也可以用 npx 不安装直接跑：
+第一行安装全局 `ome` 命令；第二行启动初始化向导。初始化会选择经验库路径、
+安装默认 provider 的 hook，并写入内置示例卡，方便你马上验证召回。
+
+如果不想全局安装，也可以用 `npx` 直接运行：
 
 ```bash
 npx oh-my-experience init
 ```
 
-`ome init` 引导你设置经验库路径（默认 `~/.oh-my-experience`），安装 Codex hook，
-写入内置示例卡。
-
 **让 Agent 帮你初始化：**
 
-> 帮我完成 Oh My Experience 的初始化。运行 ome init，选择默认路径。完成后运行
-> ome doctor 确认一切正常，再 ome hook status --provider codex 检查 hook 状态。
+```text
+帮我完成 Oh My Experience 的初始化。
+
+1. 运行 `ome init`，选择默认经验库路径。
+2. 运行 `ome doctor`，确认经验库、配置和 hook 状态正常。
+3. 运行 `ome hook status --provider codex`，检查 Codex hook 状态。
+
+把每一步的结果告诉我；如果有写入 hook、修改配置或需要我确认的地方，先说明。
+```
 
 初始化完成后，把打印出来的第一段任务复制给 Agent，体验内置示例卡的回召效果。
 
@@ -40,6 +47,9 @@ npx oh-my-experience init
 ome init -y --data-dir ~/.oh-my-experience
 ```
 
+`-y` 会跳过交互确认，适合脚本、CI 或 Agent runner。显式传入
+`--data-dir` 可以避免初始化到错误目录。
+
 ## 配置数据目录
 
 可以改成任意本地路径，包括 Obsidian vault：
@@ -49,6 +59,10 @@ ome config preview dataDir ~/Obsidian/Oh-My-Experience   # 预览变更
 ome config set dataDir ~/Obsidian/Oh-My-Experience       # 执行迁移
 ome doctor                                                # 确认迁移成功
 ```
+
+`dataDir` 只控制全局经验库和运行状态，不移动项目经验库。项目经验库始终从
+`<project-root>/.oh-my-experience/` 发现；当仓库需要携带自己的卡片时，用
+`ome project init` 初始化。
 
 ## 安装 Hook
 

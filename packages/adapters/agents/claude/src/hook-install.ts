@@ -60,10 +60,15 @@ export function claudeHookStatus(options: HookInstallOptions = {}) {
   const hook = plan.hook as HookSettings;
   const settings = readSettings(target);
   const entries: HookEntry[] = Array.isArray(settings.hooks?.UserPromptSubmit) ? settings.hooks.UserPromptSubmit : [];
-  const installed = Boolean(entries.some((entry: HookEntry) =>
-    (entry.hooks || []).some((candidate: HookSettings) => candidate.command === hook.command),
-  ));
-  return { ...plan, installed };
+  const installedHook = entries
+    .flatMap((entry: HookEntry) => entry.hooks || [])
+    .find((candidate: HookSettings) => isOmeHookCommand(candidate.command, String(hook.command)));
+  return {
+    ...plan,
+    installed: Boolean(installedHook),
+    installedCommand: installedHook?.command || null,
+    matchesExpectedCommand: installedHook?.command === hook.command,
+  };
 }
 
 function readSettings(target: string): HookSettings {

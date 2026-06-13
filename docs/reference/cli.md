@@ -53,10 +53,16 @@ without deleting experiences, source indexes, or retrospective runs.
 ome match "<task>"
 ome match "<task>" --json
 ome match "<task>" --explain
+ome match "<task>" --cwd /path/to/project --explain
 ```
 
 Only active cards are recalled. Drafts created by a retrospective do not affect
 prompt-time recall until they are promoted.
+
+When the current working directory is inside a project, recall reads the global
+`dataDir` and the optional project library at
+`<project-root>/.oh-my-experience/`. Use `--cwd` when a script needs to test a
+specific project context.
 
 ## Sources
 
@@ -75,11 +81,14 @@ still work.
 
 ```bash
 ome reflect start
+ome reflect start --scope project
 ome reflect start --focus "browser validation and delivery gates"
 ome reflect list
 ome reflect show <run-id>
 ome reflect add <run-id> --title "Browser validation" --summary "..." --rule "..."
+ome reflect add <run-id> --title "Repo release gate" --summary "..." --rule "..." --triggers "release validation" --scope-level project --project-key github.com/example/repo
 ome reflect candidates <run-id> --from-file <file>
+ome reflect candidates <run-id> --scope project --from-file <file>
 ome reflect candidates <run-id> --from-file <file> --audit-file <audit.json>
 ome reflect decide <run-id> <candidate-id> --action approve --category "Product UI"
 ome reflect apply <run-id> --dry-run
@@ -94,22 +103,47 @@ the user explicitly constrained the source set.
 Use `--allow-incomplete-audit` only for an explicit incomplete review; the
 generated worksheet will show the incomplete audit status.
 
+Add `--scope project` when the retrospective should write candidates, drafts,
+and review files into the current project's `.oh-my-experience/` library.
+
+## Project Libraries
+
+```bash
+ome project status
+ome project init
+```
+
+`ome project init` creates `<project-root>/.oh-my-experience/` with the standard
+experience lifecycle folders. It does not change `dataDir`.
+
+`ome project status --json` reports the detected `projectContext`, project
+library path, whether the project library exists, whether it is readable, and
+any warnings.
+
 ## Experience Library
 
 ```bash
 ome experience list
+ome experience list --scope project
 ome experience list --status draft
 ome experience list --compact --json
 ome experience show <card-id>
+ome experience show <card-id> --scope project --section rule
 ome experience show <card-id> --section rule
 ome experience promote <card-id>
+ome experience promote <card-id> --scope project
 ome experience archive <card-id> --reason "superseded"
 ```
 
 The lifecycle stays explicit: `candidate -> draft -> active -> archived`.
-`list --json` returns full cards by default for compatibility. Add `--compact`
-or `--index` when a script only needs the title index (`id`, `title`,
-`status`, `category`, `updatedAt`).
+`list --json` returns full cards by default. Add `--compact` or `--index` when
+a script only needs the title index (`id`, `title`, `status`, `category`).
+
+`experience list --json` is a governance command, so it reports invalid card
+files instead of stopping at the first parse error. The response includes
+`invalidCards` with `status`, `path`, and `message`. Runtime recall remains
+strict for active cards; invalid active cards must still be fixed before they
+can be recalled.
 
 ## Evaluation
 
@@ -140,7 +174,9 @@ which -a ome
 `ome doctor` checks dataDir writability, config schema, card lifecycle
 integrity, active index consistency, reflect state, hook status, event JSONL
 validity, package runtime requirements, and conflicting `ome` binaries on
-PATH.
+PATH. Invalid active or draft cards are errors. Invalid archived cards are
+reported as governance warnings because archived cards are history and never
+enter runtime recall.
 
 `ome hook run` is the runtime entrypoint used by installed Codex and Claude
 hooks. It is kept public so installed hooks can execute it, but normal setup

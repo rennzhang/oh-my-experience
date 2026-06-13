@@ -1,24 +1,24 @@
 ---
-title: Applicability Flow
+title: Scope Flow
 status: active
 ---
 
-# Applicability Flow
+# Scope Flow
 
 
-Applicability controls where a card is allowed to appear. It lets global
-lessons stay broad while project-specific lessons stay scoped.
+`scope` controls where a card is allowed to appear. It lets global lessons stay
+broad while project-specific lessons stay scoped.
 
 ## End-To-End Path
 
 ```text
 session/import/retrospective
-  -> candidate.applicability
-  -> reflect decision can override applicability
-  -> draft preserves applicability
-  -> active index stores applicability
+  -> candidate.scope
+  -> reflect decision can override scope
+  -> draft preserves scope
+  -> active index stores scope
   -> hook runtime detects projectContext
-  -> retrieval filters by applicability
+  -> retrieval filters by scope
   -> scoring and context rendering
 ```
 
@@ -41,9 +41,8 @@ The runtime derives project context from the current working directory:
 ## Product Rule
 
 Do not ask users to classify every lesson by hand during setup. `init` handles
-setup; reflect candidates carry inferred applicability, and `ome reflect decide`
-can correct it before draft creation.
+setup; reflect candidates carry inferred scope, and `ome reflect decide` can
+correct it before draft creation.
 
-Manual card editing stays secondary. The reflect guide should infer
-applicability from source context first; users only correct it when the inferred
-scope is wrong.
+Manual card editing stays secondary. The reflect guide should infer scope from
+source context first; users only correct it when the inferred scope is wrong.

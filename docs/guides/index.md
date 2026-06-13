@@ -11,7 +11,9 @@ Open the advanced guides only when importing old work or tuning recall quality.
 
 - [Introduction](introduction.md): what OME is, why AGENTS.md isn't enough, and how it works.
 - [Quickstart](quickstart.md): install, initialize, check health, and verify recall.
+- [Examples](examples.md): see a real `/goal` prompt, the matched card, and the exact mounted context.
 - [Setup](setup.md): data directory, hooks, skill install, and uninstall details.
+- [Global and project libraries](project-libraries.md): choose global storage, repository storage, or both.
 
 ## Agent setup
 

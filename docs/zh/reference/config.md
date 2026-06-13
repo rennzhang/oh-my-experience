@@ -70,3 +70,12 @@ ome config set <key> <value>
 可见 diff 的情况下移动可写库位置。
 
 语言不写入配置。CLI 人类输出默认英文，`OME_LANGUAGE=zh-CN` 是显式覆盖。
+
+## 全局存储与项目存储
+
+`dataDir` 是全局 OME 经验库和运行状态位置。它控制全局 active 卡、复盘、来源索引、
+配置和 hook events。
+
+项目经验库不在这里配置。它根据当前工作目录，从
+`<project-root>/.oh-my-experience/` 发现。这样全局存储可以保持可迁移，同时仓库也可以
+在明确需要时携带自己的 active 卡。

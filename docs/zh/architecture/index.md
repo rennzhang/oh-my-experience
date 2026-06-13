@@ -23,10 +23,3 @@ title: 维护者概念
 
 - [评估体系](evaluation-harness.md)
 - [国际化](i18n.md)
-
-## 专门流程
-
-这些页面属于更底层的实现细节。大多数用户在安装配置时不需要阅读。
-
-- [适用范围流程](applicability-flow.md)
-- [分类流程](category-flow.md)

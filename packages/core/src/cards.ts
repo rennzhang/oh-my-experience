@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
-import { ExperienceCardSchema, type CardStatus, type ExperienceCard, type RetrospectiveCandidate } from "./schema.js";
+import { ExperienceCardSchema, SourceRefSchema, type CardStatus, type ExperienceCard, type RetrospectiveCandidate } from "./schema.js";
 import {
   backupFile,
   layout,
@@ -21,7 +21,6 @@ export interface CardIndexEntry {
   status: CardStatus;
   path: string;
   summary: string;
-  rule: string;
   triggers: string[];
   negativeTriggers: string[];
   topics: string[];
@@ -34,12 +33,9 @@ export interface CardIndexEntry {
   recallPolicy: string;
   risk: string;
   confidence: string;
-  staleAfter: string | null;
-  bodyExcerpt: string;
-  sources: string[];
-  origin: ExperienceCard["origin"];
-  sourceRefs: ExperienceCard["sourceRefs"];
-  updatedAt: string;
+  libraryScope?: "global" | "project";
+  libraryPath?: string;
+  projectRoot?: string | null;
 }
 
 export interface CardIndex {
@@ -48,37 +44,55 @@ export interface CardIndex {
   experiences: CardIndexEntry[];
 }
 
+export interface CardReadIssue {
+  status: CardStatus;
+  path: string;
+  message: string;
+}
+
+export interface CardInspection {
+  cards: ExperienceCard[];
+  issues: CardReadIssue[];
+}
+
+const CARD_SCHEMA_NAME = "ome-card";
+
 export function cardPath(dataDir: string, status: CardStatus | string, id: string): string {
   return path.join(layout(dataDir).experiences, status, `${id}.md`);
 }
 
 export function serializeCard(card: ExperienceCard): string {
   const parsed = ExperienceCardSchema.parse(card);
-  return matter.stringify(parsed.body || "", {
+  return matter.stringify(renderCardBody(parsed), {
+    schema: CARD_SCHEMA_NAME,
     id: parsed.id,
     status: parsed.status,
     title: parsed.title,
     category: parsed.category,
     summary: parsed.summary,
-    rule: parsed.rule,
-    triggers: parsed.triggers,
-    negative_triggers: parsed.negativeTriggers,
+    criteria: compactObject({
+      use_when: [...parsed.triggers],
+      ignore_when: [...parsed.negativeTriggers],
+      ...(parsed.intentModes.include.length || parsed.intentModes.exclude.length ? { intent_modes: parsed.intentModes } : {}),
+    }),
+    engine_hints: compactObject({
+      ...(parsed.requiredSignals.length ? { positive: [...parsed.requiredSignals] } : {}),
+      ...(parsed.blockedSignals.length ? { negative: [...parsed.blockedSignals] } : {}),
+    }),
+    recall: compactObject({
+      policy: parsed.recallPolicy,
+      risk: parsed.risk,
+      confidence: parsed.confidence,
+      triggers: [...parsed.triggers],
+      topics: [...parsed.topics],
+      ...(Object.keys(parsed.aliases || {}).length ? { aliases: parsed.aliases } : {}),
+    }),
     ...(Object.keys(parsed.aliases || {}).length ? { aliases: parsed.aliases } : {}),
-    topics: parsed.topics,
-    applicability: parsed.applicability,
-    ...(parsed.intentModes.include.length || parsed.intentModes.exclude.length ? { intent_modes: parsed.intentModes } : {}),
-    ...(parsed.requiredSignals.length ? { required_signals: parsed.requiredSignals } : {}),
-    ...(parsed.blockedSignals.length ? { blocked_signals: parsed.blockedSignals } : {}),
-    language: parsed.language,
-    recall_policy: parsed.recallPolicy,
-    risk: parsed.risk,
-    confidence: parsed.confidence,
-    ...(parsed.staleAfter ? { stale_after: parsed.staleAfter } : {}),
-    sources: parsed.sources,
-    origin: parsed.origin,
-    source_refs: parsed.sourceRefs,
-    created: parsed.createdAt,
-    updated: parsed.updatedAt,
+    scope: compactApplicability(parsed.applicability),
+    ...(parsed.sources.length ? { sources: [...parsed.sources] } : {}),
+    ...(parsed.origin && parsed.origin.createdBy !== "manual" ? { origin: parsed.origin } : {}),
+    ...(parsed.sourceRefs.length ? { source_refs: parsed.sourceRefs } : {}),
+    ...(parsed.language !== "auto" ? { language: parsed.language } : {}),
     ...(parsed.archivedReason ? { archived_reason: parsed.archivedReason } : {}),
   });
 }
@@ -86,33 +100,45 @@ export function serializeCard(card: ExperienceCard): string {
 export function parseCardMarkdown(text: string): ExperienceCard {
   const parsed = matter(text);
   const data = parsed.data || {};
-  return ExperienceCardSchema.parse({
+  if (data.schema !== CARD_SCHEMA_NAME) {
+    throw new Error(`unsupported experience card schema: ${data.schema || "missing"}; expected ${CARD_SCHEMA_NAME}`);
+  }
+  const criteria = data.criteria && typeof data.criteria === "object" ? data.criteria : {};
+  const engineHints = data.engine_hints && typeof data.engine_hints === "object" ? data.engine_hints : {};
+  const recall = data.recall && typeof data.recall === "object" ? data.recall : {};
+  const scope = data.scope && typeof data.scope === "object" && !Array.isArray(data.scope) ? data.scope : {};
+  const body = parsed.content.trim();
+  const card = ExperienceCardSchema.parse({
     id: String(data.id || ""),
     status: data.status || "draft",
     title: data.title || data.id || "Untitled",
     category: data.category,
     summary: String(data.summary || ""),
-    rule: String(data.rule || ""),
-    triggers: toArray(data.triggers),
-    negativeTriggers: toArray(data.negative_triggers || data.negativeTriggers),
-    aliases: parseAliases(data.aliases),
-    topics: toArray(data.topics).length ? toArray(data.topics) : toArray(data.scope),
-    applicability: data.applicability,
-    intentModes: data.intent_modes || data.intentModes,
-    requiredSignals: toArray(data.required_signals || data.requiredSignals),
-    blockedSignals: toArray(data.blocked_signals || data.blockedSignals),
+    rule: extractRuleSection(body),
+    triggers: toArray(recall.triggers).length ? toArray(recall.triggers) : toArray(criteria.use_when),
+    negativeTriggers: toArray(criteria.ignore_when),
+    aliases: parseAliases(data.aliases || recall.aliases),
+    topics: toArray(recall.topics),
+    applicability: normalizeApplicabilityInput(scope),
+    intentModes: criteria.intent_modes,
+    requiredSignals: toArray(engineHints.positive),
+    blockedSignals: toArray(engineHints.negative),
     language: data.language || "auto",
-    recallPolicy: data.recall_policy || data.recallPolicy || "should",
-    risk: data.risk || "medium",
-    confidence: data.confidence || "medium",
-    staleAfter: data.stale_after || data.staleAfter || null,
+    recallPolicy: recall.policy || "should",
+    risk: recall.risk || "medium",
+    confidence: recall.confidence || "medium",
+    staleAfter: null,
     sources: toArray(data.sources),
-    origin: data.origin,
-    sourceRefs: data.source_refs || data.sourceRefs || [],
-    body: parsed.content.trim(),
-    createdAt: normalizeDateField(data.created || data.createdAt, nowIso),
-    updatedAt: normalizeDateField(data.updated || data.updatedAt, nowIso),
+    origin: data.origin || {},
+    sourceRefs: parseSourceRefs(data.source_refs || data.sourceRefs),
+    body,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
     archivedReason: data.archived_reason || data.archivedReason,
+  });
+  return ExperienceCardSchema.parse({
+    ...card,
+    body: card.body || renderCardBody(card),
   });
 }
 
@@ -121,16 +147,34 @@ export function readCardFile(filePath: string): ExperienceCard {
 }
 
 export function listCards(dataDir: string, status: CardStatus | null = null): ExperienceCard[] {
+  const inspection = inspectCards(dataDir, status);
+  if (inspection.issues.length) {
+    const first = inspection.issues[0];
+    throw new Error(`invalid experience card ${path.relative(dataDir, first.path)}: ${first.message}`);
+  }
+  return inspection.cards;
+}
+
+export function inspectCards(dataDir: string, status: CardStatus | null = null): CardInspection {
   const statuses: CardStatus[] = status ? [status] : ["draft", "active", "archived"];
   const cards: ExperienceCard[] = [];
+  const issues: CardReadIssue[] = [];
   for (const state of statuses) {
     const dir = path.join(layout(dataDir).experiences, state);
     if (!fs.existsSync(dir)) continue;
     for (const file of fs.readdirSync(dir).filter((candidate) => candidate.endsWith(".md"))) {
-      cards.push(readCardFile(path.join(dir, file)));
+      const filePath = path.join(dir, file);
+      try {
+        cards.push(readCardFile(filePath));
+      } catch (error: any) {
+        issues.push({ status: state, path: filePath, message: error.message || String(error) });
+      }
     }
   }
-  return cards.sort((a, b) => a.id.localeCompare(b.id));
+  return {
+    cards: cards.sort((a, b) => a.id.localeCompare(b.id)),
+    issues: issues.sort((a, b) => a.path.localeCompare(b.path)),
+  };
 }
 
 export function getCard(dataDir: string, id: string): ExperienceCard {
@@ -143,7 +187,7 @@ export function writeCard(dataDir: string, card: ExperienceCard | Record<string,
   const input = ExperienceCardSchema.parse(card);
   const parsed = ExperienceCardSchema.parse({
     ...input,
-    body: input.body || renderCardBody(input),
+    body: renderCardBody(input),
   });
   const target = cardPath(dataDir, parsed.status, parsed.id);
   backupFile(dataDir, target, `card-${parsed.id}`);
@@ -165,11 +209,12 @@ export function updateCard(dataDir: string, id: string, patch: Record<string, an
       status: current.status,
       updatedAt: nowIso(),
     });
+    const rendered = ExperienceCardSchema.parse({ ...next, body: renderCardBody(next) });
     backupFile(dataDir, source, `card-${id}`);
-    writeTextAtomic(source, serializeCard(next), dataDir);
-    if (next.status === "active") rebuildCardIndex(dataDir);
+    writeTextAtomic(source, serializeCard(rendered), dataDir);
+    if (rendered.status === "active") rebuildCardIndex(dataDir);
     operationLog(dataDir, "card.update", { id });
-    return next;
+    return rendered;
   });
 }
 
@@ -200,7 +245,6 @@ export function createDraftFromCandidate(dataDir: string, candidate: Retrospecti
       { type: "retrospective", ref: sourceRunId },
       ...candidate.sourceRefs,
     ],
-    body: renderCardBody(candidate),
     createdAt: now,
     updatedAt: now,
   });
@@ -210,7 +254,7 @@ export function ensureStarterCards(dataDir: string): ExperienceCard[] {
   const marker = path.join(layout(dataDir).indexes, "starter.json");
   const state = readJson<{ removedAt?: string } | null>(marker, null);
   if (state?.removedAt) return [];
-  const existing = new Set(listCards(dataDir).map((card) => card.id));
+  const existing = new Set(listCards(dataDir, "active").map((card) => card.id));
   const created: ExperienceCard[] = [];
   for (const starter of starterCardDefinitions()) {
     if (existing.has(starter.id)) continue;
@@ -222,7 +266,9 @@ export function ensureStarterCards(dataDir: string): ExperienceCard[] {
 }
 
 export function listStarterCards(dataDir: string): ExperienceCard[] {
-  return listCards(dataDir).filter((card) => card.origin.adapter === "ome-starter");
+  const marker = readJson<{ ids?: string[] } | null>(path.join(layout(dataDir).indexes, "starter.json"), null);
+  const starterIds = new Set((marker?.ids || []).map(String));
+  return inspectCards(dataDir).cards.filter((card) => card.origin.adapter === "ome-starter" || starterIds.has(card.id));
 }
 
 export function removeStarterCards(dataDir: string): { ok: true; removed: string[] } {
@@ -337,11 +383,21 @@ function starterCardDefinitions(): ExperienceCard[] {
       category: "Coding Principles",
       summary: "The user prefers removing stale branches and fixing the real cause over adding compatibility clutter or fallback layers.",
       rule: "Keep modules cohesive, remove stale branches, and fix the reason an issue exists instead of adding another fallback. Before release, delete dirty compatibility paths rather than preserving two truths.",
-      triggers: ["refactor this cleanly", "avoid compatibility clutter", "make the architecture maintainable", "fix the root cause"],
+      triggers: [
+        "refactor this cleanly",
+        "avoid compatibility clutter",
+        "make the architecture maintainable",
+        "fix the root cause",
+        "高内聚低耦合",
+        "根因修复",
+        "逻辑干净",
+        "不要历史包袱",
+      ],
       negativeTriggers: ["temporary local experiment", "throwaway script"],
       aliases: {},
       topics: ["kiss", "architecture", "maintenance"],
       applicability: { level: "global", projectKey: null, modulePath: null, confidence: "medium", rationale: "Starter lesson for OME recall." },
+      requiredSignals: ["architecture_quality"],
       recallPolicy: "should",
       risk: "medium",
       body: "",
@@ -357,11 +413,12 @@ export function promoteDraft(dataDir: string, id: string): ExperienceCard {
     if (fs.existsSync(target)) throw new Error(`active card already exists: ${id}`);
     const card = readCardFile(source);
     const next = ExperienceCardSchema.parse({ ...card, status: "active", updatedAt: nowIso() });
-    writeTextAtomic(target, serializeCard(next), dataDir);
+    const rendered = ExperienceCardSchema.parse({ ...next, body: renderCardBody(next) });
+    writeTextAtomic(target, serializeCard(rendered), dataDir);
     fs.rmSync(source);
     rebuildCardIndex(dataDir);
     operationLog(dataDir, "card.approve", { id });
-    return next;
+    return rendered;
   });
 }
 
@@ -373,15 +430,23 @@ export function archiveCard(dataDir: string, id: string, reason = "archived"): E
     if (!source) throw new Error(`card not found: ${id}`);
     const card = readCardFile(source);
     const next = ExperienceCardSchema.parse({ ...card, status: "archived", archivedReason: reason, updatedAt: nowIso() });
-    writeTextAtomic(cardPath(dataDir, "archived", id), serializeCard(next), dataDir);
+    const rendered = ExperienceCardSchema.parse({ ...next, body: renderCardBody(next) });
+    writeTextAtomic(cardPath(dataDir, "archived", id), serializeCard(rendered), dataDir);
     fs.rmSync(source);
     rebuildCardIndex(dataDir);
     operationLog(dataDir, "card.archive", { id, reason });
-    return next;
+    return rendered;
   });
 }
 
 export function rebuildCardIndex(dataDir: string): CardIndex {
+  const index = buildCardIndex(dataDir);
+  backupFile(dataDir, layout(dataDir).experienceIndex, "experiences-index");
+  writeJsonAtomic(layout(dataDir).experienceIndex, index, dataDir);
+  return index;
+}
+
+export function buildCardIndex(dataDir: string): CardIndex {
   const experiences: CardIndexEntry[] = listCards(dataDir, "active").map((card) => ({
     id: card.id,
     title: card.title,
@@ -400,19 +465,9 @@ export function rebuildCardIndex(dataDir: string): CardIndex {
     recallPolicy: card.recallPolicy,
     risk: card.risk,
     confidence: card.confidence,
-    staleAfter: card.staleAfter,
     summary: card.summary,
-    rule: card.rule,
-    bodyExcerpt: card.body.slice(0, 3000),
-    sources: card.sources,
-    origin: card.origin,
-    sourceRefs: card.sourceRefs,
-    updatedAt: card.updatedAt,
   }));
-  const index: CardIndex = { version: 1, updatedAt: nowIso(), experiences };
-  backupFile(dataDir, layout(dataDir).experienceIndex, "experiences-index");
-  writeJsonAtomic(layout(dataDir).experienceIndex, index, dataDir);
-  return index;
+  return { version: 1, updatedAt: nowIso(), experiences };
 }
 
 export function readCardIndex(dataDir: string): CardIndex {
@@ -427,14 +482,85 @@ function findCardPath(dataDir: string, id: string): string | undefined {
 
 function pickCardPatch(patch: Record<string, any> = {}): Record<string, any> {
   const allowed: Record<string, any> = {};
-  for (const key of ["title", "category", "summary", "rule", "triggers", "negativeTriggers", "aliases", "topics", "applicability", "intentModes", "requiredSignals", "blockedSignals", "language", "recallPolicy", "risk", "confidence", "staleAfter", "sources", "origin", "sourceRefs", "body", "archivedReason"]) {
+  if (Object.hasOwn(patch, "scope")) allowed.applicability = normalizeApplicabilityInput(patch.scope);
+  for (const key of ["title", "category", "summary", "rule", "triggers", "negativeTriggers", "aliases", "topics", "intentModes", "requiredSignals", "blockedSignals", "language", "recallPolicy", "risk", "confidence", "archivedReason"]) {
     if (Object.hasOwn(patch, key)) allowed[key] = patch[key];
   }
-  if (Object.hasOwn(patch, "recall_policy")) allowed.recallPolicy = patch.recall_policy;
-  if (Object.hasOwn(patch, "intent_modes")) allowed.intentModes = patch.intent_modes;
-  if (Object.hasOwn(patch, "required_signals")) allowed.requiredSignals = patch.required_signals;
-  if (Object.hasOwn(patch, "blocked_signals")) allowed.blockedSignals = patch.blocked_signals;
   return allowed;
+}
+
+function renderCardBody(card: ExperienceCard): string {
+  const lines = [
+    "## 这张卡解决什么问题",
+    "",
+    card.summary.trim(),
+    "",
+    "## 使用标准",
+    "",
+    "使用：",
+    ...listItems(card.triggers, "当前任务与这张卡的工作流语义直接匹配。"),
+    "",
+    "不要使用：",
+    ...listItems(card.negativeTriggers, "当前任务只是概念讨论、文档举例，或与这张卡的工作流无关。"),
+    "",
+    `召回策略：${card.recallPolicy}。`,
+    `风险级别：${card.risk}。`,
+    "",
+    "## 完整规则",
+    "",
+    fencedText(card.rule.trim()),
+  ];
+  return lines.join("\n").trim();
+}
+
+function extractRuleSection(body: string): string {
+  const match = String(body || "").match(/(^|\n)##\s+完整规则\s*\n+```(?:text|markdown|md|agent-rule)?\s*\n([\s\S]*?)\n```/i);
+  return match?.[2]?.trim() || "";
+}
+
+function fencedText(value: string): string {
+  const fence = value.includes("```") ? "````" : "```";
+  return `${fence}text\n${value}\n${fence}`;
+}
+
+function listItems(values: string[], fallback: string, code = false): string[] {
+  const items = unique(values.map((value) => String(value || "").trim()).filter(Boolean));
+  if (!items.length) return [`- ${fallback}`];
+  return items.map((item) => `- ${code ? `\`${item}\`` : item}`);
+}
+
+function compactApplicability(applicability: ExperienceCard["applicability"]) {
+  return compactObject({
+    level: applicability.level,
+    ...(applicability.projectKey ? { project_key: applicability.projectKey } : {}),
+    ...(applicability.modulePath ? { module_path: applicability.modulePath } : {}),
+  });
+}
+
+function normalizeApplicabilityInput(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const input = value as Record<string, unknown>;
+  return {
+    ...input,
+    projectKey: input.projectKey ?? input.project_key ?? null,
+    modulePath: input.modulePath ?? input.module_path ?? null,
+  };
+}
+
+function compactObject<T extends Record<string, any>>(value: T): Partial<T> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => {
+    if (Array.isArray(item)) return item.length > 0;
+    if (item && typeof item === "object") return Object.keys(item).length > 0;
+    return item !== undefined && item !== null && item !== "";
+  })) as Partial<T>;
+}
+
+function firstArray(...values: unknown[]): string[] {
+  for (const value of values) {
+    const items = toArray(value);
+    if (items.length) return items;
+  }
+  return [];
 }
 
 function toArray(value: unknown): string[] {
@@ -443,33 +569,24 @@ function toArray(value: unknown): string[] {
   return [String(value)];
 }
 
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
 function parseAliases(value: unknown): Record<string, string[]> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(Object.entries(value).map(([key, items]) => [key, toArray(items)]));
+}
+
+function parseSourceRefs(value: unknown): ExperienceCard["sourceRefs"] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => SourceRefSchema.parse(item));
 }
 
 function normalizeDateField(value: unknown, fallback: () => string): string {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "string" && value.trim()) return value;
   return fallback();
-}
-
-function renderCardBody(card: Pick<ExperienceCard, "title" | "summary" | "triggers" | "negativeTriggers" | "rule">): string {
-  const triggers = card.triggers.length ? card.triggers.map((trigger) => `- ${trigger}`).join("\n") : "- 待补充";
-  const negativeTriggers = card.negativeTriggers.length
-    ? ["", "## 不触发", card.negativeTriggers.map((trigger) => `- ${trigger}`).join("\n")]
-    : [];
-  return [
-    `# ${card.title}`,
-    "",
-    "## 经验总结",
-    card.summary,
-    "",
-    "## 触发时机",
-    triggers,
-    ...negativeTriggers,
-    "",
-    "## 可复用规则",
-    card.rule,
-  ].join("\n");
 }

@@ -5,6 +5,9 @@ hero:
   name: Oh My Experience
   text: Stop teaching your agent the same lesson twice.
   tagline: Turn real coding corrections into reviewed experience cards that surface at prompt time — only when the task actually needs them.
+  image:
+    src: /ome-logo.png
+    alt: Oh My Experience logo
   actions:
     - theme: brand
       text: Get started

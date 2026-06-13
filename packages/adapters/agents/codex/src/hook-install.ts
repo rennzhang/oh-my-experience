@@ -64,10 +64,15 @@ export function hookStatus(options: HookInstallOptions = {}) {
   const hook = plan.hook as HookConfig;
   const config = readHooksJson(target);
   const entries: HookEntry[] = Array.isArray(config.hooks?.UserPromptSubmit) ? config.hooks.UserPromptSubmit : [];
-  const installed = Boolean(entries.some((entry: HookEntry) =>
-    (entry.hooks || []).some((candidate: HookConfig) => candidate.command === hook.command),
-  ));
-  return { ...plan, installed };
+  const installedHook = entries
+    .flatMap((entry: HookEntry) => entry.hooks || [])
+    .find((candidate: HookConfig) => isOmeHookCommand(candidate.command, String(hook.command)));
+  return {
+    ...plan,
+    installed: Boolean(installedHook),
+    installedCommand: installedHook?.command || null,
+    matchesExpectedCommand: installedHook?.command === hook.command,
+  };
 }
 
 function readHooksJson(target: string): HookConfig {

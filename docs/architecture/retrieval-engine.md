@@ -17,7 +17,9 @@ matcher.normalize
   -> matcher de-noise and segment
   -> matcher task envelope
   -> matcher query variants
+  -> library stack: global dataDir + optional project library
   -> retrieval field-aware lexical index
+  -> retrieval criteria and engine-hint filtering
   -> retrieval BM25-like sparse scoring
   -> retrieval rule boosts and penalties
   -> retrieval collapse near-duplicates
@@ -31,10 +33,14 @@ Implementation:
 - `packages/core/src/matcher.ts`: prompt decomposition, language detection,
   command/path extraction, CJK bigram tokenization, code-token splitting, query
   variants, and query plan construction.
-- `packages/core/src/retrieval.ts`: active-card filtering, field-aware scoring,
-  policy/risk/confidence/staleness weighting, near-duplicate collapse,
-  diversification, reason output, timeout fail-open support, and budgeted
-  context rendering.
+- `packages/core/src/retrieval.ts`: active-card filtering, project
+  applicability filtering, near-duplicate collapse, diversification, reason
+  output, timeout fail-open support, and budgeted context rendering.
+- `packages/core/src/retrieval-scoring.ts`: field-aware scoring, intent gates,
+  criteria penalties, engine-hint boosts and penalties, and
+  policy/risk/confidence weighting.
+- `packages/core/src/library-stack.ts`: global/project library discovery and
+  active-card loading.
 - `packages/core/src/similarity.ts`: lightweight card/candidate similarity used
   for merge suggestions and duplicate suppression without external embeddings.
 
@@ -61,16 +67,73 @@ The current scoring model is local and deterministic:
   provider surfaces, risk signals, and free keywords;
 - keep command/path/code tokens intact;
 - use CJK bigrams and phrase matching;
-- apply field weights over title, triggers, topics, category, summary, and body;
-- filter cards by applicability before scoring;
+- match ASCII terms with token boundaries, so `github` does not count as
+  `git`;
+- only treat text as a command when it has command-shaped syntax, for example
+  ``git status`` or ``ome match``;
+- apply field weights over title, triggers, aliases, topics, category, summary,
+  intent modes, and declared engine hints;
+- filter cards by scope before scoring;
+- let positive `engine_hints` provide strong boosts without becoming the human
+  usage standard;
+- treat declared routing hints as gates: a card that requires `ui_surface`,
+  `goal_execute`, or another known routing signal is not recalled unless that
+  signal is present in the prompt;
+- let negative `engine_hints` and `criteria.ignore_when` suppress known
+  near-miss situations before keyword overlap can win; negative signal
+  penalties only apply to cards that declare the related positive signal, so a
+  Git-source near miss does not suppress an unrelated browser-validation card;
+- load global and project cards into one candidate set when a project library
+  exists;
 - add BM25/IDF-like weighting from the card index;
-- boost `recall_policy: must`;
+- boost cards whose `recall.policy` is `must`;
 - dampen stale or low-confidence cards;
-- collapse near-duplicate cards within the same applicability scope so the hook
+- collapse near-duplicate cards within the same scope so the hook
   context does not repeat the same lesson;
+- also collapse a starter card into a reviewed card when they share the same
+  explicit rule signal; two reviewed cards are not collapsed merely because
+  they share a broad signal;
+- prefer a project card when a near-duplicate exists in both global and project
+  layers;
 - diversify results so one topic does not crowd out all context.
 
 No external search service is required.
+
+## Engine Hints
+
+OME runs on the agent hot path, so the production retrieval path stays local,
+deterministic, and explainable. It uses a two-stage model:
+
+1. Build lexical candidates from card fields and query variants.
+2. Apply natural-language criteria, negative criteria, and engine hints before
+   final ranking.
+
+Engine hints use prompt-derived signals as heuristics. Positive hints can boost
+a card when the prompt strongly resembles the intended workflow. Negative hints
+can suppress common false positives. They do not replace the card's natural
+language `criteria.use_when` and `criteria.ignore_when`.
+
+Examples:
+
+- A Git safety card uses a worktree/diff operation hint. Mentioning GitHub as a
+  research source is not enough.
+- A goal execution card uses a goal-execution hint. Documentation text such as
+  "show what happens when the user says /goal" is blocked by
+  `goal_example_discussion`.
+- A Spool handoff card uses `historical_session_lookup` as a strong positive
+  hint. Saying that Spool is an optional import source is not enough.
+- A browser validation card uses `ui_surface` as a strong positive hint and is
+  suppressed when UI words are explicitly described as noise.
+- An architecture-quality card uses `architecture_quality` when the user asks
+  for cohesive modules, clean logic, low coupling, or root-cause fixes. A
+  provider-boundary card should not win merely because the prompt contains the
+  words "retrieval scoring".
+
+The design follows the same direction used by modern retrieval systems:
+candidate generation should be broad enough, but final context should pass
+field-aware filtering, routing, and reranking. OME keeps the current production
+path sparse and deterministic; vector or semantic reranking should be added only
+after recall evals show a real gap.
 
 ## Prompt Decomposition
 
@@ -90,8 +153,15 @@ Envelope fields:
 - `files`: file paths or extensions mentioned by the user;
 - `commands`: command snippets such as `git push`, `npm test`, `ome match`;
 - `constraints`: must/should/not, safety, privacy, validation, no-goal;
+- `intentModes`: coarse interaction modes such as execute, discuss, or explain;
+- `ruleSignals`: prompt-derived signals used by declared engine hints;
 - `keywords`: compact multilingual lexical terms;
 - `segments`: short prompt slices used for query variants.
+
+Card `rule` and Markdown body content are intentionally not part of the hot
+retrieval index. The hook injects a compact card index. If the agent decides a
+candidate fits the task, it must fetch the rule with `ome experience show
+CARD_ID --section rule`.
 
 The envelope is allowed to contain raw prompt fragments in memory during the
 hook run, but persistent logs must store hashes or derived non-sensitive labels
@@ -103,8 +173,10 @@ Every match should be explainable:
 
 ```json
 {
-  "cardId": "browser-validation",
+  "id": "browser-validation",
+  "title": "Browser Validation",
   "score": 12.4,
+  "recallPolicy": "must",
   "reasons": [
     { "field": "triggers", "term": "browser validation", "weight": 5 },
     { "field": "topics", "term": "frontend", "weight": 2 }
@@ -115,6 +187,10 @@ Every match should be explainable:
 `ome match --explain --json` exposes the reason model, task envelope, project
 context, query variants, ranked cards, and rendered additional context.
 
+The explain output also includes the library stack. A project match shows
+`libraryScope: project`, and the rendered full-card command includes
+`--scope project`.
+
 ## Context Budget
 
 The retrieval engine returns both matches and a budgeted context plan. It
@@ -123,15 +199,15 @@ prefers concise, high-impact lessons over long card bodies.
 The rendered hook context stays neutral:
 
 ```text
-Potentially relevant OME lessons. Use only when directly applicable; ignore if unrelated or conflicting.
-Keyword matches can be ambiguous; compare each lesson's workflow meaning, use cases, and ignore cases against the current request before applying it.
+OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
+Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
 1. [high risk][must] Browser validation (browser-validation)
    Summary: ...
-   Use when: ...
-   Ignore when: ...
-   Why recalled: ...
-   Full experience: ome experience show browser-validation --section rule
-   If this lesson applies, fetch the full card before acting.
+   Use if: ...
+   Ignore if: ...
+   Matched by: ...
+   Rule: ome experience show browser-validation --section rule
+   Final link if used: [Browser validation](<experiences/active/browser-validation.md>)
 ```
 
 Budgeting considers:

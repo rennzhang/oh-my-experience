@@ -64,9 +64,10 @@ runtime hook 配置。
 - output schema 是否符合 provider；
 - 默认不保存 raw prompt；
 - fixture card 命中时 additional context 是否存在；
+- 候选经验卡链接是否存在，以及最终只披露实际使用卡片的说明是否清楚；
 - hook logs 是否包含 recall evidence。
 
-冒烟路径：
+运行时验证路径：
 
 ```bash
 printf '{"prompt":"fix UI and validate in browser"}' | ome hook run --json
@@ -74,5 +75,5 @@ npm test
 ```
 
 Hook runtime 覆盖应使用隔离 fixture 数据、真实 `ome hook run` 和 provider adapter
-测试，并检查 output schema、matched-card evidence、prompt hashing 和 raw-prompt
-privacy。它不应安装 hooks，也不应触碰用户配置的 dataDir。
+测试，并检查 output schema、matched-card evidence、候选卡链接、最终使用披露说明、prompt hashing 和
+raw-prompt privacy。它不应安装 hooks，也不应触碰用户配置的 dataDir。

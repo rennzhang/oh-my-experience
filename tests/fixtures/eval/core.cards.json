@@ -4,412 +4,716 @@
       "id": "browser-validation",
       "title": "前端改动必须做真实浏览器验收",
       "category": "测试验收",
-      "triggers": [
-        "浏览器验证",
-        "真实浏览器",
-        "前端验收",
-        "UI 验收",
-        "browser validation",
-        "real browser"
-      ],
-      "negativeTriggers": [
-        "纯后端迁移",
-        "只改文档",
-        "npm pack",
-        "tarball install",
-        "git status",
-        "发布前阻塞",
-        "语言策略",
-        "语言配置",
-        "CLI 默认英文"
-      ],
-      "topics": [
-        "frontend",
-        "ui",
-        "test"
-      ],
-      "applicability": {
+      "summary": "前端 UI 改动不能只靠静态检查。必须打开真实页面，按用户路径点击、输入、提交，检查可见状态、移动端布局和浏览器控制台错误。",
+      "criteria": {
+        "use_when": [
+          "浏览器验证",
+          "真实浏览器",
+          "前端验收",
+          "UI 验收",
+          "browser validation",
+          "real browser"
+        ],
+        "ignore_when": [
+          "纯后端迁移",
+          "只改文档",
+          "npm pack",
+          "tarball install",
+          "git status",
+          "发布前阻塞",
+          "语言策略",
+          "语言配置",
+          "CLI 默认英文"
+        ]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "medium",
+        "triggers": [
+          "浏览器验证",
+          "真实浏览器",
+          "前端验收",
+          "UI 验收",
+          "browser validation",
+          "real browser"
+        ],
+        "topics": [
+          "frontend",
+          "ui",
+          "test"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "must",
-      "risk": "high",
-      "body": "前端 UI 改动不能只靠静态检查。必须打开真实页面，按用户路径点击、输入、提交，检查可见状态、移动端布局和浏览器控制台错误。",
-      "summary": "前端 UI 改动不能只靠静态检查。必须打开真实页面，按用户路径点击、输入、提交，检查可见状态、移动端布局和浏览器控制台错误。",
-      "rule": "前端 UI 改动不能只靠静态检查。必须打开真实页面，按用户路径点击、输入、提交，检查可见状态、移动端布局和浏览器控制台错误。"
+      "rule": "前端 UI 改动不能只靠静态检查。必须打开真实页面，按用户路径点击、输入、提交，检查可见状态、移动端布局和浏览器控制台错误。",
+      "engine_hints": {
+        "positive": [
+          "ui_surface"
+        ],
+        "negative": [
+          "ui_surface_noise"
+        ]
+      }
     },
     {
       "id": "git-commit-safety",
       "title": "提交前必须隔离无关改动",
       "category": "Git 操作",
-      "triggers": [
-        "git status",
-        "提交范围",
-        "脏工作区",
-        "暂存区",
-        "commit scope",
-        "dirty worktree",
-        "staged diff"
-      ],
-      "negativeTriggers": [
-        "无需提交",
-        "只读分析"
-      ],
-      "topics": [
-        "git"
-      ],
-      "applicability": {
+      "summary": "提交、发布或打包前先检查工作区状态，只处理当前目标相关文件。用户已有改动不能回滚、覆盖或混进本次提交。",
+      "criteria": {
+        "use_when": [
+          "git status",
+          "提交范围",
+          "脏工作区",
+          "暂存区",
+          "commit scope",
+          "dirty worktree",
+          "staged diff"
+        ],
+        "ignore_when": [
+          "无需提交",
+          "只读分析"
+        ]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "medium",
+        "triggers": [
+          "git status",
+          "提交范围",
+          "脏工作区",
+          "暂存区",
+          "commit scope",
+          "dirty worktree",
+          "staged diff"
+        ],
+        "topics": [
+          "git"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "must",
-      "risk": "high",
-      "body": "提交、发布或打包前先检查工作区状态，只处理当前目标相关文件。用户已有改动不能回滚、覆盖或混进本次提交。",
-      "summary": "提交、发布或打包前先检查工作区状态，只处理当前目标相关文件。用户已有改动不能回滚、覆盖或混进本次提交。",
-      "rule": "提交、发布或打包前先检查工作区状态，只处理当前目标相关文件。用户已有改动不能回滚、覆盖或混进本次提交。"
+      "rule": "提交、发布或打包前先检查工作区状态，只处理当前目标相关文件。用户已有改动不能回滚、覆盖或混进本次提交。",
+      "engine_hints": {
+        "positive": [
+          "worktree_diff_operation"
+        ]
+      }
     },
     {
       "id": "config-migration-safety",
       "title": "数据目录迁移必须先预览再切换",
       "category": "安全",
-      "triggers": [
-        "dataDir 迁移",
-        "配置预览",
-        "备份",
-        "doctor",
-        "Obsidian",
-        "数据目录"
-      ],
-      "negativeTriggers": [
-        "临时评估夹具"
-      ],
-      "topics": [
-        "storage",
-        "config"
-      ],
-      "applicability": {
+      "summary": "修改数据目录要走 copy -> validate -> doctor -> pointer switch。必须拒绝嵌套目标和危险路径，旧目录保留，不能用一次点击直接改写真实库。",
+      "criteria": {
+        "use_when": [
+          "dataDir 迁移",
+          "配置预览",
+          "备份",
+          "doctor",
+          "Obsidian",
+          "数据目录"
+        ],
+        "ignore_when": [
+          "临时评估夹具"
+        ]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "medium",
+        "triggers": [
+          "dataDir 迁移",
+          "配置预览",
+          "备份",
+          "doctor",
+          "Obsidian",
+          "数据目录"
+        ],
+        "topics": [
+          "storage",
+          "config"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "must",
-      "risk": "high",
-      "body": "修改数据目录要走 copy -> validate -> doctor -> pointer switch。必须拒绝嵌套目标和危险路径，旧目录保留，不能用一次点击直接改写真实库。",
-      "summary": "修改数据目录要走 copy -> validate -> doctor -> pointer switch。必须拒绝嵌套目标和危险路径，旧目录保留，不能用一次点击直接改写真实库。",
-      "rule": "修改数据目录要走 copy -> validate -> doctor -> pointer switch。必须拒绝嵌套目标和危险路径，旧目录保留，不能用一次点击直接改写真实库。"
+      "rule": "修改数据目录要走 copy -> validate -> doctor -> pointer switch。必须拒绝嵌套目标和危险路径，旧目录保留，不能用一次点击直接改写真实库。",
+      "engine_hints": {}
     },
     {
       "id": "codex-importer-filtering",
       "title": "导入会话时不要把系统指令当成经验",
       "category": "运行时与发布",
-      "triggers": [
-        "Codex 导入",
-        "会话导入",
-        "developer role",
-        "system role",
-        "harness instruction",
-        "复盘素材"
-      ],
-      "negativeTriggers": [
-        "用户原话归档",
-        "npm pack",
-        "tarball install",
-        "git status",
-        "发布前阻塞",
-        "package install smoke"
-      ],
-      "topics": [
-        "import",
-        "codex",
-        "review"
-      ],
-      "applicability": {
+      "summary": "会话导入只应提取用户可见的任务事实、错误、决策和结果。系统、开发者或 harness 指令是执行环境，不应沉淀成用户经验卡。",
+      "criteria": {
+        "use_when": [
+          "Codex 导入",
+          "会话导入",
+          "developer role",
+          "system role",
+          "harness instruction",
+          "复盘素材"
+        ],
+        "ignore_when": [
+          "用户原话归档",
+          "npm pack",
+          "tarball install",
+          "git status",
+          "发布前阻塞",
+          "package install smoke"
+        ]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "medium",
+        "triggers": [
+          "Codex 导入",
+          "会话导入",
+          "developer role",
+          "system role",
+          "harness instruction",
+          "复盘素材"
+        ],
+        "topics": [
+          "import",
+          "codex",
+          "review"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "must",
-      "risk": "high",
-      "body": "会话导入只应提取用户可见的任务事实、错误、决策和结果。系统、开发者或 harness 指令是执行环境，不应沉淀成用户经验卡。",
-      "summary": "会话导入只应提取用户可见的任务事实、错误、决策和结果。系统、开发者或 harness 指令是执行环境，不应沉淀成用户经验卡。",
-      "rule": "会话导入只应提取用户可见的任务事实、错误、决策和结果。系统、开发者或 harness 指令是执行环境，不应沉淀成用户经验卡。"
+      "rule": "会话导入只应提取用户可见的任务事实、错误、决策和结果。系统、开发者或 harness 指令是执行环境，不应沉淀成用户经验卡。",
+      "engine_hints": {}
     },
     {
       "id": "provider-adapter-boundary",
       "title": "不同 Agent 只做适配，不分叉召回引擎",
       "category": "运行时与发布",
-      "triggers": [
-        "Claude UserPromptSubmit",
-        "Codex hook",
-        "provider-neutral hook",
-        "additionalContext",
-        "不要分叉召回"
-      ],
-      "negativeTriggers": [
-        "独立重写检索算法",
-        "会话导入",
-        "system/developer",
-        "harness",
-        "retrospective apply",
-        "active card",
-        "stats",
-        "npm pack",
-        "tarball install",
-        "git status",
-        "commit scope",
-        "不要发布",
-        "发布前阻塞",
-        "真正的发布前阻塞",
-        "打包",
-        "public alpha",
-        "package install smoke",
-        "unrelated dirty files",
-        "临时目录安装验证",
-        "发布 diff",
-        "语言配置",
-        "卡片语言",
-        "双语界面",
-        "CLI 默认英文",
-        "不要暴露经验语言",
-        "hook additionalContext 语言",
-        "hook frame 固定英文"
-      ],
-      "topics": [
-        "hook",
-        "claude",
-        "codex"
-      ],
-      "applicability": {
+      "summary": "Codex、Claude 和未来 Agent 的差异只属于输入输出适配层。召回评分、预算、日志和卡片生命周期必须保持共享，不能为某个 provider 复制一套检索逻辑。",
+      "criteria": {
+        "use_when": [
+          "Claude UserPromptSubmit",
+          "Codex hook",
+          "provider-neutral hook",
+          "additionalContext",
+          "不要分叉召回"
+        ],
+        "ignore_when": [
+          "独立重写检索算法",
+          "会话导入",
+          "system/developer",
+          "harness",
+          "retrospective apply",
+          "active card",
+          "stats",
+          "npm pack",
+          "tarball install",
+          "git status",
+          "commit scope",
+          "不要发布",
+          "发布前阻塞",
+          "真正的发布前阻塞",
+          "打包",
+          "public alpha",
+          "package install smoke",
+          "unrelated dirty files",
+          "临时目录安装验证",
+          "发布 diff",
+          "语言配置",
+          "卡片语言",
+          "双语界面",
+          "CLI 默认英文",
+          "不要暴露经验语言",
+          "hook additionalContext 语言",
+          "hook frame 固定英文",
+          "GitHub 只是资料来源",
+          "研究召回算法，不改 provider hook"
+        ]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": [
+          "Claude UserPromptSubmit",
+          "Codex hook",
+          "provider-neutral hook",
+          "additionalContext",
+          "不要分叉召回"
+        ],
+        "topics": [
+          "hook",
+          "claude",
+          "codex"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "must",
-      "risk": "medium",
-      "body": "Codex、Claude 和未来 Agent 的差异只属于输入输出适配层。召回评分、预算、日志和卡片生命周期必须保持共享，不能为某个 provider 复制一套检索逻辑。",
-      "summary": "Codex、Claude 和未来 Agent 的差异只属于输入输出适配层。召回评分、预算、日志和卡片生命周期必须保持共享，不能为某个 provider 复制一套检索逻辑。",
-      "rule": "Codex、Claude 和未来 Agent 的差异只属于输入输出适配层。召回评分、预算、日志和卡片生命周期必须保持共享，不能为某个 provider 复制一套检索逻辑。"
+      "rule": "Codex、Claude 和未来 Agent 的差异只属于输入输出适配层。召回评分、预算、日志和卡片生命周期必须保持共享，不能为某个 provider 复制一套检索逻辑。",
+      "engine_hints": {
+        "positive": [
+          "provider_adapter_boundary"
+        ],
+        "negative": [
+          "explain_only"
+        ]
+      }
     },
     {
       "id": "package-install-smoke",
       "title": "发布前要用临时项目验证安装包",
       "category": "运行时与发布",
-      "triggers": [
-        "npm pack",
-        "tarball install",
-        "临时项目安装",
-        "npx smoke",
-        "发布验收"
-      ],
-      "negativeTriggers": [
-        "只改文档",
-        "UserPromptSubmit",
-        "provider-neutral",
-        "additionalContext",
-        "adapter",
-        "retrieval scoring",
-        "不要分叉",
-        "fork retrieval",
-        "secret",
-        "token",
-        "recovery code",
-        "凭据",
-        "恢复码",
-        "不是 npm pack",
-        "不是 clean temp project"
-      ],
-      "topics": [
-        "package",
-        "install"
-      ],
-      "applicability": {
+      "summary": "声称可发布前，必须打出 npm tarball，在干净临时目录安装并运行 init、doctor、config preview 等入口。只跑源码仓库测试不等于用户安装可用。",
+      "criteria": {
+        "use_when": [
+          "npm pack",
+          "tarball install",
+          "临时项目安装",
+          "npx smoke",
+          "发布验收"
+        ],
+        "ignore_when": [
+          "只改文档",
+          "UserPromptSubmit",
+          "provider-neutral",
+          "additionalContext",
+          "adapter",
+          "retrieval scoring",
+          "不要分叉",
+          "fork retrieval",
+          "secret",
+          "token",
+          "recovery code",
+          "凭据",
+          "恢复码",
+          "不是 npm pack",
+          "不是 clean temp project",
+          "安装文档",
+          "可选导入来源",
+          "Spool 可选导入",
+          "不是 Codex 召回前置条件"
+        ]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": [
+          "npm pack",
+          "tarball install",
+          "临时项目安装",
+          "npx smoke",
+          "发布验收"
+        ],
+        "topics": [
+          "package",
+          "install"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "must",
-      "risk": "medium",
-      "body": "声称可发布前，必须打出 npm tarball，在干净临时目录安装并运行 init、doctor、config preview 等入口。只跑源码仓库测试不等于用户安装可用。",
-      "summary": "声称可发布前，必须打出 npm tarball，在干净临时目录安装并运行 init、doctor、config preview 等入口。只跑源码仓库测试不等于用户安装可用。",
-      "rule": "声称可发布前，必须打出 npm tarball，在干净临时目录安装并运行 init、doctor、config preview 等入口。只跑源码仓库测试不等于用户安装可用。"
+      "rule": "声称可发布前，必须打出 npm tarball，在干净临时目录安装并运行 init、doctor、config preview 等入口。只跑源码仓库测试不等于用户安装可用。",
+      "engine_hints": {
+        "positive": [
+          "package_install_validation"
+        ]
+      }
     },
     {
       "id": "secret-management",
       "title": "密钥和恢复码不能进入日志或公开产物",
       "category": "安全",
-      "triggers": [
-        "密钥",
-        "token",
-        "recovery code",
-        "凭据",
-        "secret",
-        "恢复码"
-      ],
-      "negativeTriggers": [
-        "公开 README 示例"
-      ],
-      "topics": [
-        "security"
-      ],
-      "applicability": {
+      "summary": "处理 PyPI、npm、GitHub 等凭据时，不能在日志、review summary、公开文档、通知或打包产物里打印原文。路径管理可以说明，内容必须脱敏。",
+      "criteria": {
+        "use_when": [
+          "密钥",
+          "token",
+          "recovery code",
+          "凭据",
+          "secret",
+          "恢复码"
+        ],
+        "ignore_when": [
+          "公开 README 示例"
+        ]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "medium",
+        "triggers": [
+          "密钥",
+          "token",
+          "recovery code",
+          "凭据",
+          "secret",
+          "恢复码"
+        ],
+        "topics": [
+          "security"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "must",
-      "risk": "high",
-      "body": "处理 PyPI、npm、GitHub 等凭据时，不能在日志、review summary、公开文档、通知或打包产物里打印原文。路径管理可以说明，内容必须脱敏。",
-      "summary": "处理 PyPI、npm、GitHub 等凭据时，不能在日志、review summary、公开文档、通知或打包产物里打印原文。路径管理可以说明，内容必须脱敏。",
-      "rule": "处理 PyPI、npm、GitHub 等凭据时，不能在日志、review summary、公开文档、通知或打包产物里打印原文。路径管理可以说明，内容必须脱敏。"
+      "rule": "处理 PyPI、npm、GitHub 等凭据时，不能在日志、review summary、公开文档、通知或打包产物里打印原文。路径管理可以说明，内容必须脱敏。",
+      "engine_hints": {}
     },
     {
       "id": "roadmap-doc-sync",
       "title": "实现方向变化时同步路线图和架构文档",
       "category": "文档与开源",
-      "triggers": [
-        "roadmap",
-        "文档同步",
-        "架构文档",
-        "source notes",
-        "用户原话",
-        "决策口径"
-      ],
-      "negativeTriggers": [
-        "笔误修正"
-      ],
-      "topics": [
-        "docs",
-        "roadmap"
-      ],
-      "applicability": {
+      "summary": "当实现方向、数据模型或产品边界发生变化，README、roadmap、architecture、reference 和 source/user-voice 的口径都要同步。用户原话是来源，不是最终规范。",
+      "criteria": {
+        "use_when": [
+          "roadmap",
+          "文档同步",
+          "架构文档",
+          "source notes",
+          "用户原话",
+          "决策口径"
+        ],
+        "ignore_when": [
+          "笔误修正"
+        ]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": [
+          "roadmap",
+          "文档同步",
+          "架构文档",
+          "source notes",
+          "用户原话",
+          "决策口径"
+        ],
+        "topics": [
+          "docs",
+          "roadmap"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "should",
-      "risk": "medium",
-      "body": "当实现方向、数据模型或产品边界发生变化，README、roadmap、architecture、reference 和 source/user-voice 的口径都要同步。用户原话是来源，不是最终规范。",
-      "summary": "当实现方向、数据模型或产品边界发生变化，README、roadmap、architecture、reference 和 source/user-voice 的口径都要同步。用户原话是来源，不是最终规范。",
-      "rule": "当实现方向、数据模型或产品边界发生变化，README、roadmap、architecture、reference 和 source/user-voice 的口径都要同步。用户原话是来源，不是最终规范。"
+      "rule": "当实现方向、数据模型或产品边界发生变化，README、roadmap、architecture、reference 和 source/user-voice 的口径都要同步。用户原话是来源，不是最终规范。",
+      "engine_hints": {}
     },
     {
       "id": "goal-lifecycle-deferred",
       "title": "Goal 生命周期本期不进入主链路",
       "category": "经验召回",
-      "triggers": [
-        "goal lifecycle",
-        "goal.start",
-        "precomplete",
-        "目标生命周期",
-        "本期不做"
-      ],
-      "negativeTriggers": [
-        "prompt-time hook"
-      ],
-      "topics": [
-        "goal",
-        "roadmap"
-      ],
-      "applicability": {
+      "summary": "Goal 召回会改变执行节奏，从提示词时召回变成长期自主任务检查。本期只做 prompt-time hook、review、eval，不实现 goal.start 或 precomplete。",
+      "criteria": {
+        "use_when": [
+          "goal lifecycle",
+          "goal.start",
+          "precomplete",
+          "目标生命周期",
+          "本期不做"
+        ],
+        "ignore_when": [
+          "prompt-time hook"
+        ]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": [
+          "goal lifecycle",
+          "goal.start",
+          "precomplete",
+          "目标生命周期",
+          "本期不做"
+        ],
+        "topics": [
+          "goal",
+          "roadmap"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "must",
-      "risk": "medium",
-      "body": "Goal 召回会改变执行节奏，从提示词时召回变成长期自主任务检查。本期只做 prompt-time hook、review、eval，不实现 goal.start 或 precomplete。",
-      "summary": "Goal 召回会改变执行节奏，从提示词时召回变成长期自主任务检查。本期只做 prompt-time hook、review、eval，不实现 goal.start 或 precomplete。",
-      "rule": "Goal 召回会改变执行节奏，从提示词时召回变成长期自主任务检查。本期只做 prompt-time hook、review、eval，不实现 goal.start 或 precomplete。"
+      "rule": "Goal 召回会改变执行节奏，从提示词时召回变成长期自主任务检查。本期只做 prompt-time hook、review、eval，不实现 goal.start 或 precomplete。",
+      "engine_hints": {
+        "negative": [
+          "goal_execute"
+        ]
+      }
     },
     {
       "id": "cli-docs-i18n",
       "title": "CLI 与文档语言策略不进入持久配置",
       "category": "产品与 UI",
-      "triggers": [
-        "CLI 默认英文",
-        "OME_LANGUAGE",
-        "双语文档",
-        "路径式 locale",
-        "固定英文 hook frame"
-      ],
-      "negativeTriggers": [
-        "经验语言选项",
-        "卡片默认语言",
-        "注入语言选项"
-      ],
-      "topics": [
-        "cli",
-        "docs",
-        "i18n"
-      ],
-      "applicability": {
+      "summary": "语言不写入持久配置。CLI 人类输出默认英文，只在显式 OME_LANGUAGE=zh-CN 时使用中文；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。",
+      "criteria": {
+        "use_when": [
+          "CLI 默认英文",
+          "OME_LANGUAGE",
+          "双语文档",
+          "路径式 locale",
+          "固定英文 hook frame"
+        ],
+        "ignore_when": [
+          "经验语言选项",
+          "卡片默认语言",
+          "注入语言选项"
+        ]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "low",
+        "confidence": "medium",
+        "triggers": [
+          "CLI 默认英文",
+          "OME_LANGUAGE",
+          "双语文档",
+          "路径式 locale",
+          "固定英文 hook frame"
+        ],
+        "topics": [
+          "cli",
+          "docs",
+          "i18n"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "should",
-      "risk": "low",
-      "body": "语言不写入持久配置。CLI 人类输出默认英文，只在显式 OME_LANGUAGE=zh-CN 时使用中文；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。",
-      "summary": "语言不写入持久配置。CLI 人类输出默认英文，只在显式 OME_LANGUAGE=zh-CN 时使用中文；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。",
-      "rule": "语言不写入持久配置。CLI 人类输出默认英文，只在显式 OME_LANGUAGE=zh-CN 时使用中文；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。"
+      "rule": "语言不写入持久配置。CLI 人类输出默认英文，只在显式 OME_LANGUAGE=zh-CN 时使用中文；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。",
+      "engine_hints": {}
     },
     {
       "id": "agent-goal-execution",
       "title": "创建目标时进入完整闭环交付模式",
       "category": "执行协议",
-      "triggers": [
-        "/goal",
-        "创建目标",
-        "使用 goal",
-        "创建目标开干",
-        "跑长任务",
-        "全部完成，自己验证",
-        "完整闭环，逐一验收"
-      ],
-      "negativeTriggers": [
-        "公司目标",
-        "业务目标",
-        "OKR",
-        "人生目标",
-        "解释 goal"
-      ],
-      "topics": [
-        "goal",
-        "agent-workflow"
-      ],
-      "applicability": {
-        "level": "global"
-      },
-      "intentModes": {
-        "include": [
-          "execute"
+      "summary": "用户要求创建目标并开干时，必须进入完整闭环交付模式，而不是只写目标文案或局部实现。",
+      "criteria": {
+        "use_when": [
+          "/goal",
+          "创建目标",
+          "使用 goal",
+          "创建目标开干",
+          "跑长任务",
+          "全部完成，自己验证",
+          "完整闭环，逐一验收"
         ],
-        "exclude": [
-          "discuss",
-          "explain"
+        "ignore_when": [
+          "公司目标",
+          "业务目标",
+          "OKR",
+          "人生目标",
+          "解释 goal"
+        ],
+        "intent_modes": {
+          "include": [
+            "execute"
+          ],
+          "exclude": [
+            "discuss",
+            "explain"
+          ]
+        }
+      },
+      "engine_hints": {
+        "positive": [
+          "goal_execute"
+        ],
+        "negative": [
+          "business_goal_discussion",
+          "explain_only",
+          "goal_example_discussion"
         ]
       },
-      "requiredSignals": [
-        "goal_execute"
-      ],
-      "blockedSignals": [
-        "business_goal_discussion",
-        "explain_only"
-      ],
-      "recallPolicy": "must",
-      "risk": "high",
-      "body": "用户要求创建目标并开干时，必须先明确目标、边界和真实完成标准，再完整执行、逐项验证并 fail closed。",
-      "summary": "用户要求创建目标并开干时，必须进入完整闭环交付模式，而不是只写目标文案或局部实现。",
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "medium",
+        "triggers": [
+          "/goal",
+          "创建目标",
+          "使用 goal",
+          "创建目标开干",
+          "跑长任务",
+          "全部完成，自己验证",
+          "完整闭环，逐一验收"
+        ],
+        "topics": [
+          "goal",
+          "agent-workflow"
+        ]
+      },
+      "scope": {
+        "level": "global"
+      },
       "rule": "用户要求创建目标并开干时，必须先明确目标、边界和真实完成标准，再完整执行、逐项验证并 fail closed。"
+    },
+    {
+      "id": "spool-session-context-anchoring",
+      "title": "历史会话交接必须用 Spool UUID 锚定",
+      "category": "会话交接",
+      "summary": "只在需要复用历史会话、Spool 记录或跨会话证据时触发；普通 Spool 安装/导入说明不触发。",
+      "criteria": {
+        "use_when": [
+          "Spool",
+          "spool uuid",
+          "session UUID",
+          "历史会话",
+          "会话交接",
+          "旧线程恢复",
+          "跨会话 handoff",
+          "来源锚点",
+          "messageId",
+          "turn id"
+        ],
+        "ignore_when": [
+          "Spool 可选导入",
+          "没有历史会话或跨会话证据需求",
+          "普通 code review",
+          "Spool 是可选导入来源",
+          "Spool 只是可选导入来源",
+          "不是 Codex 召回前置条件"
+        ]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": [
+          "Spool",
+          "spool uuid",
+          "session UUID",
+          "历史会话",
+          "会话交接",
+          "旧线程恢复",
+          "跨会话 handoff",
+          "来源锚点",
+          "messageId",
+          "turn id"
+        ],
+        "topics": [
+          "spool",
+          "session-handoff",
+          "source-refs"
+        ]
+      },
+      "scope": {
+        "level": "global"
+      },
+      "rule": "需要复用历史会话、Spool 记录或跨会话证据时，必须使用稳定 UUID、turn/message 锚点和 来源锚点。",
+      "engine_hints": {
+        "positive": [
+          "historical_session_lookup"
+        ],
+        "negative": [
+          "explain_only"
+        ]
+      }
+    },
+    {
+      "id": "architecture-root-cause",
+      "title": "优先高内聚低耦合和根因修复",
+      "category": "工程质量",
+      "summary": "当用户要求优化实现质量、召回引擎或核心逻辑时，应优先收窄模块职责、删除历史包袱，并修复根因，而不是继续堆兼容分支或 fallback。",
+      "criteria": {
+        "use_when": [
+          "高内聚低耦合",
+          "根因修复",
+          "逻辑干净",
+          "召回引擎优化",
+          "不要历史包袱",
+          "不要兼容包袱",
+          "clean architecture",
+          "root-cause fix"
+        ],
+        "ignore_when": [
+          "临时实验脚本",
+          "一次性草稿",
+          "纯文案润色"
+        ]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": [
+          "高内聚低耦合",
+          "根因修复",
+          "逻辑干净",
+          "召回引擎优化",
+          "不要历史包袱",
+          "不要兼容包袱",
+          "clean architecture",
+          "root-cause fix"
+        ],
+        "topics": [
+          "architecture",
+          "maintenance",
+          "retrieval"
+        ]
+      },
+      "scope": {
+        "level": "global"
+      },
+      "rule": "核心逻辑优化时，先划清模块职责和真实边界，再删除过期分支、重复 fallback 和两套真相。实现应让召回、评分、治理和渲染各自内聚，避免用兼容代码掩盖数据或 schema 问题。",
+      "engine_hints": {
+        "positive": [
+          "architecture_quality"
+        ],
+        "negative": [
+          "explain_only"
+        ]
+      }
     },
     {
       "id": "ai-first-review-flow",
       "title": "复杂经验创建应 AI first，UI 做审核辅助",
       "category": "经验召回",
-      "triggers": [
-        "AI first",
-        "经验扫描",
-        "候选经验",
-        "人工审核",
-        "review flow"
-      ],
-      "negativeTriggers": [
-        "用户手写单张卡片"
-      ],
-      "topics": [
-        "review",
-        "product"
-      ],
-      "applicability": {
+      "summary": "经验生成、分类、适用范围和触发词应优先由扫描提示词输出。UI 主要用于查看、纠错、批准、合并和修改硬配置，避免让用户手动填写大量结构化字段。",
+      "criteria": {
+        "use_when": [
+          "AI first",
+          "经验扫描",
+          "候选经验",
+          "人工审核",
+          "review flow"
+        ],
+        "ignore_when": [
+          "用户手写单张卡片"
+        ]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": [
+          "AI first",
+          "经验扫描",
+          "候选经验",
+          "人工审核",
+          "review flow"
+        ],
+        "topics": [
+          "review",
+          "product"
+        ]
+      },
+      "scope": {
         "level": "global"
       },
-      "recallPolicy": "should",
-      "risk": "medium",
-      "body": "经验生成、分类、适用范围和触发词应优先由扫描提示词输出。UI 主要用于查看、纠错、批准、合并和修改硬配置，避免让用户手动填写大量结构化字段。",
-      "summary": "经验生成、分类、适用范围和触发词应优先由扫描提示词输出。UI 主要用于查看、纠错、批准、合并和修改硬配置，避免让用户手动填写大量结构化字段。",
-      "rule": "经验生成、分类、适用范围和触发词应优先由扫描提示词输出。UI 主要用于查看、纠错、批准、合并和修改硬配置，避免让用户手动填写大量结构化字段。"
+      "rule": "经验生成、分类、适用范围和触发词应优先由扫描提示词输出。UI 主要用于查看、纠错、批准、合并和修改硬配置，避免让用户手动填写大量结构化字段。",
+      "engine_hints": {}
     }
   ]
 }

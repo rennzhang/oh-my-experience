@@ -109,16 +109,41 @@ function prepareFixtureDataDir(dataDir: string, suiteFile: string, suite: Record
   for (const card of cards) {
     writeCard(fixtureDataDir, {
       status: "active",
-      risk: "medium",
-      recallPolicy: "should",
       sources: ["eval-fixture"],
       createdAt: now,
       updatedAt: now,
-      ...card,
+      ...normalizeFixtureCard(card),
     });
   }
   rebuildCardIndex(fixtureDataDir);
   return { dataDir: fixtureDataDir, isolated: true, cardCount: cards.length };
+}
+
+function normalizeFixtureCard(card: Record<string, any>): Record<string, any> {
+  const criteria = card.criteria || {};
+  const recall = card.recall || {};
+  const engineHints = card.engine_hints || {};
+  const scope = card.scope || {};
+  return {
+    ...card,
+    triggers: Array.isArray(recall.triggers) ? recall.triggers : [],
+    negativeTriggers: Array.isArray(criteria.ignore_when) ? criteria.ignore_when : [],
+    aliases: recall.aliases || {},
+    topics: Array.isArray(recall.topics) ? recall.topics : [],
+    intentModes: criteria.intent_modes || { include: [], exclude: [] },
+    requiredSignals: Array.isArray(engineHints.positive) ? engineHints.positive : [],
+    blockedSignals: Array.isArray(engineHints.negative) ? engineHints.negative : [],
+    applicability: {
+      level: scope.level || "global",
+      projectKey: scope.project_key || scope.projectKey || null,
+      modulePath: scope.module_path || scope.modulePath || null,
+      confidence: "medium",
+      rationale: "",
+    },
+    recallPolicy: recall.policy || "should",
+    risk: recall.risk || "medium",
+    confidence: recall.confidence || "medium",
+  };
 }
 
 function loadCardFixtures(suiteFile: string, suite: Record<string, any>, experiencesFile?: string): Record<string, any>[] {

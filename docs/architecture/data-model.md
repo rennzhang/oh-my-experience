@@ -17,6 +17,10 @@ Users can point the data directory to another local path, including an Obsidian
 subfolder. OME should use a dedicated subfolder instead of writing into an
 entire vault root.
 
+`dataDir` is global storage. Project-level storage, when used, lives beside the
+project at `<project-root>/.oh-my-experience/` and is discovered from the
+current working directory.
+
 ## Directory Layout
 
 ```text
@@ -65,23 +69,17 @@ retrospective extraction -> candidate.category -> draft.category -> active.categ
 ```
 
 The CLI accepts `category` on reflect candidates and infers one when the field
-is missing. Users can create categories and override a candidate category before
-applying a reflect run. `sources` remains evidence and provenance only; it must
-not be used as a category transport.
+is missing. Users can override a candidate category before applying a reflect
+run. There is no separate category registry command; new category names travel
+on candidates and cards. `sources` remains evidence and provenance only; it
+must not be used as a category transport.
 
 ## Provenance
 
-Experiences and candidates carry both human-readable and structured provenance:
-
-- `sources`: compact display/evidence strings.
-- `origin`: source adapter, agent family, optional model/session/project, and
-  whether the item came from a reflect run, starter lesson, import, or manual
-  entry.
-- `sourceRefs`: structured references to sessions, turns, files,
-  retrospectives, starter lessons, or manual sources.
-
-The matcher currently treats provenance as evidence and diagnostics. Recall
-eligibility is controlled by card status and applicability.
+Active cards stay focused on recall and usage. They do not carry raw source
+metadata, dates, `origin`, or `sourceRefs` as core card fields. Provenance lives
+in retrospective runs, operation logs, backups, and source indexes. The matcher
+uses active-card criteria, recall metadata, scope, and status.
 
 ## Source Index
 
@@ -122,14 +120,35 @@ materialized session directory in the canonical layout.
 Prompt-time recall must not depend on session bodies. It depends on active
 experiences and `indexes/experiences.json`.
 
-## Topics And Applicability
+## Project Library Layout
+
+A project library uses the same reviewed-card lifecycle folders:
+
+```text
+<project-root>/.oh-my-experience/
+  README.md
+  .gitignore
+  experiences/
+    draft/
+    active/
+    archived/
+```
+
+Project prompt-time recall reads `experiences/active/` directly and annotates
+cards as `libraryScope: project`. It does not require a project config file.
+Project `events.jsonl`, `retrospectives/`, and `indexes/` are ignored by the
+default `.gitignore`; match and hook recall do not write them. Lifecycle
+commands with `--scope project` may write project retrospectives and events
+because the user explicitly chose to create or manage project cards.
+
+## Topics And Scope
 
 Experiences separate subject matching from project fit:
 
 - `topics`: the technical or workflow surfaces a card belongs to, such as
   `frontend`, `git`, `runtime`, `review`, or `deployment`.
-- `applicability`: where the card can be recalled, with `global`, `project`,
-  and `project-family` levels.
+- `scope`: where the card can be recalled, with `global`, `project`, and
+  `project-family` levels.
 
 At prompt time the runtime detects the current project context from the working
 directory, package metadata, and Git remote, then filters scoped cards before

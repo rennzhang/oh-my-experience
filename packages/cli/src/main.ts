@@ -15,20 +15,26 @@ import {
   getCard,
   getRetrospectiveRun,
   hashText,
+  inspectCards,
+  inspectProjectLibrary,
   initializeDataDir,
+  initializeProjectLibrary,
   layout,
   listCards,
   listRetrospectiveRuns,
   listStarterCards,
   loadConfig,
-  matchCards,
+  matchCardEntries,
   normalizeLocale,
-  explainMatch,
+  explainMatchFromCards,
+  projectLibraryPath,
   previewConfigValue,
   previewApplyRetrospective,
   promoteDraft,
   renderAdditionalContext,
   repairIndex,
+  readLibraryStackCards,
+  resolveLibraryStack,
   runDoctor,
   saveConfig,
   setConfigValue,
@@ -62,6 +68,7 @@ const KNOWN_COMMANDS = [
   "import",
   "init",
   "match",
+  "project",
   "reflect",
   "source",
   "stats",
@@ -80,12 +87,13 @@ export async function runCli(argv: string[]) {
   if (command === "init") return initCommand(dataDir, args);
   if (command === "doctor") return doctorCommand(dataDir, args);
   if (command === "config") return configCommand(dataDir, subcommand, args);
-  if (command === "create-reflect") return createReflectCommand(dataDir, subcommand, args);
+  if (command === "create-reflect") return createReflectCommand(scopedExperienceDataDir(dataDir, args), subcommand, args);
   if (command === "import") return importCommand(dataDir, subcommand, args);
-  if (command === "reflect") return reflectCommand(dataDir, subcommand, args);
+  if (command === "reflect") return reflectCommand(scopedExperienceDataDir(dataDir, args), subcommand, args);
   if (command === "source") return sourceCommand(dataDir, subcommand, args);
   if (command === "experience") return experienceCommand(dataDir, subcommand, args);
   if (command === "match") return matchCommand(dataDir, args);
+  if (command === "project") return projectCommand(dataDir, subcommand, args);
   if (command === "hook") return hookCommand(dataDir, subcommand, args);
   if (command === "uninstall") return uninstallCommand(dataDir, args);
   if (command === "eval") return evalCommand(dataDir, subcommand, args);
@@ -715,7 +723,7 @@ function initCopy() {
     afterRecallIntro: "Agent 会先停下来询问是否开始 OME 复盘扫描，以及本次扫描的关注方向。",
     importSourcesRecommendation: "用 Spool 导入更多 Agent 历史",
     importSourcesDescription: "导入 Claude CLI、Gemini CLI、opencode 等会话；不安装也不影响 Codex 默认召回。",
-    importSourcesGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/import-sources.zh-CN.md",
+    importSourcesGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/import-sources.md",
     spoolStepPrompt: "可选：连接 Spool CLI",
     spoolStepDescription: "OME 的核心设置已经完成。Spool 只是扩大可扫描的历史会话范围，不是 Codex 召回的前置条件。",
     spoolWhyTitle: "为什么建议安装",
@@ -1041,13 +1049,23 @@ function reflectCommand(dataDir: string, subcommand: string | undefined, args: P
       category: args.flags.category,
       summary: args.flags.summary,
       rule: args.flags.rule,
-      triggers: splitList(args.flags.triggers || args.flags.trigger || ""),
-      negativeTriggers: splitList(args.flags["negative-triggers"] || args.flags.negativeTriggers || ""),
-      topics: splitList(args.flags.topics || args.flags.topic || ""),
-      applicability: parseApplicability(args),
+      criteria: {
+        use_when: splitList(args.flags.triggers || args.flags.trigger || ""),
+        ignore_when: splitList(args.flags["negative-triggers"] || args.flags.negativeTriggers || ""),
+      },
+      engine_hints: {
+        positive: splitList(args.flags["engine-hints"] || args.flags.engineHints || ""),
+        negative: splitList(args.flags["negative-engine-hints"] || args.flags.negativeEngineHints || ""),
+      },
+      recall: {
+        policy: args.flags["recall-policy"] || args.flags.recallPolicy || "should",
+        risk: args.flags.risk || "medium",
+        confidence: args.flags.confidence || "medium",
+        triggers: splitList(args.flags.triggers || args.flags.trigger || ""),
+        topics: splitList(args.flags.topics || args.flags.topic || ""),
+      },
+      scope: parseApplicability(args),
       evidence: splitList(args.flags.evidence || ""),
-      risk: args.flags.risk || "medium",
-      recallPolicy: args.flags["recall-policy"] || args.flags.recallPolicy || "should",
     });
     return print(withReviewPaths(dataDir, {
       ok: true,
@@ -1160,21 +1178,24 @@ function sourceCommand(dataDir: string, subcommand: string | undefined, args: Pa
 }
 
 function experienceCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
+  const targetDataDir = scopedExperienceDataDir(dataDir, args);
   if (!subcommand || subcommand === "list") {
-    const experiences = listCards(dataDir, args.flags.status || null);
+    const inspection = inspectCards(targetDataDir, args.flags.status || null);
+    const experiences = inspection.cards;
     const compact = Boolean(args.flags.compact || args.flags.index);
-    if (!compact) return print({ ok: true, experiences }, args);
+    if (!compact) return print({ ok: inspection.issues.length === 0, experiences, invalidCards: inspection.issues }, args);
     return print({
-      ok: true,
+      ok: inspection.issues.length === 0,
       total: experiences.length,
       compact: true,
       experiences: experiences.map(compactExperienceCard),
+      invalidCards: inspection.issues,
     }, args);
   }
   if (subcommand === "show") {
     const id = args.positionals[2];
     if (!id) throw new Error("usage: ome experience show <id> [--section summary|rule|triggers]");
-    const card = getCard(dataDir, id);
+    const card = getCard(targetDataDir, id);
     if (args.flags.json) return print({ ok: true, card, section: args.flags.section || null, content: cardSection(card, args.flags.section) }, args);
     console.log(cardSection(card, args.flags.section) || card.body);
     return;
@@ -1182,14 +1203,24 @@ function experienceCommand(dataDir: string, subcommand: string | undefined, args
   if (subcommand === "approve" || subcommand === "promote") {
     const id = args.positionals[2];
     if (!id) throw new Error("usage: ome experience promote <id>");
-    return print(promoteDraft(dataDir, id), args);
+    return print(promoteDraft(targetDataDir, id), args);
   }
   if (subcommand === "archive") {
     const id = args.positionals[2];
     if (!id) throw new Error("usage: ome experience archive <id> [--reason <reason>]");
-    return print(archiveCard(dataDir, id, args.flags.reason || "archived"), args);
+    return print(archiveCard(targetDataDir, id, args.flags.reason || "archived"), args);
   }
   throw new Error("usage: ome experience list|show|promote|archive");
+}
+
+function scopedExperienceDataDir(dataDir: string, args: ParsedArgs): string {
+  const scope = String(args.flags.scope || "").trim().toLowerCase();
+  if (!scope || scope === "global") return dataDir;
+  if (scope !== "project") throw new Error("unknown scope: use global or project");
+  const cwd = args.flags.cwd ? path.resolve(args.flags.cwd) : process.cwd();
+  const projectContext = detectProjectContext(cwd);
+  if (!projectContext.root) throw new Error("project scope requires running inside a project");
+  return projectLibraryPath(projectContext.root);
 }
 
 function compactExperienceCard(card: ReturnType<typeof listCards>[number]) {
@@ -1198,7 +1229,6 @@ function compactExperienceCard(card: ReturnType<typeof listCards>[number]) {
     title: card.title,
     status: card.status,
     category: card.category,
-    updatedAt: card.updatedAt,
   };
 }
 
@@ -1216,19 +1246,44 @@ function matchCommand(dataDir: string, args: ParsedArgs) {
   const query = args.flags.query || args.positionals.slice(1).join(" ");
   if (!query) throw new Error("usage: ome match <query>");
   const config = loadConfig(dataDir);
-  const projectContext = args.flags.cwd ? detectProjectContext(path.resolve(args.flags.cwd)) : detectProjectContext(process.cwd());
+  const cwd = args.flags.cwd ? path.resolve(args.flags.cwd) : process.cwd();
+  const stack = resolveLibraryStack(dataDir, cwd);
+  const cards = readLibraryStackCards(stack);
   const options = {
     limit: Number(args.flags.limit || config.retrieval.maxCards),
     threshold: args.flags.threshold === undefined ? config.retrieval.minScore : Number(args.flags.threshold),
-    projectContext,
+    projectContext: stack.projectContext,
   };
-  if (args.flags.explain) return print({ query, ...explainMatch(dataDir, query, options) }, args);
-  const matches = matchCards(dataDir, query, {
+  if (args.flags.explain) {
+    return print({ query, ...explainMatchFromCards(cards, query, options, { libraries: stack.libraries, warnings: stack.warnings }) }, args);
+  }
+  const matches = matchCardEntries(cards, query, {
     limit: options.limit,
     threshold: options.threshold,
-    projectContext,
+    projectContext: stack.projectContext,
   });
-  return print({ ok: true, query, matches, additionalContext: renderAdditionalContext(matches) }, args);
+  return print({ ok: true, query, libraries: stack.libraries, matches, additionalContext: renderAdditionalContext(matches) }, args);
+}
+
+function projectCommand(_dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
+  const cwd = args.flags.cwd ? path.resolve(args.flags.cwd) : process.cwd();
+  const projectContext = detectProjectContext(cwd);
+  if (!projectContext.root) throw new Error("project command requires running inside a project");
+  if (!subcommand || subcommand === "status") {
+    const library = inspectProjectLibrary(projectContext.root);
+    return print({
+      ok: true,
+      projectContext,
+      projectLibrary: library.dataDir,
+      exists: library.exists,
+      readable: library.readable,
+      warnings: library.warnings,
+    }, args);
+  }
+  if (subcommand === "init") {
+    return print(initializeProjectLibrary(projectContext.root), args);
+  }
+  throw new Error("usage: ome project init|status");
 }
 
 async function evalCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
@@ -1317,13 +1372,13 @@ function splitList(value: unknown): string[] {
 }
 
 function parseApplicability(args: ParsedArgs) {
-  const level = args.flags["applicability"] || args.flags["applicability-level"] || "global";
+  const level = args.flags["scope-level"] || "global";
   return {
     level,
     projectKey: args.flags["project-key"] || null,
     modulePath: args.flags["module-path"] || null,
-    confidence: args.flags["applicability-confidence"] || "medium",
-    rationale: args.flags["applicability-rationale"] || "",
+    confidence: args.flags["scope-confidence"] || "medium",
+    rationale: args.flags["scope-rationale"] || "",
   };
 }
 
@@ -1384,6 +1439,7 @@ function renderHumanOutput(value: unknown, args: ParsedArgs): string {
   if (command === "reflect") return renderReflectResult(record, zh);
   if (command === "experience") return renderExperienceResult(record, subcommand, zh);
   if (command === "match") return renderMatchResult(record, Boolean(args.flags.explain), zh);
+  if (command === "project") return renderProjectResult(record, subcommand, zh);
   if (command === "eval") return renderEvalResult(record, subcommand, zh);
   if (command === "stats") return renderStatsResult(record, zh);
   if (command === "uninstall") return renderUninstallResult(record, zh);
@@ -1419,7 +1475,7 @@ function renderInitResult(record: Record<string, any>, zh: boolean): string {
     lines.push(zh ? "建议:" : "Recommendations:");
     lines.push(`  ${zh ? "用 Spool 导入更多 Agent 历史" : "Import more agent histories with Spool"}`);
     lines.push(`  ${zh ? "可把 Claude CLI、Gemini CLI、opencode 等会话导入 OME；不安装也不影响 Codex 默认召回。" : "Bring Claude CLI, Gemini CLI, opencode, and other supported histories into OME. Codex recall works without it."}`);
-    lines.push(`  ${zh ? "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/import-sources.zh-CN.md" : "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/import-sources.md"}`);
+    lines.push(`  ${zh ? "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/import-sources.md" : "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/import-sources.md"}`);
   }
   lines.push(jsonHint(zh));
   return lines.join("\n");
@@ -1508,7 +1564,7 @@ function renderCreateReflectResult(record: Record<string, any>, zh: boolean): st
   return [
     zh ? "复盘工作目录已准备" : "Retrospective workspace prepared",
     `runId: ${record.runId || record.id || ""}`,
-    record.reviewFile ? `${zh ? "审批文件" : "Approval file"}: ${record.reviewFile}` : "",
+    reviewFileLine(record, zh),
     record.nextStep ? `${zh ? "下一步" : "Next"}: ${record.nextStep}` : "",
     jsonHint(zh),
   ].filter(Boolean).join("\n");
@@ -1521,7 +1577,7 @@ function renderReflectResult(record: Record<string, any>, zh: boolean): string {
   return [
     zh ? "经验审批批次" : "Experience approval run",
     `runId: ${record.runId || record.id || ""}`,
-    record.reviewFile ? `${zh ? "审批文件" : "Approval file"}: ${record.reviewFile}` : "",
+    reviewFileLine(record, zh),
     record.nextStep ? `${zh ? "下一步" : "Next"}: ${record.nextStep}` : "",
     jsonHint(zh),
   ].filter(Boolean).join("\n");
@@ -1537,12 +1593,31 @@ function renderRetrospectiveResult(record: Record<string, any>, zh: boolean): st
   if (candidates) lines.push(`${zh ? "候选经验" : "Candidate experiences"}: ${candidates}`);
   if (drafts) lines.push(`${zh ? "经验草稿" : "Experience drafts"}: ${drafts}`);
   if (record.candidate?.id) lines.push(`candidate: ${record.candidate.id}`);
-  if (record.reviewFile) lines.push(`${zh ? "审批文件" : "Approval file"}: ${record.reviewFile}`);
+  const reviewLine = reviewFileLine(record, zh);
+  if (reviewLine) lines.push(reviewLine);
   if (record.dryRun) lines.push(zh ? "这是 dry-run，没有写入经验草稿。" : "Dry run only; no experience drafts were written.");
   else if (drafts) lines.push(zh ? "经验草稿尚未参与召回；确认无误后运行 ome experience promote <draft-experience-id> 启用。" : "Experience drafts are not recalled yet; run ome experience promote <draft-experience-id> to enable them.");
   else if (candidates) lines.push(retrospectiveNextStep(record, zh));
   lines.push(jsonHint(zh));
   return lines.join("\n");
+}
+
+function reviewFileLine(record: Record<string, any>, zh: boolean): string {
+  if (!record.reviewFile) return "";
+  const relative = reviewRelativePath(record);
+  const label = zh ? "审批文件" : "Approval file";
+  return `${label}: [retrospective.md](${relative})`;
+}
+
+function reviewRelativePath(record: Record<string, any>): string {
+  if (record.reviewFile) return normalizeMarkdownPath(path.relative(process.cwd(), String(record.reviewFile)));
+  if (record.runId) return normalizeMarkdownPath(path.join("retrospectives", String(record.runId), "retrospective.md"));
+  if (record.runFile && record.runDir) return normalizeMarkdownPath(path.relative(process.cwd(), String(record.runFile)));
+  return "retrospective.md";
+}
+
+function normalizeMarkdownPath(value: string): string {
+  return value.split(path.sep).join("/");
 }
 
 function retrospectiveNextStep(record: Record<string, any>, zh: boolean): string {
@@ -1564,22 +1639,42 @@ function retrospectiveNextStep(record: Record<string, any>, zh: boolean): string
 
 function renderExperienceResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
   const cards = Array.isArray(record.experiences) ? record.experiences : [];
+  const invalidCards = Array.isArray(record.invalidCards) ? record.invalidCards : [];
   const lines = [subcommand === "list" || cards.length ? `${zh ? "经验" : "Experiences"}: ${cards.length}` : (zh ? "经验已更新" : "Experience updated")];
   for (const card of cards.slice(0, 10)) lines.push(`  - ${asRecord(card).id}: ${asRecord(card).title || ""}`);
   if (cards.length > 10) lines.push(`  ... ${cards.length - 10} more`);
+  if (invalidCards.length) {
+    lines.push(`${zh ? "无效卡片" : "Invalid cards"}: ${invalidCards.length}`);
+    for (const issue of invalidCards.slice(0, 5)) {
+      const item = asRecord(issue);
+      lines.push(`  - ${item.status || ""}: ${item.path || ""} (${item.message || ""})`);
+    }
+    if (invalidCards.length > 5) lines.push(`  ... ${invalidCards.length - 5} more invalid`);
+  }
   lines.push(jsonHint(zh));
   return lines.join("\n");
 }
 
 function renderMatchResult(record: Record<string, any>, explain: boolean, zh: boolean): string {
   const matches = Array.isArray(record.matches) ? record.matches : [];
+  const libraries = Array.isArray(record.libraries) ? record.libraries : [];
   const lines = [
     `${zh ? "召回结果" : "Recall result"}: ${matches.length} ${zh ? "张卡片" : "cards"}`,
     `${zh ? "查询" : "Query"}: ${record.query || ""}`,
   ];
+  if (explain && libraries.length) {
+    lines.push(`${zh ? "经验库" : "Libraries"}: ${libraries.map((library) => {
+      const item = asRecord(library);
+      return `${item.scope}${item.exists === false ? (zh ? "(不存在)" : "(missing)") : item.readable === false ? (zh ? "(不可读)" : "(unreadable)") : ""}`;
+    }).join(", ")}`);
+  }
   for (const match of matches.slice(0, 8)) {
     const item = asRecord(match);
-    lines.push(`  ${item.rank || "-"}。${item.title || item.id} (${zh ? "分数" : "score"} ${Math.round(Number(item.score || 0))})`);
+    const card = asRecord(item.card);
+    const title = item.title || card.title || item.id || card.id;
+    const id = item.id || card.id || "";
+    const scope = card.libraryScope ? ` ${card.libraryScope}` : "";
+    lines.push(`  ${item.rank || "-"}。${title} (${zh ? "分数" : "score"} ${Math.round(Number(item.score || 0))}${scope}) ${id ? `[${id}]` : ""}`);
     if (explain && Array.isArray(item.reasons) && item.reasons.length) lines.push(`     ${item.reasons.slice(0, 2).map(formatMatchReason).join("; ")}`);
   }
   const envelope = asRecord(record.envelope);
@@ -1588,6 +1683,25 @@ function renderMatchResult(record: Record<string, any>, explain: boolean, zh: bo
   if (record.additionalContext) lines.push(`${zh ? "注入上下文" : "Additional context"}: ${String(record.additionalContext).length} chars`);
   lines.push(jsonHint(zh));
   return lines.join("\n");
+}
+
+function renderProjectResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
+  if (subcommand === "init") {
+    return [
+      zh ? "项目经验库已初始化" : "Project library initialized",
+      `${zh ? "项目" : "Project"}: ${record.projectRoot || ""}`,
+      `${zh ? "项目经验库" : "Project library"}: ${record.projectLibrary || ""}`,
+      jsonHint(zh),
+    ].join("\n");
+  }
+  return [
+    zh ? "项目经验库状态" : "Project library status",
+    `${zh ? "项目经验库" : "Project library"}: ${record.projectLibrary || ""}`,
+    `${zh ? "存在" : "Exists"}: ${record.exists ? (zh ? "是" : "yes") : (zh ? "否" : "no")}`,
+    `${zh ? "可读" : "Readable"}: ${record.readable ? (zh ? "是" : "yes") : (zh ? "否" : "no")}`,
+    ...(Array.isArray(record.warnings) && record.warnings.length ? [`${zh ? "警告" : "Warnings"}: ${record.warnings.join("; ")}`] : []),
+    jsonHint(zh),
+  ].join("\n");
 }
 
 function formatMatchReason(value: unknown): string {
@@ -1758,6 +1872,7 @@ function printHelp() {
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume
   ome experience list|show|promote|archive
+  ome project init|status
   ome eval recall --suite <file>
   ome hook run|status
   ome stats
@@ -1768,8 +1883,8 @@ function printHelp() {
   如果 init 没有出现向导，先运行 ome version 确认当前二进制，再用 ome init --interactive。
 
 文档:
-  docs/guides/quickstart.zh-CN.md
-  docs/reference/cli.zh-CN.md
+  docs/zh/guides/quickstart.md
+  docs/zh/reference/cli.md
 ` : `${t("cli.title", locale)}
 
 Local-first experience layer for AI coding agents: review cards first, recall
@@ -1791,6 +1906,7 @@ Core commands:
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume
   ome experience list|show|promote|archive
+  ome project init|status
   ome eval recall --suite <file>
   ome hook run|status
   ome stats

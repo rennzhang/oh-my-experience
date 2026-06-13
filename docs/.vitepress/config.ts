@@ -2,9 +2,9 @@ import { defineConfig } from "vitepress";
 import type { DefaultTheme } from "vitepress";
 
 const logo = {
-  light: "/ome-mark.svg",
-  dark: "/ome-mark.svg",
-  alt: "OME",
+  light: "/ome-logo-nav.png",
+  dark: "/ome-logo-nav.png",
+  alt: "Oh My Experience",
 };
 
 const socialLinks: DefaultTheme.SocialLink[] = [
@@ -57,7 +57,9 @@ const englishSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "Introduction", link: "/guides/introduction" },
         { text: "Quickstart", link: "/guides/quickstart" },
+        { text: "Examples", link: "/guides/examples" },
         { text: "Setup", link: "/guides/setup" },
+        { text: "Global and project libraries", link: "/guides/project-libraries" },
       ],
     },
     {
@@ -107,7 +109,9 @@ const englishSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "Introduction", link: "/guides/introduction" },
         { text: "Quickstart", link: "/guides/quickstart" },
+        { text: "Examples", link: "/guides/examples" },
         { text: "Setup", link: "/guides/setup" },
+        { text: "Global and project libraries", link: "/guides/project-libraries" },
       ],
     },
     {
@@ -130,7 +134,9 @@ const chineseSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "介绍", link: "/zh/guides/introduction" },
         { text: "快速开始", link: "/zh/guides/quickstart" },
+        { text: "实际案例", link: "/zh/guides/examples" },
         { text: "安装配置", link: "/zh/guides/setup" },
+        { text: "全局与项目经验库", link: "/zh/guides/project-libraries" },
       ],
     },
     {
@@ -180,7 +186,9 @@ const chineseSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "总览", link: "/zh/" },
         { text: "快速开始", link: "/zh/guides/quickstart" },
+        { text: "实际案例", link: "/zh/guides/examples" },
         { text: "安装配置", link: "/zh/guides/setup" },
+        { text: "全局与项目经验库", link: "/zh/guides/project-libraries" },
       ],
     },
     {
@@ -248,10 +256,13 @@ export default defineConfig({
     /^https?:\/\/localhost/,
   ],
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/ome-mark.svg" }],
+    ["link", { rel: "icon", type: "image/x-icon", href: "/favicon.ico?v=ome-logo-20260613" }],
+    ["link", { rel: "icon", type: "image/png", href: "/ome-logo-favicon.png?v=ome-logo-20260613" }],
+    ["link", { rel: "apple-touch-icon", href: "/ome-logo-favicon.png?v=ome-logo-20260613" }],
     ["meta", { name: "theme-color", content: "#111827" }],
     ["meta", { property: "og:title", content: "Oh My Experience" }],
     ["meta", { property: "og:description", content: "Stop teaching your agent the same lesson twice." }],
+    ["meta", { property: "og:image", content: "/ome-logo.png" }],
   ],
   locales: {
     root: {

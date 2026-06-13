@@ -25,8 +25,13 @@ The installer writes to `~/.claude/settings.json`.
 
 **Have your agent do it:**
 
-> Help me install the Oh My Experience Claude hook. Run ome init --provider claude --dry-run
-> first to preview, then ome init --provider claude.
+```text
+Help me install the Oh My Experience Claude hook.
+
+1. Run `ome init --provider claude --dry-run` first to preview what will be written.
+2. If the preview is safe, run `ome init --provider claude`.
+3. Run `ome hook status --provider claude` to confirm the hook is enabled.
+```
 
 ## Using both Codex and Claude
 
@@ -42,13 +47,13 @@ One library, one retrieval engine, shared automatically. No duplicate rules.
 
 Copy and paste this prompt:
 
-```
+```text
 Run an OME reflect scan over my recent coding sessions.
 
 1. Run ome reflect start --focus "recent execution mistakes I corrected"
 2. Check recent conversations for places where I corrected you
-3. Generate ≤5 candidates. Each must include: problem, anti-pattern, correct approach, triggers, negative triggers
-4. Write candidates to file, then ome reflect candidates RUN_ID --from-file FILE
+3. Generate ≤5 candidates in the current OME candidate JSON shape: audit plus candidates with summary, criteria.use_when, criteria.ignore_when, recall, optional engine_hints, scope, and rule.
+4. Write candidates to candidates.json, then ome reflect candidates RUN_ID --from-file candidates.json
 5. ome reflect show RUN_ID to display candidates. Wait for my approval on each one.
 
 Only extract reusable execution judgment. Don't turn one-off context into experience cards.

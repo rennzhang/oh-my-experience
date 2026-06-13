@@ -8,28 +8,34 @@ status: active
 For a first run, start with [Quickstart](quickstart.md). This guide covers
 install and configuration details.
 
-## Install
+## Install the CLI
 
 ```bash
 npm install -g oh-my-experience
 ome init
 ```
 
-Or with npx (no global install):
+The first command installs the global `ome` command. The second starts the setup
+wizard, which chooses a library path, installs the default provider hook, and
+writes starter cards so you can verify recall immediately.
+
+If you do not want a global install, run it with `npx`:
 
 ```bash
 npx oh-my-experience init
 ```
 
-`ome init` walks you through setting the library path (default
-`~/.oh-my-experience`), installing the Codex hook, and writing built-in starter
-cards.
-
 **Have your agent do it:**
 
-> Help me set up Oh My Experience. Run ome init, accept the default path. Then
-> run ome doctor to verify, and ome hook status --provider codex to confirm
-> the hook is active.
+```text
+Help me set up Oh My Experience.
+
+1. Run `ome init` and accept the default library path.
+2. Run `ome doctor` to verify the library, config, and hook state.
+3. Run `ome hook status --provider codex` to check the Codex hook state.
+
+Report each result. If anything writes hooks, changes config, or needs my confirmation, call it out first.
+```
 
 After initialization, copy the printed first task to your agent to experience
 starter card recall.
@@ -45,6 +51,9 @@ For non-interactive environments:
 ome init -y --data-dir ~/.oh-my-experience
 ```
 
+`-y` skips interactive prompts for scripts, CI, or agent runners. Passing
+`--data-dir` explicitly prevents setup from targeting the wrong library.
+
 ## Configure data directory
 
 You can point it anywhere, including an Obsidian vault:
@@ -54,6 +63,11 @@ ome config preview dataDir ~/Obsidian/Oh-My-Experience   # Preview changes
 ome config set dataDir ~/Obsidian/Oh-My-Experience       # Execute migration
 ome doctor                                                # Confirm success
 ```
+
+`dataDir` controls the global library and runtime state. It does not move
+project libraries. Project libraries are always discovered at
+`<project-root>/.oh-my-experience/`; initialize one with `ome project init` when
+the repository should carry its own cards.
 
 ## Install hooks
 

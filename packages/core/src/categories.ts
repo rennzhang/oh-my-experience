@@ -1,6 +1,6 @@
 import { CategoryRecordSchema, DEFAULT_CATEGORY, type CategoryRecord } from "./schema.js";
 import { layout, nowIso, operationLog, readJson, writeJsonAtomic } from "./storage.js";
-import { listCards } from "./cards.js";
+import { inspectCards } from "./cards.js";
 
 interface CategoryIndex {
   version: 1;
@@ -61,7 +61,7 @@ export function listCategories(dataDir: string): CategoryRecord[] {
     byName.set(name, CategoryRecordSchema.parse({ name, source: "manual", count: 0, createdAt: now, updatedAt: now }));
   }
   for (const category of readCategoryIndex(dataDir).categories) byName.set(category.name, category);
-  for (const card of listCards(dataDir)) {
+  for (const card of inspectCards(dataDir).cards) {
     const name = normalizeCategory(card.category);
     const current = byName.get(name) || CategoryRecordSchema.parse({ name, source: "card", count: 0, createdAt: now, updatedAt: now });
     byName.set(name, { ...current, source: current.source === "manual" ? "manual" : "card", count: current.count + 1 });

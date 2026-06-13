@@ -5,103 +5,93 @@ status: active
 
 # Introduction
 
-Oh My Experience is a local tool that remembers execution lessons from your AI
-coding sessions and recalls them at the right moment.
+<div class="ome-intro-brand">
+  <img src="/ome-logo.png" alt="Oh My Experience logo">
+  <p>Stop teaching your agent the same lesson twice.</p>
+</div>
 
-You correct your agent during real work. Those corrections become **experience
-cards** — a behavioral fix with trigger conditions. The next time a similar task
-comes up, the hook auto-injects the relevant card into the prompt.
+Oh My Experience (OME) helps your agent understand your way of working over
+time. It is a local-first experience recall layer for AI coding agents. It
+turns real Codex and Claude corrections, rework, and delivery lessons into
+reviewed experience cards, then recalls the most relevant reminder when a
+similar task appears again.
 
-Not stuffing every rule into every prompt. **Surfacing the right rule at the
-right moment.**
+OME is not about writing more rules. It is about timing: showing the right
+lesson while the agent can still change its next action.
 
-## Why not just AGENTS.md?
+## Why Developers Use It
 
-AGENTS.md and CLAUDE.md have two problems.
+AI coding agents are getting better at writing code, but they still lack
+durable judgment for your way of working.
 
-### Always-on context bloat
+OME helps you:
 
-Every prompt carries every rule. But most rules are conditional — they only
-matter for specific tasks.
+- Keep `AGENTS.md` and `CLAUDE.md` small.
+- Stop losing hard-won execution lessons in chat history.
+- Help agents remember the right skill, check, or release gate.
+- Review every lesson before it becomes active.
+- Stay local by default.
 
-A rule like "validate UI in a real browser before closing" doesn't belong in a
-backend refactoring session. Yet if it's in AGENTS.md, it's there every turn,
-burning tokens and diluting attention. The more rules you add, the weaker each
-one becomes.
+## Each Layer Has A Job
 
-OME keeps conditional rules out of always-on context. A card is only injected
-when the task envelope matches its triggers.
+AI agents already have many ways to keep context, but each layer solves a
+different problem.
 
-### Context compression eats your rules
+- `AGENTS.md` and `CLAUDE.md` are best as always-on entries: norms, maps, capability indexes, and collaboration boundaries.
+- Skills are best for repeatable workflows such as validation, release checks, or external-system operations.
+- Memory is best for facts, preferences, and long-term background that help the agent understand you and the project.
+- Rules are best for stable, pre-declared behavior constraints that apply by scope.
 
-AGENTS.md injects once at the very start of a conversation. Long sessions
-trigger context compression, and the initial rules can disappear — your agent
-forgets your conventions mid-task.
+OME adds a different layer: execution experience.
 
-OME's hook runs on every `UserPromptSubmit`. Lessons are re-injected fresh each
-turn. They can't be compressed away.
+Execution experience usually comes from a judgment formed during real work:
+why a step mattered last time, when it should matter again, which similar cases
+should not trigger it, and what reminder the agent should see before acting.
 
-### How they work together
+It is not always-on project guidance, and it is not a tool manual. It is
+recalled lightly when the current task matches, so rule files stay small and
+lessons do not get lost.
 
-You don't throw away AGENTS.md. It keeps the truly universal rules — the ones
-that apply to every task, every time. OME handles the conditional ones that
-only matter for certain work.
+See [Examples](examples.md) for a concrete `/goal` case that shows the matched
+experience card and the exact context mounted into the agent prompt.
 
-## The missing layer
+## How It Works
 
-Memory remembers facts. Skills package workflows. **OME remembers execution
-judgment.**
-
-- **Memory** knows you care about UI quality.
-- **A skill** knows how to run Playwright.
-- **An experience card** reminds the agent: don't call a UI task done without
-  checking the real browser, responsive states, interactions, loading states,
-  errors, and console.
-
-That's the layer most coding agents miss — not facts, not tools, but judgment
-from the last time the work went wrong.
-
-## How it works
-
-```
-real work → reflect scan → candidates → your review → active card
-→ prompt-time recall → stats → refinement
+```text
+real work -> reflect scan -> candidates -> human review -> active cards
+-> prompt-time recall -> match stats -> ongoing maintenance
 ```
 
-1. **Import sessions** from Codex (or optionally Spool for multi-agent)
-2. **Run a reflect scan** — your agent inspects sessions, finds where you
-   corrected it, and generates candidate cards
-3. **You review** — approve, reject, merge, or rewrite each candidate
-4. **Cards go active** — only after your explicit approval
-5. **Auto-recall** — the hook matches active cards to each new prompt
+1. **Import sessions** from local Codex history, or optionally from Spool.
+2. **Run a reflect scan** so the agent finds places where you corrected it.
+3. **Review candidates** one by one: approve, reject, merge, or rewrite.
+4. **Activate cards** only after they are confirmed.
+5. **Recall at prompt time** when the hook matches active cards to the current task.
+6. **Maintain the library** with stats and evals for coverage, stale cards, and noisy matches.
 
-Nothing enters the library without your review. AI-generated noise never
-becomes a permanent rule.
+## What You Get
 
-## Before and after
+- A local Markdown library of reviewed experience cards.
+- Optional project libraries at `<project-root>/.oh-my-experience/`.
+- Codex and Claude hooks for prompt-time recall.
+- Project-aware matching from one local hook.
+- Explicit ignore criteria for noisy words such as "goal", "review", and "release".
+- Explainable recall: matched cards, scores, reasons, and rendered context.
+- A Markdown-first review loop for candidates before they become active.
+- Isolated evaluation so retrieval changes do not pollute your real library.
 
-**Before OME:** Your AGENTS.md has 200 lines of rules. The agent still skips
-browser validation on UI work — the rule is buried between a Git convention
-and a release checklist. You correct it again.
+## Local And Reviewed By Default
 
-**After OME:** AGENTS.md has 30 lines of always-relevant rules. You say "fix
-the login page UI". The hook detects a UI task and recalls one card: "Don't
-call UI work done without real browser validation." That's the only extra
-context. The agent checks the browser before reporting done.
+The hook path does not call an LLM, use the network, or require an API key. If
+recall fails, it fails open and returns empty context so your agent still runs.
 
-## Safety by design
-
-- **No LLM on the hot path.** Retrieval is deterministic BM25-like matching.
-  No API keys, no network, no latency.
-- **Fail-open.** If the hook errors, it returns empty context — your prompt
-  still works.
-- **No raw prompt storage.** Hook events store prompt hashes and task
-  envelopes by default. Raw logging is opt-in with TTL.
-- **No auto-approval.** Nothing bypasses human review to become active.
-- **Local only.** No cloud, no accounts, no remote sync.
+By default, hook events store prompt hashes and task summaries, not raw prompts.
+Candidates created by reflect scans never become active automatically. Nothing
+bypasses human review to enter prompt-time recall.
 
 ## Next
 
-Start with the [Quickstart](/guides/quickstart) to see recall in 3 minutes.
-Read [Reflect and Review](/guides/reflect-review) to learn how to turn real
-corrections into experience cards.
+Start with the [Quickstart](/guides/quickstart) to install OME and verify your
+first recall. Use [Global And Project Libraries](/guides/project-libraries) if
+you want repository-level cards. Then read [Reflect and Review](/guides/reflect-review)
+to turn real corrections into reusable experience.

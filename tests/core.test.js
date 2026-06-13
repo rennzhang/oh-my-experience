@@ -16,24 +16,31 @@ import {
   evaluateRecallSuite,
   explainMatch,
   generateStats,
+  getCard,
   initializeDataDir,
+  initializeProjectLibrary,
   layout,
   listCards,
   listCategories,
   findSimilarCards,
   matchCards,
+  matchCardEntries,
   parseCardMarkdown,
+  projectLibraryPath,
   promoteDraft,
   previewApplyRetrospective,
   readCardFile,
   readCardIndex,
+  readLibraryStackCards,
   readSessionIndex,
   rebuildSessionCatalog,
   rebuildSessionIndex,
+  resolveLibraryStack,
   removeStarterCards,
   renderAdditionalContext,
   runDoctor,
   pruneMaterializedSessions,
+  serializeCard,
   setSessionStoreMode,
   withLock,
   writeCard,
@@ -62,6 +69,31 @@ function completeAudit(overrides = {}) {
     remainingEvidenceGaps: [],
     ...overrides,
   };
+}
+
+function candidateFromFixture(runId, fixture) {
+  return candidateFromLesson(runId, {
+    ...fixture,
+    criteria: {
+      use_when: fixture.triggers || [],
+      ignore_when: fixture.negativeTriggers || [],
+      ...(fixture.criteria || {}),
+    },
+    engine_hints: {
+      positive: fixture.requiredSignals || fixture.triggers || [],
+      negative: fixture.blockedSignals || fixture.negativeTriggers || [],
+      ...(fixture.engine_hints || {}),
+    },
+    recall: {
+      policy: fixture.recallPolicy || "should",
+      risk: fixture.risk || "medium",
+      confidence: fixture.confidence || "medium",
+      triggers: fixture.triggers || [],
+      topics: fixture.topics || [],
+      ...(fixture.recall || {}),
+    },
+    scope: fixture.scope || {},
+  });
 }
 
 function writeTestCandidates(dataDir, runId, candidates, options = {}) {
@@ -101,6 +133,57 @@ test("doctor dedupes PATH shims that resolve to the same ome binary", () => {
   }
 });
 
+test("doctor accepts duplicate PATH binaries when package identity matches", () => {
+  const dataDir = tmpDir("doctor-path-same-version");
+  initializeDataDir({ dataDir });
+  const binRoot = tmpDir("doctor-path-same-version-bin");
+  const installOne = path.join(binRoot, "install-one", "lib", "node_modules", "oh-my-experience");
+  const installTwo = path.join(binRoot, "install-two", "lib", "node_modules", "oh-my-experience");
+  const shimOne = path.join(binRoot, "shim-one");
+  const shimTwo = path.join(binRoot, "shim-two");
+  for (const install of [installOne, installTwo]) {
+    fs.mkdirSync(path.join(install, "bin"), { recursive: true });
+    fs.writeFileSync(path.join(install, "package.json"), JSON.stringify({ name: "oh-my-experience", version: "0.1.0" }), "utf8");
+    fs.writeFileSync(path.join(install, "bin", "ome.js"), "#!/usr/bin/env node\n", "utf8");
+  }
+  fs.mkdirSync(shimOne, { recursive: true });
+  fs.mkdirSync(shimTwo, { recursive: true });
+  fs.symlinkSync(path.join(installOne, "bin", "ome.js"), path.join(shimOne, "ome"));
+  fs.symlinkSync(path.join(installTwo, "bin", "ome.js"), path.join(shimTwo, "ome"));
+
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${shimOne}${path.delimiter}${shimTwo}`;
+  try {
+    const doctor = runDoctor(dataDir);
+    assert.equal(doctor.warnings.some((warning) => warning.includes("multiple ome binaries")), false);
+  } finally {
+    process.env.PATH = previousPath;
+  }
+});
+
+test("doctor treats invalid archived cards as governance warnings", () => {
+  const dataDir = tmpDir("doctor-invalid-archived");
+  initializeDataDir({ dataDir });
+  const invalidPath = path.join(layout(dataDir).archivedExperiences, "legacy-card.md");
+  fs.writeFileSync(invalidPath, "---\nid: legacy-card\nstatus: archived\n---\n# Legacy\n", "utf8");
+
+  const doctor = runDoctor(dataDir);
+  assert.equal(doctor.ok, true, doctor.errors.join("\n"));
+  assert.equal(doctor.checked.invalidCards, 1);
+  assert.match(doctor.warnings.join("\n"), /archived card schema invalid/);
+});
+
+test("doctor fails on invalid active cards", () => {
+  const dataDir = tmpDir("doctor-invalid-active");
+  initializeDataDir({ dataDir });
+  const invalidPath = path.join(layout(dataDir).activeExperiences, "broken-card.md");
+  fs.writeFileSync(invalidPath, "---\nid: broken-card\nstatus: active\n---\n# Broken\n", "utf8");
+
+  const doctor = runDoctor(dataDir);
+  assert.equal(doctor.ok, false);
+  assert.match(doctor.errors.join("\n"), /card schema invalid/);
+});
+
 test("plain review does not imply dispatch operation", () => {
   const envelope = buildTaskEnvelope("做一次交付前 review，看看能不能提交");
 
@@ -114,6 +197,27 @@ test("generic checks do not imply review or runtime", () => {
   assert.equal(envelope.intentModes.includes("review"), false);
   assert.equal(envelope.operations.includes("review"), false);
   assert.equal(envelope.taskTypes.includes("runtime"), false);
+});
+
+test("matcher keeps source names separate from execution commands", () => {
+  const envelope = buildTaskEnvelope("用 spool 查 019e90a5-9539-7922-86f1-ea81f9a3b01f，研究 github x 论文里的召回引擎设计。");
+
+  assert.deepEqual(envelope.commands, []);
+  assert.ok(envelope.surfaces.includes("spool"));
+  assert.ok(envelope.surfaces.includes("github"));
+  assert.ok(envelope.ruleSignals.some((signal) => signal.id === "historical_session_lookup"));
+  assert.equal(envelope.taskTypes.includes("git"), false);
+});
+
+test("matcher suppresses positive signals in explicit near-miss examples", () => {
+  const goalExample = buildTaskEnvelope("文档里要增加实际案例，比如当我说创建目标或者使用 /goal 斜杠命令时会加载什么经验，并展示给用户看。");
+  assert.ok(goalExample.ruleSignals.some((signal) => signal.id === "goal_example_discussion"));
+  assert.equal(goalExample.ruleSignals.some((signal) => signal.id === "goal_execute"), false);
+  assert.equal(goalExample.intentModes.includes("execute"), false);
+
+  const uiNoise = buildTaskEnvelope("这个提示里有 UI、browser 等噪声；真正任务是 npm tarball 安装验证。");
+  assert.ok(uiNoise.ruleSignals.some((signal) => signal.id === "ui_surface_noise"));
+  assert.equal(uiNoise.ruleSignals.some((signal) => signal.id === "ui_surface"), false);
 });
 
 test("init creates only the compact root storage model", () => {
@@ -202,24 +306,27 @@ test("init repairs a stale self config dataDir pointer", () => {
   assert.equal("locale" in repaired, false);
 });
 
-test("YAML dates parse as strings in card frontmatter", () => {
-  const card = parseCardMarkdown(`---
+test("legacy card schema is rejected instead of silently downgraded", () => {
+  assert.throws(() => parseCardMarkdown(`---
 id: dated-card
 status: active
 title: Dated card
 summary: Dated card summary
-rule: Keep dated card dates parseable.
-triggers: [date]
-topics: [frontmatter]
+criteria:
+  use_when: [date]
+recall:
+  triggers: [date]
+  topics: [frontmatter]
 created: 2026-05-27
 updated: 2026-05-28
 ---
 
-Card body.
-`);
-  assert.equal(typeof card.createdAt, "string");
-  assert.equal(typeof card.updatedAt, "string");
-  assert.match(card.createdAt, /^2026-05-27/);
+## 完整规则
+
+\`\`\`text
+Keep dated card dates parseable.
+\`\`\`
+`), /unsupported experience card schema/);
 });
 
 test("candidate to draft to active lifecycle is explicit", () => {
@@ -228,7 +335,7 @@ test("candidate to draft to active lifecycle is explicit", () => {
   removeStarterCards(dataDir);
   const runId = "run-1";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const candidate = candidateFromLesson(runId, {
+  const candidate = candidateFromFixture(runId, {
     title: "UI browser validation",
     summary: "UI changes were accepted without browser validation.",
     rule: "Open the real UI and check viewport and console.",
@@ -265,11 +372,12 @@ test("candidate to draft to active lifecycle is explicit", () => {
   assert.equal(readCardIndex(dataDir).experiences.length, 0);
   const applied = applyRetrospective(dataDir, runId);
   assert.equal(applied.drafts.length, 1);
-  assert.match(applied.drafts[0].body, /## 触发时机/);
-  assert.match(applied.drafts[0].body, /## 可复用规则/);
+  assert.match(applied.drafts[0].body, /## 这张卡解决什么问题/);
+  assert.match(applied.drafts[0].body, /## 使用标准/);
+  assert.match(applied.drafts[0].body, /## 完整规则/);
+  assert.match(applied.drafts[0].body, /Open the real UI and check viewport and console\./);
   assert.equal(applied.drafts[0].rule, "Open the real UI and check viewport and console.");
   assert.doesNotMatch(applied.drafts[0].rule, /```/);
-  assert.doesNotMatch(applied.drafts[0].body, /## Problem|## Anti-pattern|## Evidence|## Negative recall conditions/);
   assert.deepEqual(applied.drafts[0].sources, ["retrospective:run-1"]);
   assert.match(fs.readFileSync(reviewFile, "utf8"), /状态：applied_to_drafts/);
   const repeated = applyRetrospective(dataDir, runId);
@@ -277,6 +385,10 @@ test("candidate to draft to active lifecycle is explicit", () => {
   assert.equal(repeated.merges.length, 0);
   assert.equal(readCardIndex(dataDir).experiences.length, 0);
   promoteDraft(dataDir, applied.drafts[0].id);
+  const promoted = getCard(dataDir, applied.drafts[0].id);
+  assert.deepEqual(promoted.sources, ["retrospective:run-1"]);
+  assert.deepEqual(promoted.sourceRefs, [{ type: "retrospective", ref: "run-1" }]);
+  assert.equal(promoted.origin.createdBy, "retrospective");
   const index = readCardIndex(dataDir);
   assert.equal(index.experiences.length, 1);
   assert.equal(index.experiences[0].category, "产品与 UI");
@@ -286,7 +398,7 @@ test("retrospective candidates require source audit unless explicitly incomplete
   const dataDir = tmpDir("audit-required");
   initializeDataDir({ dataDir });
   const run = createRetrospectiveRun(dataDir, { title: "manual" });
-  const candidate = candidateFromLesson(run.runId, {
+  const candidate = candidateFromFixture(run.runId, {
     title: "Source audit gate",
     summary: "Candidates were written without source audit.",
     rule: "Complete source audit before writing candidates.",
@@ -310,7 +422,7 @@ test("retrospective candidates persist complete source audit", () => {
   const dataDir = tmpDir("audit-complete");
   initializeDataDir({ dataDir });
   const run = createRetrospectiveRun(dataDir, { title: "manual" });
-  const candidate = candidateFromLesson(run.runId, {
+  const candidate = candidateFromFixture(run.runId, {
     title: "Complete audit",
     summary: "A complete audit is required.",
     rule: "Attach the audit before candidate import.",
@@ -330,7 +442,7 @@ test("retrospective source audit requires explicit source coverage", () => {
   const dataDir = tmpDir("audit-source-coverage");
   initializeDataDir({ dataDir });
   const run = createRetrospectiveRun(dataDir, { title: "manual" });
-  const candidate = candidateFromLesson(run.runId, {
+  const candidate = candidateFromFixture(run.runId, {
     title: "Missing coverage",
     summary: "Audit did not say how much source was covered.",
     rule: "State source coverage separately from focus.",
@@ -348,7 +460,7 @@ test("retrospective apply can resume later decisions without duplicating earlier
   initializeDataDir({ dataDir });
   const runId = "run-incremental";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const first = candidateFromLesson(runId, {
+  const first = candidateFromFixture(runId, {
     title: "First lesson",
     summary: "P1",
     rule: "C1",
@@ -356,7 +468,7 @@ test("retrospective apply can resume later decisions without duplicating earlier
     topics: ["review"],
     evidence: ["fixture"],
   });
-  const second = candidateFromLesson(runId, {
+  const second = candidateFromFixture(runId, {
     title: "Second lesson",
     summary: "P2",
     rule: "C2",
@@ -380,7 +492,7 @@ test("categories can be created and assigned through retrospective decisions", (
   assert.equal(manual.name, "自定义验收");
   const runId = "run-category";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const candidate = candidateFromLesson(runId, {
+  const candidate = candidateFromFixture(runId, {
     title: "API pagination",
     summary: "List API had no pagination.",
     rule: "Use stable pagination.",
@@ -401,7 +513,7 @@ test("recall eval measures multilingual long prompts without AI calls", () => {
   initializeDataDir({ dataDir });
   const runId = "run-eval";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const browser = candidateFromLesson(runId, {
+  const browser = candidateFromFixture(runId, {
     title: "Browser validation",
     summary: "P",
     rule: "C",
@@ -410,7 +522,7 @@ test("recall eval measures multilingual long prompts without AI calls", () => {
     evidence: ["e"],
     recallPolicy: "must",
   });
-  const git = candidateFromLesson(runId, {
+  const git = candidateFromFixture(runId, {
     title: "Git scoped commit",
     summary: "P",
     rule: "C",
@@ -451,9 +563,20 @@ test("recall eval uses isolated fixture libraries by default", () => {
       title: "Isolated Browser Card",
       summary: "Browser validation should be evaluated in an isolated fixture library.",
       rule: "Evaluate browser validation without writing to the user's library.",
-      triggers: ["browser validation", "浏览器验证"],
-      topics: ["frontend"],
-      body: "Evaluate browser validation without writing to the user's library.",
+      criteria: {
+        use_when: ["browser validation", "浏览器验证"],
+      },
+      engine_hints: {
+        positive: ["ui_surface"],
+      },
+      recall: {
+        policy: "must",
+        risk: "high",
+        confidence: "medium",
+        triggers: ["browser validation", "浏览器验证"],
+        topics: ["frontend"],
+      },
+      scope: { level: "global" },
     }],
     cases: [{
       id: "isolated-hit",
@@ -474,7 +597,7 @@ test("match only recalls active cards", () => {
   initializeDataDir({ dataDir });
   const runId = "run-2";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const candidate = candidateFromLesson(runId, {
+  const candidate = candidateFromFixture(runId, {
     title: "Git safety",
     summary: "Dirty worktree was ignored.",
     rule: "Check git status and only touch scoped files.",
@@ -490,7 +613,18 @@ test("match only recalls active cards", () => {
   assert.equal(matchCards(dataDir, "git status before commit").length, 1);
 });
 
-test("hook context is neutral and carries applicability hints", () => {
+test("runtime recall fails closed when an active card file is invalid", () => {
+  const dataDir = tmpDir("match-invalid-active");
+  initializeDataDir({ dataDir });
+  const activePath = cardPath(dataDir, "active", "starter-code-kiss-root-cause");
+  writeTextAtomic(activePath, "---\nid: starter-code-kiss-root-cause\nstatus: active\n---\n# broken\n", dataDir);
+  assert.throws(
+    () => matchCards(dataDir, "fix the root cause"),
+    /unsupported experience card schema/,
+  );
+});
+
+test("hook context is neutral and carries scope hints", () => {
   const dataDir = tmpDir("context-neutral");
   initializeDataDir({ dataDir });
   const now = new Date().toISOString();
@@ -512,14 +646,60 @@ test("hook context is neutral and carries applicability hints", () => {
   });
   const matches = matchCards(dataDir, "neutral hook context");
   const context = renderAdditionalContext(matches, { maxChars: 2000 });
-  assert.match(context, /Potentially relevant OME lessons/);
-  assert.match(context, /Keyword matches can be ambiguous/);
+  assert.match(context, /OME candidate experience cards/);
+  assert.match(context, /Matched does not mean used/);
+  assert.match(context, /Final report: if you actually used any card/);
+  assert.match(context, /\*\*本次使用 N条 OME 经验卡：\*\*/);
   assert.match(context, /Summary: Keep hook output neutral/);
-  assert.match(context, /Full experience: ome experience show neutral-context --section rule/);
-  assert.match(context, /Use when: neutral hook context/);
-  assert.match(context, /Ignore when: unrelated task/);
+  assert.match(context, /Rule: ome experience show neutral-context --section rule/);
+  assert.match(context, /Use if: neutral hook context/);
+  assert.match(context, /Ignore if: unrelated task/);
+  assert.match(context, /Final link if used: \[Neutral context wording\]\(<experiences\/active\/neutral-context\.md>\)/);
+  assert.doesNotMatch(context, /Candidate links:/);
+  assert.doesNotMatch(context, /本次挂载/);
+  assert.doesNotMatch(context, /Final mounted-card disclosure/);
   assert.doesNotMatch(context, /must follow|必须遵守/i);
   assert.doesNotMatch(context, /可能相关的过往经验|关键词命中可能存在歧义/);
+});
+
+test("candidate links include all rendered cards without claiming usage", () => {
+  const dataDir = tmpDir("mounted-count");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  writeCard(dataDir, {
+    id: "alpha-mounted-card",
+    status: "active",
+    title: "Alpha mounted card",
+    category: "验证",
+    summary: "Alpha card should be mounted for alpha prompts.",
+    rule: "Use alpha mounted card.",
+    triggers: ["alpha-mounted-validation"],
+    topics: ["alpha"],
+    body: "Use alpha mounted card.",
+    createdAt: now,
+    updatedAt: now,
+  });
+  writeCard(dataDir, {
+    id: "beta-mounted-card",
+    status: "active",
+    title: "Beta mounted card",
+    category: "验证",
+    summary: "Beta card should be mounted for beta prompts.",
+    rule: "Use beta mounted card.",
+    triggers: ["beta-mounted-validation"],
+    topics: ["beta"],
+    body: "Use beta mounted card.",
+    createdAt: now,
+    updatedAt: now,
+  });
+  const matches = matchCards(dataDir, "alpha-mounted-validation beta-mounted-validation");
+  assert.equal(matches.length, 2);
+  const context = renderAdditionalContext(matches);
+  assert.match(context, /\*\*本次使用 N条 OME 经验卡：\*\*/);
+  assert.doesNotMatch(context, /本次挂载/);
+  assert.match(context, /\[Alpha mounted card\]\(<experiences\/active\/alpha-mounted-card\.md>\)/);
+  assert.match(context, /\[Beta mounted card\]\(<experiences\/active\/beta-mounted-card\.md>\)/);
 });
 
 test("retrieval collapses near duplicates without hiding scoped cards", () => {
@@ -583,6 +763,46 @@ test("retrieval collapses near duplicates without hiding scoped cards", () => {
   assert.ok(similar.some((item) => item.id === "browser-a"));
 });
 
+test("retrieval does not collapse distinct reviewed cards only because they share a signal", () => {
+  const dataDir = tmpDir("same-signal-distinct");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  for (const card of [
+    {
+      id: "module-boundary-cleanup",
+      title: "模块边界清理",
+      summary: "模块边界混乱时先拆职责。",
+      rule: "Separate module responsibilities before changing implementation.",
+      triggers: ["module boundary cleanup", "模块边界清理"],
+    },
+    {
+      id: "fallback-removal",
+      title: "删除 fallback 包袱",
+      summary: "fallback 掩盖问题时要删掉包袱。",
+      rule: "Remove fallback clutter when it hides the real failure.",
+      triggers: ["fallback removal", "删除 fallback 包袱"],
+    },
+  ]) {
+    writeCard(dataDir, {
+      ...card,
+      status: "active",
+      category: "工程质量",
+      negativeTriggers: [],
+      topics: ["architecture"],
+      requiredSignals: ["architecture_quality"],
+      recallPolicy: "should",
+      risk: "medium",
+      body: card.rule,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const matches = matchCards(dataDir, "请做高内聚低耦合优化：module boundary cleanup，同时做 fallback removal。", { threshold: 40 });
+  assert.deepEqual(matches.map((item) => item.card.id).sort(), ["fallback-removal", "module-boundary-cleanup"]);
+});
+
 test("negative triggers disambiguate overloaded terms like goal", () => {
   const dataDir = tmpDir("goal-ambiguity");
   initializeDataDir({ dataDir });
@@ -616,6 +836,8 @@ test("negative triggers disambiguate overloaded terms like goal", () => {
   assert.equal(businessGoal.some((item) => item.card.id === "agent-goal-routine"), false);
   const ordinaryGoal = matchCards(dataDir, "今天的目标是去公司验收前端页面，只讨论项目指标", { threshold: 40 });
   assert.equal(ordinaryGoal.some((item) => item.card.id === "agent-goal-routine"), false);
+  const docsExample = matchCards(dataDir, "文档里要增加实际案例，比如当我说创建目标或者使用 /goal 斜杠命令时会加载什么经验，并展示给用户看。", { threshold: 20 });
+  assert.equal(docsExample.some((item) => item.card.id === "agent-goal-routine"), false);
 });
 
 test("starter review flow only recalls for OME review work", () => {
@@ -633,6 +855,16 @@ test("starter review flow only recalls for OME review work", () => {
   assert.ok(reviewSurface[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "ome_review_surface"));
 });
 
+test("starter architecture card recalls for cohesive root-cause implementation work", () => {
+  const dataDir = tmpDir("starter-architecture-quality-gate");
+  initializeDataDir({ dataDir });
+
+  const match = matchCards(dataDir, "召回引擎还是不太行，急需优化，高内聚低耦合，逻辑要干净，不要继续堆兼容包袱。", { threshold: 40 });
+  assert.equal(match[0]?.card.id, "starter-code-kiss-root-cause");
+  assert.ok(match[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "architecture_quality"));
+  assert.match(renderAdditionalContext(match), /cohesive architecture, clean logic, or a root-cause fix/);
+});
+
 test("browser validation cards require a UI or browser surface", () => {
   const dataDir = tmpDir("browser-validation-surface-gate");
   initializeDataDir({ dataDir });
@@ -647,6 +879,8 @@ test("browser validation cards require a UI or browser surface", () => {
     triggers: ["浏览器验证", "真实浏览器", "前端验收", "UI 验收", "browser validation", "real browser"],
     negativeTriggers: [],
     topics: ["frontend", "ui", "test"],
+    requiredSignals: ["ui_surface"],
+    blockedSignals: ["ui_surface_noise"],
     recallPolicy: "must",
     risk: "high",
     body: "前端 UI 改动不能只靠静态检查。",
@@ -657,13 +891,81 @@ test("browser validation cards require a UI or browser surface", () => {
   const storageValidation = matchCards(dataDir, "把 dataDir 迁移到 Obsidian 子目录，必须 preview、backup、doctor 验证，不能误写真实根目录。", { threshold: 40 });
   assert.equal(storageValidation.some((item) => item.card.id === "browser-validation"), false);
 
+  const uiAsNoise = matchCards(dataDir, "这个提示里有 UI、hook、docs 等噪声；真正任务是 npm tarball 安装验证和 git status 检查。", { threshold: 40 });
+  assert.equal(uiAsNoise.some((item) => item.card.id === "browser-validation"), false);
+
   const browserValidation = matchCards(dataDir, "Fix a frontend UI bug and validate the result in a real browser.", { threshold: 40 });
   assert.equal(browserValidation[0]?.card.id, "browser-validation");
   assert.ok(browserValidation[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "ui_surface"));
 });
 
-test("global hooks filter project-specific cards by applicability", () => {
-  const dataDir = tmpDir("applicability");
+test("git safety cards require a real git operation, not a GitHub source mention", () => {
+  const dataDir = tmpDir("git-operation-gate");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  writeCard(dataDir, {
+    id: "git-commit-safety",
+    status: "active",
+    title: "脏工作区只处理本任务 diff",
+    category: "Git 安全",
+    summary: "Dirty worktree, stage, commit, format and user-change protection.",
+    rule: "Check git status and only stage this task's diff.",
+    triggers: ["git", "commit", "push", "stage", "脏工作区", "dirty", "diff", "worktree"],
+    negativeTriggers: ["GitHub 只是资料来源", "只读资料研究"],
+    topics: ["git", "worktree", "commit-safety", "user-change-protection"],
+    requiredSignals: ["worktree_diff_operation"],
+    recallPolicy: "must",
+    risk: "high",
+    body: "Check git status and only stage this task's diff.",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const githubResearch = matchCards(dataDir, "研究 github 和 X 上关于召回引擎设计的资料。", { threshold: 4 });
+  assert.equal(githubResearch.some((item) => item.card.id === "git-commit-safety"), false);
+  const githubSourceOnly = matchCards(dataDir, "GitHub 只是资料来源，帮我读 issue 背景，不要处理 diff。", { threshold: 40 });
+  assert.equal(githubSourceOnly.some((item) => item.card.id === "git-commit-safety"), false);
+  const noLocalGitOperation = matchCards(dataDir, "不涉及 git diff 或提交，只做代码阅读。", { threshold: 40 });
+  assert.equal(noLocalGitOperation.some((item) => item.card.id === "git-commit-safety"), false);
+  const gitOperation = matchCards(dataDir, "Before commit, run git status and keep unrelated dirty files out of the staged diff.", { threshold: 4 });
+  assert.equal(gitOperation[0]?.card.id, "git-commit-safety");
+  assert.ok(gitOperation[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "worktree_diff_operation"));
+});
+
+test("Spool handoff cards require historical-session lookup intent", () => {
+  const dataDir = tmpDir("spool-session-gate");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  writeCard(dataDir, {
+    id: "spool-session-context-anchoring",
+    status: "active",
+    title: "历史会话交接必须用 Spool UUID 锚定",
+    category: "会话交接",
+    summary: "Use stable Spool/session anchors when reusing historical conversation evidence.",
+    rule: "Record Spool/session UUID, turn ids, sourceRefs and current source-of-truth checks.",
+    triggers: ["Spool", "spool uuid", "session UUID", "历史会话", "会话交接"],
+    negativeTriggers: ["Spool 是可选导入来源", "不是当前召回前置条件"],
+    topics: ["spool", "session-handoff", "source-refs"],
+    requiredSignals: ["historical_session_lookup"],
+    recallPolicy: "should",
+    risk: "medium",
+    body: "Use stable Spool/session anchors when reusing historical conversation evidence.",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const optionalImport = matchCards(dataDir, "Spool 是可选导入来源，不是当前召回前置条件。", { threshold: 4 });
+  assert.equal(optionalImport.some((item) => item.card.id === "spool-session-context-anchoring"), false);
+  const historicalLookup = matchCards(dataDir, "用 spool 查 019e90a5-9539-7922-86f1-ea81f9a3b01f 的历史会话证据。", { threshold: 4 });
+  assert.equal(historicalLookup[0]?.card.id, "spool-session-context-anchoring");
+  assert.ok(historicalLookup[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "historical_session_lookup"));
+  assert.match(renderAdditionalContext(historicalLookup), /Matched by: task asks to look up historical session evidence/);
+});
+
+test("global hooks filter project-specific cards by scope", () => {
+  const dataDir = tmpDir("scope");
   initializeDataDir({ dataDir });
   const now = new Date().toISOString();
   writeCard(dataDir, {
@@ -753,6 +1055,88 @@ test("global hooks filter project-specific cards by applicability", () => {
   assert.equal(other.includes("project-family-browser-validation"), false);
 });
 
+test("project library cards merge with global recall without writing project events", () => {
+  const globalDataDir = tmpDir("project-stack-global");
+  initializeDataDir({ dataDir: globalDataDir });
+  removeStarterCards(globalDataDir);
+  const projectRoot = tmpDir("project-stack-repo");
+  fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "@example/project-stack" }), "utf8");
+  const projectInit = initializeProjectLibrary(projectRoot);
+  const projectLibrary = projectLibraryPath(projectRoot);
+  const now = new Date().toISOString();
+  writeCard(globalDataDir, {
+    id: "global-project-stack-validation",
+    status: "active",
+    title: "Global project stack validation",
+    category: "测试验收",
+    summary: "Global fallback for project library validation.",
+    rule: "Use the global validation path.",
+    triggers: ["project library validation"],
+    topics: ["project-library"],
+    applicability: { level: "global" },
+    body: "Use the global validation path.",
+    createdAt: now,
+    updatedAt: now,
+  });
+  writeCard(globalDataDir, {
+    id: "other-project-stack-validation",
+    status: "active",
+    title: "Other project validation",
+    category: "测试验收",
+    summary: "This card belongs to another project.",
+    rule: "Do not recall in this project.",
+    triggers: ["project library validation"],
+    topics: ["project-library"],
+    applicability: { level: "project", projectKey: "github.com/other/project" },
+    body: "Do not recall in this project.",
+    createdAt: now,
+    updatedAt: now,
+  });
+  fs.writeFileSync(path.join(projectLibrary, "experiences", "active", "project-stack-validation.md"), serializeCard({
+    id: "project-stack-validation",
+    status: "active",
+    title: "Project stack validation",
+    category: "测试验收",
+    summary: "Project-local validation should be preferred in this repository.",
+    rule: "Use the project-local validation path.",
+    triggers: ["project library validation"],
+    negativeTriggers: [],
+    aliases: {},
+    topics: ["project-library"],
+    applicability: { level: "global" },
+    intentModes: { include: [], exclude: [] },
+    requiredSignals: [],
+    blockedSignals: [],
+    language: "auto",
+    recallPolicy: "must",
+    risk: "high",
+    confidence: "high",
+    staleAfter: null,
+    sources: [],
+    origin: { adapter: "manual", agent: "codex", model: null, sessionId: null, projectKey: null, createdBy: "manual" },
+    sourceRefs: [],
+    body: "Use the project-local validation path.",
+    createdAt: now,
+    updatedAt: now,
+  }), "utf8");
+
+  const stack = resolveLibraryStack(globalDataDir, projectRoot);
+  const stackFromProjectLibrary = resolveLibraryStack(globalDataDir, projectLibrary);
+  assert.equal(projectInit.projectLibrary, projectLibrary);
+  assert.equal(stack.libraries.length, 2);
+  assert.equal(stackFromProjectLibrary.projectContext.root, projectRoot);
+  const cards = readLibraryStackCards(stack);
+  const matches = matchCardEntries(cards, "project library validation", { projectContext: stack.projectContext, threshold: 20 });
+  const ids = matches.map((match) => match.card.id);
+  assert.equal(ids[0], "project-stack-validation");
+  assert.ok(matches[0].similarCards.some((card) => card.id === "global-project-stack-validation"));
+  assert.equal(ids.includes("other-project-stack-validation"), false);
+  const context = renderAdditionalContext(matches);
+  assert.ok(context.includes(`[Project stack validation](<${path.join(projectLibrary, "experiences", "active", "project-stack-validation.md")}>)`));
+  assert.match(context, /ome experience show project-stack-validation --scope project --section rule/);
+  assert.equal(fs.existsSync(path.join(projectLibrary, "events.jsonl")), false);
+});
+
 test("card ids reject path separators", () => {
   const dataDir = tmpDir("card-id");
   initializeDataDir({ dataDir });
@@ -776,8 +1160,8 @@ test("matcher handles partial trigger tokens and Chinese variants", () => {
   removeStarterCards(dataDir);
   const runId = "run-token";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const candidate = candidateFromLesson(runId, {
-    title: "Git commit safety",
+  const candidate = candidateFromFixture(runId, {
+    title: "Mixed trigger token matching",
     summary: "P",
     rule: "C",
     triggers: ["git commit", "浏览器验证"],
@@ -805,7 +1189,6 @@ test("starter lessons recall Linear-style Kanban workflow guidance", () => {
   const matches = matchCards(dataDir, query);
   assert.equal(matches[0]?.card.id, "starter-product-design-real-workflow");
   assert.match(matches[0]?.card.summary || "", /workflow clarity and operational density/);
-  assert.match(matches[0]?.card.bodyExcerpt || "", /Avoid landing pages, decorative heroes/);
   const context = renderAdditionalContext(matches);
   assert.match(context, /Build Linear-style tool screens around workflow, not decoration/);
   assert.match(context, /workflow clarity and operational density/);
@@ -816,7 +1199,7 @@ test("review rewrite creates rewritten draft and merge updates target card", () 
   initializeDataDir({ dataDir });
   const runId = "run-3";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const first = candidateFromLesson(runId, {
+  const first = candidateFromFixture(runId, {
     title: "Target card",
     summary: "P",
     rule: "C",
@@ -831,7 +1214,7 @@ test("review rewrite creates rewritten draft and merge updates target card", () 
 
   const runId2 = "run-4";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId2), { recursive: true });
-  const rewrite = candidateFromLesson(runId2, {
+  const rewrite = candidateFromFixture(runId2, {
     title: "Rewrite card",
     summary: "P",
     rule: "old",
@@ -839,7 +1222,7 @@ test("review rewrite creates rewritten draft and merge updates target card", () 
     topics: ["core"],
     evidence: ["e"],
   });
-  const merge = candidateFromLesson(runId2, {
+  const merge = candidateFromFixture(runId2, {
     title: "Merge card",
     summary: "P",
     rule: "merged approach",
@@ -853,8 +1236,9 @@ test("review rewrite creates rewritten draft and merge updates target card", () 
   const result = applyRetrospective(dataDir, runId2);
   assert.equal(result.drafts.length, 1);
   const mergedCard = readCardFile(cardPath(dataDir, "active", draft.id));
+  assert.match(mergedCard.rule, /merged approach/);
+  assert.match(mergedCard.body, /## 完整规则/);
   assert.match(mergedCard.body, /merged approach/);
-  assert.doesNotMatch(mergedCard.body, /Merged lesson|Revision Notes/);
   assert.equal(matchCards(dataDir, "merged").length, 1);
 });
 
@@ -863,7 +1247,7 @@ test("review merge and rewrite fail fast when payload is incomplete", () => {
   initializeDataDir({ dataDir });
   const runId = "run-5";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const candidate = candidateFromLesson(runId, {
+  const candidate = candidateFromFixture(runId, {
     title: "Needs payload",
     summary: "P",
     rule: "C",
@@ -884,7 +1268,7 @@ test("retrospective candidates reject duplicate ids before apply", () => {
   initializeDataDir({ dataDir });
   const runId = "run-dupe";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const candidate = candidateFromLesson(runId, {
+  const candidate = candidateFromFixture(runId, {
     title: "Same",
     summary: "P",
     rule: "C",
@@ -900,7 +1284,7 @@ test("doctor fails when active index is stale", () => {
   initializeDataDir({ dataDir });
   const runId = "run-index";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const candidate = candidateFromLesson(runId, {
+  const candidate = candidateFromFixture(runId, {
     title: "Indexed card",
     summary: "P",
     rule: "C",
@@ -1095,7 +1479,7 @@ test("stats does not mark every card stale before hook is installed", () => {
   initializeDataDir({ dataDir });
   const runId = "run-stats";
   fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
-  const candidate = candidateFromLesson(runId, {
+  const candidate = candidateFromFixture(runId, {
     title: "Stats card",
     summary: "P",
     rule: "C",

@@ -294,6 +294,9 @@ function mergeCandidateIntoCard(dataDir: string, candidate: RetrospectiveCandida
     blockedSignals: Array.from(new Set([...card.blockedSignals, ...candidate.blockedSignals])),
     applicability: mergeApplicability(card.applicability, candidate.applicability),
     sources: Array.from(new Set([...card.sources, `retrospective:${runId}`])),
+    origin: card.origin.createdBy === "manual"
+      ? { ...card.origin, adapter: card.origin.adapter === "unknown" ? "manual" : card.origin.adapter, createdBy: "retrospective" as const }
+      : card.origin,
     sourceRefs: Array.from(new Map([
       ...card.sourceRefs,
       { type: "retrospective" as const, ref: runId },
@@ -301,7 +304,7 @@ function mergeCandidateIntoCard(dataDir: string, candidate: RetrospectiveCandida
     ].map((item) => [`${item.type}:${item.ref}`, item])).values()),
     summary: card.summary || candidate.summary,
     rule: appendUniqueRule(card.rule, candidate.rule),
-    body: mergeReusableRuleInBody(card.body, candidate.rule),
+    body: card.body,
     updatedAt: nowIso(),
   };
   writeCard(dataDir, next);
@@ -314,20 +317,11 @@ function appendUniqueRule(current: string, reusableRule: string): string {
   return `${current.trim()}\n\n${next}`.trim();
 }
 
-function mergeReusableRuleInBody(current: string, reusableRule: string): string {
-  const next = reusableRule.trim();
-  if (!next || current.includes(next)) return current;
-  const heading = "## 可复用规则";
-  const index = current.indexOf(heading);
-  if (index < 0) return [current.trim(), "", heading, next].join("\n");
-  const afterHeading = index + heading.length;
-  const nextHeading = current.indexOf("\n## ", afterHeading);
-  if (nextHeading < 0) return `${current.trim()}\n\n${next}`;
-  return `${current.slice(0, nextHeading).trim()}\n\n${next}${current.slice(nextHeading)}`;
-}
-
 export function candidateFromLesson(runId: string, lesson: JsonRecord): RetrospectiveCandidate {
   const title = lesson.title || "Untitled lesson";
+  const criteria = asRecord(lesson.criteria);
+  const recall = asRecord(lesson.recall);
+  const engineHints = asRecord(lesson.engine_hints);
   return RetrospectiveCandidateSchema.parse({
     id: slugify(`${title}-${hashText(JSON.stringify(lesson)).slice(0, 8)}`),
     runId,
@@ -335,20 +329,37 @@ export function candidateFromLesson(runId: string, lesson: JsonRecord): Retrospe
     category: normalizeCategory(lesson.category || lesson.categoryName || inferCategory(lesson)),
     summary: lesson.summary,
     rule: lesson.rule,
-    triggers: Array.isArray(lesson.triggers) ? lesson.triggers : [],
-    negativeTriggers: Array.isArray(lesson.negativeTriggers) ? lesson.negativeTriggers : [],
-    topics: Array.isArray(lesson.topics) ? lesson.topics : [],
-    intentModes: lesson.intentModes || lesson.intent_modes || {},
-    requiredSignals: Array.isArray(lesson.requiredSignals || lesson.required_signals) ? (lesson.requiredSignals || lesson.required_signals) : [],
-    blockedSignals: Array.isArray(lesson.blockedSignals || lesson.blocked_signals) ? (lesson.blockedSignals || lesson.blocked_signals) : [],
-    applicability: lesson.applicability || {},
+    triggers: toStringArray(recall.triggers).length ? toStringArray(recall.triggers) : toStringArray(criteria.use_when),
+    negativeTriggers: toStringArray(criteria.ignore_when),
+    topics: toStringArray(recall.topics),
+    intentModes: criteria.intent_modes || {},
+    requiredSignals: toStringArray(engineHints.positive),
+    blockedSignals: toStringArray(engineHints.negative),
+    applicability: normalizeScope(lesson.scope || {}),
     evidence: Array.isArray(lesson.evidence) ? lesson.evidence : [],
     origin: lesson.origin || {},
-    sourceRefs: Array.isArray(lesson.sourceRefs) ? lesson.sourceRefs : Array.isArray(lesson.source_refs) ? lesson.source_refs : [],
+    sourceRefs: Array.isArray(lesson.sourceRefs) ? lesson.sourceRefs : [],
     conflicts: Array.isArray(lesson.conflicts) ? lesson.conflicts : [],
-    risk: lesson.risk || "medium",
-    recallPolicy: lesson.recallPolicy || lesson.recall_policy || "should",
+    risk: recall.risk || "medium",
+    recallPolicy: recall.policy || "should",
   });
+}
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+function normalizeScope(value: unknown): JsonRecord {
+  const input = asRecord(value);
+  return {
+    ...input,
+    projectKey: input.projectKey ?? input.project_key ?? null,
+    modulePath: input.modulePath ?? input.module_path ?? null,
+  };
 }
 
 function deriveRetrospectiveState(runDir: string, candidates: RetrospectiveCandidate[], decisions: RetrospectiveDecision[]): string {
@@ -503,7 +514,7 @@ function candidateWithDecision(candidate: RetrospectiveCandidate, decision: Retr
     ...rewrite,
     runId: candidate.runId,
     category: normalizeCategory(rewrite.category || candidate.category),
-    applicability: rewrite.applicability || candidate.applicability,
+    applicability: rewrite.scope ? normalizeScope(rewrite.scope) : candidate.applicability,
   });
 }
 

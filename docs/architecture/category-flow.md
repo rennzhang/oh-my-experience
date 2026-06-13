@@ -27,14 +27,14 @@ session/source
   source value.
 - Reflect candidate generation should provide a category. If omitted, the CLI infers one
   from title, topics, triggers, summary, and rule.
-- Users can create a category before assigning it. Empty categories are allowed;
-  they make later candidate intake easier.
+- Categories are free-form metadata carried by candidates and cards. There is no
+  separate category registry command.
 - Review should keep the default path light: show the category in the worksheet
   and expose override only when the inferred category is wrong.
 
 ## Default Categories
 
 
-These are starting points, not a closed taxonomy. Users may create more
-categories from the CLI. Project fit belongs in `applicability`, not in category
-names.
+These are starting points, not a closed taxonomy. New category names can appear
+on candidates or cards as needed. Project fit belongs in `scope`, not in
+category names.

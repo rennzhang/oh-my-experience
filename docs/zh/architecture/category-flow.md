@@ -26,9 +26,9 @@ session/source
 - `category` 是 candidate、card 和 active index 上的一等字段。
 - `sources` 只记录证据和来源。不要把分类写成 source 值。
 - reflect candidate generation 应提供 category。如果缺失，CLI 会根据 title、topics、triggers、summary 和 rule 推断。
-- 用户可以先创建分类再分配。允许空分类存在，因为它们可以让后续 candidate intake 更顺畅。
+- 分类是 candidate 和 card 携带的自由文本 metadata。当前没有单独的 category registry 命令。
 - Review 默认路径必须轻：在 worksheet 中展示分类，只在推断分类错误时覆盖。
 
 ## 默认分类
 
-默认分类只是起点，不是封闭 taxonomy。用户可以从 CLI 创建更多分类。项目适配关系属于 `applicability`，不应该塞进分类名称。
+默认分类只是起点，不是封闭 taxonomy。需要新分类时，candidate 或 card 可以直接携带新的分类名称。项目适配关系属于 `scope`，不应该塞进分类名称。

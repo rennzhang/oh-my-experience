@@ -47,6 +47,7 @@ setup -> recall -> retrospective -> draft -> active -> eval -> maintenance
 
 - Keep the lifecycle explicit: `candidate -> draft -> active -> archived`.
 - Never create or edit active cards directly; create retrospective runs with `ome reflect start`, manage existing runs with `ome reflect ...`, then use `ome experience promote`.
+- Use `--scope project` only when the user wants cards written to the current project's `.oh-my-experience/` library.
 - Never install or overwrite real Codex hooks unless the user explicitly confirms.
 - Never store raw prompt text in events unless the user explicitly opts into that behavior.
 - Keep Spool optional. If Spool is unavailable, Codex session import and local recall still need to work.

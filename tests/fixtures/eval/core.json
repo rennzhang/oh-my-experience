@@ -182,6 +182,70 @@
       ]
     },
     {
+      "id": "goal-doc-example-only",
+      "difficulty": "hard",
+      "prompt": "文档里要增加实际案例，比如当我说创建目标或者使用 /goal 斜杠命令时会加载什么经验，并展示给用户看。",
+      "expectedCards": [],
+      "unexpectedCards": [
+        "agent-goal-execution"
+      ],
+      "expectNoMatches": true,
+      "tags": [
+        "goal",
+        "docs",
+        "negative",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "github-research-not-git",
+      "difficulty": "hard",
+      "prompt": "研究 GitHub、X 和论文里的召回引擎设计，重点是检索准确性、query routing 和 reranking；GitHub 这里只是资料来源。",
+      "expectedCards": [],
+      "unexpectedCards": [
+        "git-commit-safety"
+      ],
+      "expectNoMatches": true,
+      "tags": [
+        "git",
+        "research",
+        "negative",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "spool-uuid-history-lookup",
+      "difficulty": "medium",
+      "prompt": "用 spool 查 019e90a5-9539-7922-86f1-ea81f9a3b01f，回溯那次历史会话里到底挂了哪些经验。",
+      "expectedCards": [
+        "spool-session-context-anchoring"
+      ],
+      "unexpectedCards": [
+        "git-commit-safety"
+      ],
+      "tags": [
+        "spool",
+        "history",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "spool-optional-import-not-handoff",
+      "difficulty": "medium",
+      "prompt": "安装文档里说明 Spool 是可选导入来源，不是 Codex 召回的前置条件。",
+      "expectedCards": [],
+      "unexpectedCards": [
+        "spool-session-context-anchoring"
+      ],
+      "expectNoMatches": true,
+      "tags": [
+        "spool",
+        "docs",
+        "negative",
+        "zh-CN"
+      ]
+    },
+    {
       "id": "hard-noisy-release-git-package",
       "difficulty": "hard",
       "prompt": "我准备把一个本地-first agent 工具做成 public alpha：不要发布，但必须打包 npm tarball，在临时目录安装验证，再检查 git status，确保 unrelated dirty files 不进发布 diff。这个提示里还有 UI、hook、docs、Claude、Codex 等噪声，但真正的发布前阻塞是 package install smoke 和 git commit scope。",
@@ -264,6 +328,41 @@
         "hook",
         "provider",
         "mixed"
+      ]
+    },
+    {
+      "id": "architecture-quality-retrieval-engine",
+      "difficulty": "medium",
+      "prompt": "召回引擎还是不太行，急需优化，高内聚低耦合，逻辑要干净，不要继续堆兼容包袱。",
+      "expectedCards": [
+        "architecture-root-cause"
+      ],
+      "unexpectedCards": [
+        "agent-goal-execution",
+        "git-commit-safety"
+      ],
+      "tags": [
+        "architecture",
+        "retrieval",
+        "zh-CN"
+      ]
+    },
+    {
+      "id": "goal-plus-architecture-quality",
+      "difficulty": "hard",
+      "prompt": "召回引擎还是不太行实测了一下急需优化不限时间创建目标开始优化，高内聚低耦合。",
+      "expectedCards": [
+        "agent-goal-execution",
+        "architecture-root-cause"
+      ],
+      "unexpectedCards": [
+        "git-commit-safety"
+      ],
+      "tags": [
+        "goal",
+        "architecture",
+        "retrieval",
+        "zh-CN"
       ]
     }
   ]

@@ -24,15 +24,28 @@ status: active
 
 ```json
 {
-  "surfaces": ["frontend", "test"],
-  "risks": ["validation"],
-  "operations": ["review"],
-  "constraints": ["必须", "真实"],
-  "files": ["packages/cli/src/main.ts"],
-  "commands": ["npm test"],
+  "summary": "Fix UI and validate in browser",
+  "language": "en",
+  "taskTypes": ["ui"],
+  "surfaces": ["ui"],
+  "risks": [],
+  "operations": ["fix"],
+  "constraints": [],
+  "files": [],
+  "commands": [],
+  "intentModes": [],
+  "ruleSignals": [
+    {
+      "id": "ui_surface",
+      "polarity": "positive",
+      "weight": 14,
+      "reason": "UI, browser, or frontend validation wording"
+    }
+  ],
   "keywords": ["UI", "browser", "validate"],
-  "language": "mixed",
-  "segments": ["Fix UI and validate in browser"]
+  "negativeKeywords": [],
+  "segments": ["Fix UI and validate in browser"],
+  "length": 30
 }
 ```
 
@@ -40,18 +53,27 @@ status: active
 
 ```json
 {
-  "cardId": "browser-validation",
+  "rank": 1,
+  "id": "browser-validation",
+  "title": "Browser Validation",
   "score": 12.4,
-  "recall_policy": "must",
+  "recallPolicy": "must",
+  "risk": "high",
+  "confidence": "high",
+  "summary": "Open the real browser after UI changes.",
+  "card": {
+    "libraryScope": "project"
+  },
   "reasons": [
     { "field": "triggers", "term": "browser validation", "weight": 5 },
     { "field": "topics", "term": "frontend", "weight": 2 }
-  ]
+  ],
+  "similarCards": []
 }
 ```
 
-Cards whose `applicability` does not match the detected `projectContext` are
-filtered out before scoring.
+Cards whose active-card `scope` does not match the detected `projectContext`
+are filtered out before scoring.
 
 The CLI explain surface wraps the same data with envelope and query diagnostics:
 
@@ -68,12 +90,21 @@ ome match "Fix UI and validate in browser" --explain --json
     "modulePath": "apps/web",
     "source": "git"
   },
+  "libraries": [
+    { "scope": "global", "exists": true, "readable": true },
+    { "scope": "project", "exists": true, "readable": true }
+  ],
   "matches": [
     {
       "rank": 1,
       "id": "browser-validation",
       "score": 12.4,
-      "reasons": [],
+      "card": {
+        "libraryScope": "project"
+      },
+      "reasons": [
+        { "field": "ruleSignals", "term": "ui_surface", "weight": 14 }
+      ],
       "similarCards": [
         {
           "id": "browser-validation-overlap",
@@ -84,16 +115,31 @@ ome match "Fix UI and validate in browser" --explain --json
       ]
     }
   ],
-  "additionalContext": "Potentially relevant OME lessons. Use only when directly applicable; ignore if unrelated or conflicting.\\nKeyword matches can be ambiguous; compare each lesson's workflow meaning, use cases, and ignore cases against the current request before applying it.\\n..."
+  "additionalContext": "OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.\\nFinal report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
 }
 ```
+
+`libraries` describes the global/project library stack used for the match.
+Project cards include `libraryScope: project`; their rendered full-card command
+uses `ome experience show CARD_ID --scope project --section rule`.
 
 `similarCards` lists near-duplicates that were omitted from the ranked output.
 The renderer can mention them as omitted related cards, but it should not inject
 duplicate full lessons.
 
-`additionalContext` uses a fixed English frame. Card body content stays in the
-language stored on the card.
+`ruleSignals` are internal recall hints derived from the prompt. Positive
+engine hints boost cards when the prompt strongly resembles the right workflow;
+negative engine hints suppress common false positives. They are heuristic
+signals, not the final usage standard. Hook context renders natural-language
+criteria and match reasons instead of exposing hint ids.
+
+`additionalContext` uses a fixed English frame and contains only compact index
+information. Card rule bodies are not injected. Matched cards are candidates,
+not proof that the agent used them. The frame tells the agent to ignore
+unrelated or conflicting cards, fetch the rule only when a card applies, and to
+mention only cards it actually used in the final response:
+`**本次使用 N条 OME 经验卡：** [Card title](<card-path>)`. Card titles are rendered
+as Markdown links to the relevant experience card paths.
 
 ## Budgeted Context
 

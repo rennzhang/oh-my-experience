@@ -32,17 +32,19 @@ Not every session needs one. Good times:
 
 Copy this to your agent:
 
-> Run an OME reflect scan over my recent coding sessions:
->
-> 1. Run `ome reflect start --focus "recent execution mistakes I corrected"`
-> 2. Check recent sessions for places where I corrected you. Look for:
->    - You skipped a validation step (browser check, test run, etc.)
->    - You silently swallowed an error with a fallback
->    - You mixed in unrelated changes
->    - You forgot a project-specific process
-> 3. Generate candidates and write them to a file
-> 4. Run `ome reflect candidates RUN_ID --from-file FILE`
-> 5. Run `ome reflect show RUN_ID` to display all candidates
+```text
+Run an OME reflect scan over my recent coding sessions:
+
+1. Run `ome reflect start --focus "recent execution mistakes I corrected"`.
+2. Check recent sessions for places where I corrected you. Look for:
+   - You skipped a validation step (browser check, test run, etc.)
+   - You silently swallowed an error with a fallback
+   - You mixed in unrelated changes
+   - You forgot a project-specific process
+3. Generate candidates and write them to a file.
+4. Run `ome reflect candidates RUN_ID --from-file FILE`.
+5. Run `ome reflect show RUN_ID` to display all candidates.
+```
 
 ### Narrowing the focus
 
@@ -63,11 +65,13 @@ Each candidate must include:
 
 | Field | Meaning | Example |
 |-------|---------|---------|
-| Problem | What went wrong | UI task reported done without real browser validation |
-| Anti-pattern | What not to do | Checking only console/screenshots and calling it done |
-| Correct approach | What to do instead | Launch real browser, check responsive states, interactions, loading, errors, and console |
-| Triggers | When to recall | UI changes, frontend fixes, page style adjustments |
-| Negative triggers | When not to recall | Backend-only changes, database migrations, config tweaks |
+| `summary` | One sentence covering failure mode, use case, ignore case, and expected action | UI changes need real browser validation; backend-only or docs-only work should ignore this card |
+| `criteria.use_when` | Natural-language standards for when the model should use the card | UI changes, frontend fixes, page style adjustments |
+| `criteria.ignore_when` | Natural-language near misses that should not use the card | Backend-only changes, database migrations, documentation examples |
+| `recall.triggers` | Compact matcher anchors, usually 3-5 short phrases from `use_when` | browser validation, UI验收 |
+| `recall.topics` | Broad surfaces used for explainability and weighting | frontend, browser |
+| `scope` | Where the card can be recalled | `{ "level": "global" }` |
+| `rule` | Complete executable rule the agent reads after deciding the card applies | Launch real browser, check responsive states, interactions, loading, errors, and console |
 
 **Good card:** one behavioral correction, precise triggers, will match accurately on future tasks.
 **Bad candidate:** too vague ("value code quality"), too narrow (only applies to one file), no actionable instruction for the agent.
@@ -78,13 +82,16 @@ After the agent shows the candidates, decide one by one.
 
 Copy this to your agent:
 
-> Show me all candidates from run RUN_ID one at a time. For each, show:
-> - Problem
-> - Wrong approach
-> - Correct approach
-> - Trigger conditions
->
-> Then ask whether I want to approve, reject, merge, or rewrite.
+```text
+Show me all candidates from run RUN_ID one at a time. For each, show:
+
+- Summary
+- Use criteria
+- Ignore criteria
+- Complete rule text
+
+Then ask whether I want to approve, reject, merge, or rewrite.
+```
 
 For each candidate, ask three questions:
 1. Will this situation happen again?
@@ -95,10 +102,13 @@ For each candidate, ask three questions:
 
 After deciding on each candidate, have the agent apply the results:
 
-> Help me apply the review decisions:
-> 1. `ome reflect apply RUN_ID --dry-run` to preview
-> 2. `ome reflect apply RUN_ID` to write drafts
-> 3. For cards that should be active, `ome experience promote DRAFT_ID`
+```text
+Help me apply the review decisions:
+
+1. Run `ome reflect apply RUN_ID --dry-run` to preview the drafts that would be written.
+2. Run `ome reflect apply RUN_ID` to write drafts.
+3. For cards that should become active, run `ome experience promote DRAFT_ID`.
+```
 
 Applying creates drafts. Promoting makes them active. You can inspect and edit
 drafts in between.
@@ -107,12 +117,12 @@ drafts in between.
 
 Verify immediately after promoting:
 
-> Use ome match to verify the new cards. Simulate a task similar to where the
-> mistake happened and check whether the new cards hit.
->
-> ```
-> ome match "a realistic task description" --explain
-> ```
+```text
+Use `ome match` to verify the new cards.
+Simulate a task similar to where the mistake happened and check whether the new cards hit.
+
+ome match "a realistic task description" --explain
+```
 
 ## Decision reference
 
@@ -130,7 +140,7 @@ More cards is not better. A few long-term habits:
 - **Fewer, sharper cards.** 10 cards that recall precisely beat 50 vague rules.
 - **Check stats regularly.** `ome stats` shows which cards haven't matched — consider archiving them.
 - **Deduplicate.** If a new card feels similar to an old one, merge them.
-- **Fix over-triggering.** If a card fires on unrelated tasks, add negative triggers or narrow tags.
+- **Fix over-triggering.** If a card fires on unrelated tasks, tighten `criteria.ignore_when`, `recall.triggers`, topics, or scope.
 
 ---
 
@@ -138,7 +148,7 @@ More cards is not better. A few long-term habits:
 
 Use this whenever you want to run a reflect scan:
 
-```
+```text
 Run an OME reflect scan over my recent [time period / project name] coding sessions.
 
 Steps:
@@ -148,6 +158,6 @@ Steps:
 4. ome reflect show RUN_ID to display candidates
 5. Wait for me to approve/reject/merge/rewrite each one
 
-Each candidate must include: problem, anti-pattern, correct approach, triggers, negative triggers.
+Each candidate must use the current OME candidate JSON shape: audit plus summary, criteria, recall, scope, and rule. Add engine_hints only when a concrete internal signal is needed.
 Only extract reusable execution judgment — don't turn one-off context into rules.
 ```

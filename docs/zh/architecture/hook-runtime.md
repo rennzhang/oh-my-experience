@@ -45,7 +45,11 @@ ome init --provider claude
 ```
 
 提示词进入 hook 时，共享运行时会检测当前工作目录，推导 project context，然后在
-评分前应用每张卡片的 `applicability`。
+评分前应用每张卡片的 `scope`。
+
+如果项目根目录下存在 `<project-root>/.oh-my-experience/`，runtime 会把它和全局
+`dataDir` 经验库一起读取。读取路径 fail-open：项目库不存在或不可读时，全局召回仍然
+可用。
 
 ## 热路径约束
 
@@ -57,6 +61,7 @@ Hook runtime 必须：
 - 默认不保存原始 prompt；
 - 记录结构化事件，供 stats 和 debugging 使用；
 - 记录脱敏后的 project context；
+- hook events 写入全局 `dataDir`，不写入项目经验库；
 - 在 `retrieval.hookTimeoutMs` 内完成，让大库超时也 fail open，而不是阻塞 Agent
   prompt path。
 

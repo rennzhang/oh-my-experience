@@ -14,6 +14,11 @@ Agent 收到以下指令时执行本指南：
 **不要**把本指南用于从历史会话中提炼新经验。会话扫描和新候选生成走
 `references/reflect-retrospective.md`。
 
+两份指南共享同一套卡片质量标准：`summary`、使用标准、排除边界、召回锚点、engine hints 和 rule 都必须服务“准确召回、低噪音、可执行”。区别是：
+
+- `reflect-retrospective.md` 负责从历史会话深扫出新候选。
+- 本指南负责净化、合并、归档和修复现有经验卡。
+
 需要执行 `ome` 命令时，先读 `references/cli.md`。本指南只规定经验库治理流程，
 不替代 CLI 手册。
 
@@ -42,6 +47,8 @@ Agent 收到以下指令时执行本指南：
   `candidate -> draft -> active`，验证命中后再归档旧卡。
 - **保留历史，不保留噪音**：archived 卡和 retrospective 可以保留审计历史；active 库只保留
   当前可用、边界清楚、不会互相污染的经验。
+- **净化不是兼容旧字段**：当前 schema 才是事实来源。字段变更后，应迁移或归档旧内容，不保留两套逻辑。
+- **archived 也要能被系统读懂**：归档卡不参与召回，但不应持续制造 doctor 噪音。旧格式归档卡可以迁成当前格式的归档卡，并在备份目录保留原文。
 
 ## 工作模式
 
@@ -72,7 +79,7 @@ Agent 收到以下指令时执行本指南：
    - Active 库规模和分类分布。
    - P0：明显污染、错误、冲突或应归档。
    - P1：需要重写、合并、收窄或补负触发。
-   - P2：可读性、标题、分类、证据字段优化。
+   - P2：可读性、标题、分类、证据字段和 archived schema 噪音优化。
    - 建议的单条复盘顺序。
 5. 引导用户进入单条复盘：
    - 优先建议一次处理 1 张或 1 个紧密簇。
@@ -157,13 +164,88 @@ ome experience archive <card-id> --reason "<reason>" --json
 每张 active 卡都应满足：
 
 - **独立场景**：一句话能说清它何时比其他卡更该出现。
-- **触发准确**：triggers 是用户自然表达中的短锚点，不是长句、抽象形容词或 rule 摘抄。
-- **负触发明确**：对 overloaded terms 必须写清不触发边界。
+- **summary 可判断**：`summary` 是一整句判断依据，包含触发场景、常见误判或失败、正确动作，以及必要的不适用边界；不是标题复述、口号或来源审计摘要。
+- **使用标准自然**：`criteria.use_when` 写真实执行入口，模型读完能理解“什么时候用”，不是关键词堆叠。
+- **排除边界明确**：`criteria.ignore_when` 写相近但不该用的场景，尤其是文档案例、只解释、不实际执行、工具名只是资料来源、业务概念和用户明确降噪的场景。
+- **触发准确**：`recall.triggers` 是从使用标准中抽出的短锚点，不是长句、抽象形容词或 rule 摘抄。
 - **规则可执行**：rule 是未来 Agent 能直接执行的步骤、判断或禁令，不是口号。
 - **分类正确**：category 表示这张卡的工作层级，不只是关键词所属领域。
-- **证据可追溯**：sourceRefs / evidence / retrospective 能解释它为什么存在。
+- **证据可追溯**：retrospective、operation log 或 review 证据能解释它为什么存在；active 卡本身不承载长 provenance。
 - **召回不污染**：常见正例能命中；常见反例不应命中；相邻卡共同命中时有清晰分工。
 - **生命周期干净**：旧同义卡已 archived；active 库里没有并行旧版本。
+
+## 净化优先级
+
+### P0：必须先处理
+
+- active 卡会在明显无关任务中召回。
+- active 卡漏掉高风险或高频正例。
+- 同一场景存在多张 active 旧版本。
+- 卡片 schema 无法被 CLI 读取，导致 doctor 或 list 失败。
+- rule 缺失、被截断，或不再包含复盘出的核心规则。
+
+### P1：需要本轮处理
+
+- `summary` 不能帮助模型判断使用边界。
+- `criteria.use_when` / `criteria.ignore_when` 仍是关键词式、过宽或人读不懂。
+- `recall.triggers` 泛化到会污染普通任务。
+- `engine_hints` 缺少已知误召回的负向信号，或把纯自然语言能表达的边界硬塞成程序字段。
+- 项目级卡缺少 `scope.level`、`project_key` 或 `module_path`，导致全局误召回。
+
+### P2：可排期清理
+
+- 标题、分类、topics 不够清楚，但召回行为正确。
+- archived 旧格式卡不影响 active 召回，但持续制造治理噪音。
+- provenance 字段可读性不足，但核心规则和召回边界正确。
+
+## 字段净化规则
+
+### summary
+
+重写为一整句，不超过必要长度，包含：
+
+- 触发场景：用户在什么工作流里需要它。
+- 失败模式：不使用时容易犯什么错。
+- 正确动作：Agent 应该怎么做。
+- 边界：相近但不该用的场景。
+
+不合格示例：
+
+```text
+创建目标时完整交付。
+```
+
+合格示例：
+
+```text
+当用户要求启动 /goal、创建目标或明确说开干时，Agent 应进入完整闭环交付模式，先明确目标和真实完成标准，再实现、验证和汇报；如果只是解释 goal 功能、写文档案例或讨论业务目标，则不要使用。
+```
+
+### use_when / ignore_when
+
+- 用自然语言短句写给模型判断，不用分号拼接，不写只有系统才懂的缩写。
+- `use_when` 描述真正执行入口。
+- `ignore_when` 描述近似噪声和误召回边界。
+- 被用户纠正过的误解必须进入 `ignore_when`；如果召回引擎也能稳定识别，再补 `engine_hints.negative`。
+
+### recall.triggers
+
+- 从 `use_when` 抽出最短、最自然的锚点。
+- 优先 3-5 条；高风险卡可以略多，但必须仍然具体。
+- 不把宽词当主触发，例如单独的 `goal`、`git`、`review`、`source`、`Spool`。
+
+### engine_hints
+
+- 只用于程序能稳定识别的正负信号。
+- positive 用来确认任务意图，例如 `goal_execute`、`worktree_diff_operation`、`historical_session_lookup`、`architecture_quality`；路由型 positive hint 是严格门槛，不命中就不召回。
+- negative 用来压住已知近似噪声，例如 `goal_example_discussion`、`business_goal_discussion`、`git_source_noise`、`ui_surface_noise`。
+- 不要把自然语言判断完全转成 hints；模型仍需要读 `summary` 和 `criteria` 自主判断。
+
+### rule
+
+- 只保存未来 Agent 要执行的完整规则。
+- 保留复盘总结出的核心内容，不要在净化时丢掉。
+- 不写来源审计、历史说明、候选审批备注或外层代码块 fence。
 
 ## 总览输出模板
 
@@ -207,7 +289,7 @@ keep / rewrite / merge / archive。
 - Spool / 用户原话证据（如使用）
 
 建议改法：
-标题、summary、triggers、negativeTriggers、category、rule、sourceRefs 或归档理由。
+标题、summary、criteria、recall、engine_hints、scope、category、rule 或归档理由。
 
 是否执行：
 未获明确授权时，只给建议；获授权后按生命周期执行并验证。

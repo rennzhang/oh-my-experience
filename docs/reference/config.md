@@ -73,3 +73,13 @@ location without a visible diff.
 
 Language is intentionally not stored in config. Human CLI output is English by
 default, and `OME_LANGUAGE=zh-CN` is an explicit override.
+
+## Global Versus Project Storage
+
+`dataDir` is the global OME library and runtime state location. It controls
+global active cards, retrospectives, source indexes, config, and hook events.
+
+Project libraries are not configured here. They are discovered from the current
+working directory at `<project-root>/.oh-my-experience/`. This keeps global
+storage portable while still letting a repository carry its own active cards
+when that is intentional.

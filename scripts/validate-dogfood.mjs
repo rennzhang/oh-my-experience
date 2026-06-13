@@ -17,9 +17,17 @@ fs.mkdirSync(runRoot, { recursive: true });
 step("build", "npm", ["run", "build"]);
 step("check", "npm", ["run", "check"]);
 step("test", "npm", ["test"]);
-step("recall-gate", "node", ["bin/ome.js", "eval", "recall", "--suite", "tests/fixtures/eval/core.json", "--limit", "8", "--threshold", "40", "--min-pass-rate", "1", "--min-recall", "1", "--min-precision", "1", "--max-over-recall", "0", "--json"]);
-step("codex-hook-eval", "node", ["bin/ome.js", "eval", "hook", "--provider", "codex", "--json"]);
-step("claude-hook-eval", "node", ["bin/ome.js", "eval", "hook", "--provider", "claude", "--json"]);
+const recallGate = jsonStep("recall-gate", "node", ["bin/ome.js", "eval", "recall", "--suite", "tests/fixtures/eval/core.json", "--limit", "8", "--threshold", "40", "--min-pass-rate", "1", "--min-recall", "1", "--min-precision", "1", "--max-over-recall", "0", "--json"]);
+const hookDataDir = recallGate.fixtureDataDir;
+const hookPrompt = "Fix a frontend UI bug and validate the result in a real browser.";
+jsonStep("codex-hook-run", "node", ["bin/ome.js", "hook", "run", "--data-dir", hookDataDir, "--json"], {
+  input: JSON.stringify({ prompt: hookPrompt, session_id: "dogfood-codex", turn_id: "1", cwd: root }),
+  validate: assertHookInjected("browser-validation", hookDataDir),
+});
+jsonStep("claude-hook-run", "node", ["bin/ome.js", "hook", "run", "--data-dir", hookDataDir, "--json"], {
+  input: JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: hookPrompt, transcript_path: path.join(runRoot, "claude-transcript.jsonl"), cwd: root }),
+  validate: assertHookInjected("browser-validation", hookDataDir),
+});
 step("pack-dry-run", "npm", ["pack", "--dry-run", "--silent"]);
 
 const packDir = path.join(runRoot, "pack");
@@ -47,6 +55,7 @@ function step(name, command, args, options = {}) {
     cwd: options.cwd || root,
     env: { ...env, CLAUDE_HOME: claudeHome, ...(options.env || {}) },
     encoding: "utf8",
+    input: options.input,
     maxBuffer: 20 * 1024 * 1024,
   });
   const entry = {
@@ -67,6 +76,58 @@ function step(name, command, args, options = {}) {
     process.exit(result.status || 1);
   }
   return result;
+}
+
+function jsonStep(name, command, args, options = {}) {
+  const result = step(name, command, args, options);
+  let parsed;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch (error) {
+    fail(name, `invalid JSON output: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (options.validate) options.validate(parsed);
+  return parsed;
+}
+
+function assertHookInjected(cardId, dataDir) {
+  return (output) => {
+    const context = output?.hookSpecificOutput?.additionalContext || "";
+    if (!context.includes(cardId)) {
+      fail("hook-run-validation", `expected hook additionalContext to include ${cardId}`);
+    }
+    if (!context.includes("**本次使用 N条 OME 经验卡：**")) {
+      fail("hook-run-validation", "expected hook additionalContext to include used-card disclosure template");
+    }
+    if (context.includes("本次挂载")) {
+      fail("hook-run-validation", "expected hook additionalContext not to use mounted-card wording");
+    }
+    if (!context.includes("Final link if used:")) {
+      fail("hook-run-validation", "expected hook additionalContext to include final-use links");
+    }
+    const expectedLink = `](<${path.join(dataDir, "experiences", "active", `${cardId}.md`)}>)`;
+    if (!context.includes(expectedLink)) {
+      fail("hook-run-validation", `expected hook additionalContext to link mounted card path ${expectedLink}`);
+    }
+  };
+}
+
+function fail(name, message) {
+  const entry = {
+    name,
+    command: "internal validation",
+    status: 1,
+    signal: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    stdout: "",
+    stderr: message,
+  };
+  steps.push(entry);
+  const report = { ok: false, runRoot, failedStep: entry, steps };
+  fs.writeFileSync(path.join(runRoot, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  console.error(JSON.stringify(report, null, 2));
+  process.exit(1);
 }
 
 function stamp() {

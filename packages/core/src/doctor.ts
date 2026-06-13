@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { listCards, rebuildCardIndex, type CardIndex } from "./cards.js";
+import { inspectCards, listCards, rebuildCardIndex, type CardIndex } from "./cards.js";
 import { ConfigSchema, type Config } from "./schema.js";
 import { defaultDataDir, layout, readJson } from "./storage.js";
 
@@ -21,7 +21,7 @@ export function runDoctor(dataDir: string, { codexHome = process.env.CODEX_HOME 
   })) {
     checkDir(dir, name, errors);
   }
-  checkCards(dataDir, errors, warnings);
+  const cardInspection = checkCards(dataDir, errors, warnings);
   checkIndex(dataDir, errors);
   checkJsonl(l.events, "events", warnings);
   const config = checkConfig(dataDir, errors, warnings);
@@ -33,7 +33,8 @@ export function runDoctor(dataDir: string, { codexHome = process.env.CODEX_HOME 
     warnings,
     checked: {
       dataDir,
-      experiences: listCards(dataDir).length,
+      experiences: cardInspection.cards.length,
+      invalidCards: cardInspection.issues.length,
       layers: ["storage", "schema", "index", "hook", "config", "package"],
     },
   };
@@ -57,22 +58,22 @@ function checkWritable(dir: string, label: string, errors: string[]): void {
   }
 }
 
-function checkCards(dataDir: string, errors: string[], warnings: string[]): void {
+function checkCards(dataDir: string, errors: string[], warnings: string[]) {
   const seen = new Set<string>();
-  let cards;
-  try {
-    cards = listCards(dataDir);
-  } catch (error: any) {
-    errors.push(`card schema invalid: ${error.message}`);
-    return;
+  const inspection = inspectCards(dataDir);
+  for (const issue of inspection.issues) {
+    const message = `card schema invalid: ${path.relative(dataDir, issue.path)}: ${issue.message}`;
+    if (issue.status === "archived") warnings.push(`archived ${message}`);
+    else errors.push(message);
   }
-  for (const card of cards) {
+  for (const card of inspection.cards) {
     if (seen.has(card.id)) errors.push(`duplicate card id: ${card.id}`);
     seen.add(card.id);
     if (!card.triggers.length) errors.push(`card has no triggers: ${card.id}`);
     if (!card.topics.length) warnings.push(`card has no topics: ${card.id}`);
     if (card.status === "active" && card.recallPolicy === "off") warnings.push(`active card recall is off: ${card.id}`);
   }
+  return inspection;
 }
 
 function checkIndex(dataDir: string, errors: string[]): void {
@@ -81,7 +82,13 @@ function checkIndex(dataDir: string, errors: string[]): void {
     errors.push("missing indexes/experiences.json");
     return;
   }
-  const activeIds = new Set(listCards(dataDir, "active").map((card) => card.id));
+  let activeIds: Set<string>;
+  try {
+    activeIds = new Set(listCards(dataDir, "active").map((card) => card.id));
+  } catch (error: any) {
+    errors.push(`active card schema invalid: ${error.message}`);
+    return;
+  }
   const indexedIds = new Set((index.experiences || []).map((card) => card.id));
   for (const id of activeIds) {
     if (!indexedIds.has(id)) errors.push(`active card missing from index: ${id}`);
@@ -155,7 +162,31 @@ function checkPackage(errors: string[], warnings: string[]): void {
       return candidate;
     }
   })));
-  if (realBins.length > 1) warnings.push(`multiple ome binaries on PATH: ${omeBins.join(", ")}`);
+  if (realBins.length > 1 && hasConflictingOmeBinaries(realBins)) warnings.push(`multiple ome binaries on PATH: ${omeBins.join(", ")}`);
+}
+
+function hasConflictingOmeBinaries(realBins: string[]): boolean {
+  const identities = new Set(realBins.map((bin) => readPackageIdentityForBin(bin) || `unknown:${bin}`));
+  return identities.size > 1;
+}
+
+function readPackageIdentityForBin(binPath: string): string | null {
+  let current = path.dirname(binPath);
+  for (let depth = 0; depth < 5; depth += 1) {
+    const packagePath = path.join(current, "package.json");
+    if (fs.existsSync(packagePath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+        if (pkg?.name && pkg?.version) return `${pkg.name}@${pkg.version}`;
+      } catch {
+        return null;
+      }
+    }
+    const next = path.dirname(current);
+    if (next === current) break;
+    current = next;
+  }
+  return null;
 }
 
 function checkJsonl(filePath: string, label: string, warnings: string[]): void {

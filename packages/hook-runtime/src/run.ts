@@ -9,12 +9,16 @@ import {
 } from "../../core/src/storage.js";
 import { loadConfig } from "../../core/src/config.js";
 import {
+  readLibraryStackCards,
+  resolveLibraryStack,
+} from "../../core/src/library-stack.js";
+import {
   buildQueryVariants,
   buildTaskEnvelope,
   type TaskEnvelope,
 } from "../../core/src/matcher.js";
-import { detectProjectContext, sanitizeProjectContext } from "../../core/src/project-context.js";
-import { matchCards, renderAdditionalContext } from "../../core/src/retrieval.js";
+import { sanitizeProjectContext } from "../../core/src/project-context.js";
+import { matchCardEntries, renderAdditionalContext } from "../../core/src/retrieval.js";
 
 type HookPayload = Record<string, any>;
 
@@ -28,10 +32,12 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
     if (!prompt) return successOutput("");
     if (isOmeMaintenancePrompt(prompt)) return successOutput("");
     const config = loadConfig(dataDir);
-    const projectContext = detectProjectContext(normalized.cwd || process.cwd());
+    const stack = resolveLibraryStack(dataDir, normalized.cwd || process.cwd());
+    const projectContext = stack.projectContext;
     const envelope = buildTaskEnvelope(prompt);
     const queryVariants = buildQueryVariants(prompt);
-    const matches = matchCards(dataDir, prompt, {
+    const cards = safeReadLibraryStackCards(stack);
+    const matches = matchCardEntries(cards, prompt, {
       limit: config.retrieval.maxCards,
       threshold: config.retrieval.minScore,
       timeoutMs: config.retrieval.hookTimeoutMs,
@@ -51,6 +57,12 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
       promptHash: crypto.createHash("sha256").update(prompt).digest("hex"),
       taskEnvelope: sanitizeEnvelope(envelope),
       projectContext: sanitizeProjectContext(projectContext),
+      libraries: stack.libraries.map((library) => ({
+        scope: library.scope,
+        exists: library.exists,
+        readable: library.readable,
+        warningCount: library.warnings.length,
+      })),
       queryVariants: queryVariants.map((variant) => hashText(variant)),
       matchedCards: matches.map((match) => ({ id: match.card.id, score: match.score, reasons: match.reasons })),
       injected: Boolean(additionalContext),
@@ -89,6 +101,18 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
       // ignore logging errors
     }
     return successOutput("");
+  }
+}
+
+function safeReadLibraryStackCards(stack: ReturnType<typeof resolveLibraryStack>) {
+  try {
+    return readLibraryStackCards(stack);
+  } catch {
+    return readLibraryStackCards({
+      ...stack,
+      libraries: stack.libraries.filter((library) => library.scope === "global"),
+      warnings: stack.warnings,
+    });
   }
 }
 

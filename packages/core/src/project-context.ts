@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { ProjectContextSchema, type ProjectContext } from "./schema.js";
 import { hashText } from "./storage.js";
 
-const PROJECT_MARKERS = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "AGENTS.md", "CLAUDE.md"];
+const PROJECT_MARKERS = [".git", ".oh-my-experience", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "AGENTS.md", "CLAUDE.md"];
 
 export function detectProjectContext(cwd: string | null | undefined = process.cwd()): ProjectContext {
   if (!cwd) return ProjectContextSchema.parse({ source: "none" });

@@ -44,9 +44,13 @@ ome init --reset-config
 ome match "<task>"
 ome match "<task>" --json
 ome match "<task>" --explain
+ome match "<task>" --cwd /path/to/project --explain
 ```
 
 只有 active 卡会被召回。复盘生成的 draft 在 promote 之前不会影响提示词阶段召回。
+
+当当前工作目录位于某个项目内时，召回会同时读取全局 `dataDir` 和项目根目录下可选的
+`<project-root>/.oh-my-experience/`。脚本需要测试特定项目上下文时，可以传 `--cwd`。
 
 ## 来源
 
@@ -64,11 +68,14 @@ Spool 是可选能力。Spool 不可用时，Codex session 导入和本地召回
 
 ```bash
 ome reflect start
+ome reflect start --scope project
 ome reflect start --focus "browser validation and delivery gates"
 ome reflect list
 ome reflect show <run-id>
 ome reflect add <run-id> --title "Browser validation" --summary "..." --rule "..."
+ome reflect add <run-id> --title "仓库发版 gate" --summary "..." --rule "..." --triggers "发版验证" --scope-level project --project-key github.com/example/repo
 ome reflect candidates <run-id> --from-file <file>
+ome reflect candidates <run-id> --scope project --from-file <file>
 ome reflect candidates <run-id> --from-file <file> --audit-file <audit.json>
 ome reflect decide <run-id> <candidate-id> --action approve --category "Product UI"
 ome reflect apply <run-id> --dry-run
@@ -79,22 +86,44 @@ ome reflect apply <run-id>
 
 `ome reflect candidates` 写入候选前必须带 source audit。只有明确接受不完整审计时才使用 `--allow-incomplete-audit`；生成的 worksheet 会显示审计不完整。
 
+需要把复盘候选、draft 和 review 文件写入当前项目的 `.oh-my-experience/` 时，加
+`--scope project`。
+
+## 项目经验库
+
+```bash
+ome project status
+ome project init
+```
+
+`ome project init` 会创建 `<project-root>/.oh-my-experience/` 和标准经验生命周期目录。
+它不会修改 `dataDir`。
+
+`ome project status --json` 会返回识别到的 `projectContext`、项目经验库路径、目录是否
+存在、是否可读，以及警告信息。
+
 ## 经验库
 
 ```bash
 ome experience list
+ome experience list --scope project
 ome experience list --status draft
 ome experience list --compact --json
 ome experience show <card-id>
+ome experience show <card-id> --scope project --section rule
 ome experience show <card-id> --section rule
 ome experience promote <card-id>
+ome experience promote <card-id> --scope project
 ome experience archive <card-id> --reason "superseded"
 ```
 
 生命周期保持显式：`candidate -> draft -> active -> archived`。
-`list --json` 默认返回完整卡片，保持兼容；脚本只需要标题索引时用
-`--compact` 或 `--index`，只返回 `id`、`title`、`status`、`category`、
-`updatedAt`。
+`list --json` 默认返回完整卡片；脚本只需要标题索引时用
+`--compact` 或 `--index`，只返回 `id`、`title`、`status`、`category`。
+
+`experience list --json` 是治理命令，所以遇到无效卡片文件时不会停在第一处解析
+错误，而是返回 `invalidCards`，其中包含 `status`、`path` 和 `message`。运行时召回
+仍然对 active 卡保持严格；无效 active 卡必须修复后才能参与召回。
 
 ## 评估
 
@@ -120,7 +149,7 @@ ome -v
 which -a ome
 ```
 
-`ome doctor` 检查 dataDir 可写性、配置 schema、卡片生命周期完整性、active 索引一致性、reflect 状态、hook 状态、事件 JSONL、包运行时要求，以及 PATH 中冲突的 `ome` 二进制。
+`ome doctor` 检查 dataDir 可写性、配置 schema、卡片生命周期完整性、active 索引一致性、reflect 状态、hook 状态、事件 JSONL、包运行时要求，以及 PATH 中冲突的 `ome` 二进制。无效 active 或 draft 卡是错误；无效 archived 卡只作为治理 warning 暴露，因为 archived 只是历史，不会进入运行时召回。
 
 `ome hook run` 是已安装 Codex 和 Claude hook 使用的 runtime 入口。它保留为公开命令是为了让 hook 能执行；普通设置应通过 `ome init` 完成。
 

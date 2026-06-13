@@ -10,6 +10,10 @@ ome hook status --json
 ome stats --json
 ```
 
+Read `doctor` by severity: `errors` are runtime blockers; invalid active or
+draft cards are errors; invalid archived cards are governance warnings because
+archived cards do not enter runtime recall.
+
 Provider-specific hook checks:
 
 ```bash
@@ -58,7 +62,7 @@ npm run validate:dogfood
 
 Dogfood validation must use isolated temp data unless the user explicitly asks for a real self-use path.
 
-## Packaged Path Smoke
+## Packaged Path Validation
 
 Use this when checking the published-user path without publishing:
 

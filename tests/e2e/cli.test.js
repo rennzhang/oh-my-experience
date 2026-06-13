@@ -46,6 +46,32 @@ function completeAudit(overrides = {}) {
   };
 }
 
+function currentCandidate(fixture) {
+  return {
+    title: fixture.title,
+    category: fixture.category,
+    summary: fixture.summary,
+    rule: fixture.rule,
+    criteria: {
+      use_when: fixture.triggers || [],
+      ignore_when: fixture.negativeTriggers || [],
+    },
+    engine_hints: {
+      positive: fixture.triggers || [],
+      negative: fixture.negativeTriggers || [],
+    },
+    recall: {
+      policy: fixture.recallPolicy || "should",
+      risk: fixture.risk || "medium",
+      confidence: fixture.confidence || "medium",
+      triggers: fixture.triggers || [],
+      topics: fixture.topics || [],
+    },
+    scope: fixture.scope || { level: "global" },
+    evidence: fixture.evidence || [],
+  };
+}
+
 test("CLI full lifecycle runs in temporary dataDir", () => {
   const dataDir = tmpDir("full");
   const init = json(run(["init", "--data-dir", dataDir, "--json"]));
@@ -67,7 +93,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const candidatesFile = path.join(dataDir, "tmp-candidates.json");
   fs.writeFileSync(candidatesFile, JSON.stringify({
     audit: completeAudit(),
-    candidates: [{
+    candidates: [currentCandidate({
       title: "UI browser validation",
       summary: "UI was not validated in browser.",
       rule: "Use browser validation and console check.",
@@ -77,7 +103,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
       evidence: ["e2e"],
       risk: "high",
       recallPolicy: "must",
-    }],
+    })],
   }), "utf8");
   const candidates = json(run(["reflect", "candidates", retrospective.runId, "--from-file", candidatesFile, "--data-dir", dataDir, "--json"]));
   const candidateId = candidates.candidates[0].id;
@@ -93,6 +119,9 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const humanShow = run(["reflect", "show", retrospective.runId, "--data-dir", dataDir]);
   assert.equal(humanShow.status, 0, `${humanShow.stderr}\n${humanShow.stdout}`);
   assert.match(humanShow.stdout, /Approval file:/);
+  const reviewRelativePath = path.relative(process.cwd(), candidates.reviewFile).split(path.sep).join("/");
+  assert.match(humanShow.stdout, new RegExp(`\\[retrospective\\.md\\]\\(${reviewRelativePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)`));
+  assert.doesNotMatch(humanShow.stdout, new RegExp(`\\[retrospective\\.md\\]\\(${dataDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/retrospectives`));
   const added = json(run(["reflect", "add", retrospective.runId, "--title", "Git diff scope", "--category", "Git 操作", "--summary", "Unrelated files were mixed", "--rule", "Keep the diff scoped", "--triggers", "git status,commit", "--topics", "git", "--data-dir", dataDir, "--json"]));
   assert.equal(added.candidates.length, 2);
   json(run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--category", "产品与 UI", "--data-dir", dataDir, "--json"]));
@@ -116,7 +145,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const compactDrafts = json(run(["experience", "list", "--status", "draft", "--compact", "--data-dir", dataDir, "--json"]));
   assert.equal(compactDrafts.compact, true);
   assert.equal(compactDrafts.total, 1);
-  assert.deepEqual(Object.keys(compactDrafts.experiences[0]).sort(), ["category", "id", "status", "title", "updatedAt"]);
+  assert.deepEqual(Object.keys(compactDrafts.experiences[0]).sort(), ["category", "id", "status", "title"]);
   assert.equal(compactDrafts.experiences[0].title, "UI browser validation");
   const cardId = draftCard.id;
   assert.equal(draftCard.category, "产品与 UI");
@@ -129,7 +158,8 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const explained = json(run(["match", "修复 UI 并做 浏览器验证", "--explain", "--data-dir", dataDir, "--json"]));
   assert.equal(explained.matches[0].id, cardId);
   assert.ok(explained.matches[0].reasons.length > 0);
-  assert.match(explained.additionalContext, new RegExp(`Full experience: ome experience show ${cardId} --section rule`));
+  assert.match(explained.additionalContext, new RegExp(`Rule: ome experience show ${cardId} --section rule`));
+  assert.doesNotMatch(explained.additionalContext, /本次挂载/);
   const suiteFile = path.join(dataDir, "recall-suite.json");
   fs.writeFileSync(suiteFile, JSON.stringify({ cases: [{ id: "ui", prompt: "修复 UI 并做 浏览器验证", expectedCards: [cardId] }] }), "utf8");
   const evalReport = json(run(["eval", "recall", "--suite", suiteFile, "--use-current-library", "--data-dir", dataDir, "--json"]));
@@ -149,19 +179,106 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   assert.equal(json(run(["doctor", "--data-dir", dataDir, "--json"])).ok, true);
 });
 
+test("experience list reports invalid archived cards without crashing", () => {
+  const dataDir = tmpDir("invalid-archived-list");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const archivedDir = path.join(dataDir, "experiences", "archived");
+  fs.mkdirSync(archivedDir, { recursive: true });
+  const invalidPath = path.join(archivedDir, "legacy-card.md");
+  fs.writeFileSync(invalidPath, "---\nid: legacy-card\nstatus: archived\n---\n# Legacy\n", "utf8");
+
+  const listed = json(run(["experience", "list", "--compact", "--data-dir", dataDir, "--json"]));
+  assert.equal(listed.ok, false);
+  assert.equal(listed.invalidCards.length, 1);
+  assert.equal(listed.invalidCards[0].status, "archived");
+  assert.equal(listed.invalidCards[0].path, invalidPath);
+  assert.match(listed.invalidCards[0].message, /unsupported experience card schema/);
+  assert.ok(listed.total > 0);
+
+  const doctor = json(run(["doctor", "--data-dir", dataDir, "--json"]));
+  assert.equal(doctor.ok, true, doctor.errors.join("\n"));
+  assert.equal(doctor.checked.invalidCards, 1);
+  assert.match(doctor.warnings.join("\n"), /archived card schema invalid/);
+});
+
+test("project library participates in CLI recall without writing project events", () => {
+  const dataDir = tmpDir("project-recall-global");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const projectRoot = tmpDir("project-recall-root");
+  fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "@example/project-recall" }), "utf8");
+
+  const init = json(run(["project", "init", "--json"], { cwd: projectRoot }));
+  const realProjectRoot = fs.realpathSync(projectRoot);
+  assert.equal(init.projectRoot, realProjectRoot);
+  assert.equal(init.projectLibrary, path.join(realProjectRoot, ".oh-my-experience"));
+  const status = json(run(["project", "status", "--json"], { cwd: init.projectLibrary }));
+  assert.equal(status.projectContext.root, realProjectRoot);
+  assert.equal(status.exists, true);
+  assert.equal(status.readable, true);
+  assert.deepEqual(status.warnings, []);
+  const retrospective = json(run(["reflect", "start", "--scope", "project", "--focus", "project library validation", "--json"], { cwd: projectRoot }));
+  const candidatesFile = path.join(projectRoot, "project-candidates.json");
+  fs.writeFileSync(candidatesFile, JSON.stringify({
+    audit: completeAudit({
+      focusLens: "project library validation",
+      searchedSources: ["e2e project lifecycle"],
+      evidenceClusters: ["project-scoped card created through the reflect lifecycle"],
+    }),
+    candidates: [currentCandidate({
+      title: "Project CLI validation",
+      category: "Project recall",
+      summary: "Project-local cards should be recalled from the project library.",
+      rule: "Use the project-local validation path before reporting done.",
+      triggers: ["project library validation"],
+      topics: ["project-library"],
+      evidence: ["e2e project lifecycle"],
+      risk: "high",
+      recallPolicy: "must",
+    })],
+  }), "utf8");
+  const added = json(run([
+    "reflect",
+    "candidates",
+    retrospective.runId,
+    "--scope",
+    "project",
+    "--from-file",
+    candidatesFile,
+    "--json",
+  ], { cwd: projectRoot }));
+  const candidateId = added.candidates[0].id;
+  json(run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--scope", "project", "--json"], { cwd: projectRoot }));
+  const applied = json(run(["reflect", "apply", retrospective.runId, "--scope", "project", "--json"], { cwd: projectRoot }));
+  const cardId = applied.drafts[0].id;
+  json(run(["experience", "promote", cardId, "--scope", "project", "--json"], { cwd: projectRoot }));
+
+  const eventPath = path.join(projectRoot, ".oh-my-experience", "events.jsonl");
+  const eventsBeforeMatch = fs.existsSync(eventPath) ? fs.readFileSync(eventPath, "utf8") : "";
+  const explained = json(run(["match", "project library validation", "--data-dir", dataDir, "--cwd", projectRoot, "--explain", "--json"]));
+  assert.equal(explained.libraries.some((library) => library.scope === "project" && library.exists && library.readable), true);
+  assert.equal(explained.matches[0].id, cardId);
+  assert.equal(explained.matches[0].card.libraryScope, "project");
+  assert.match(explained.additionalContext, new RegExp(`ome experience show ${cardId} --scope project --section rule`));
+  const show = run(["experience", "show", cardId, "--scope", "project", "--section", "rule"], { cwd: projectRoot });
+  assert.equal(show.status, 0, `${show.stderr}\n${show.stdout}`);
+  assert.match(show.stdout, /project-local validation path/);
+  const eventsAfterMatch = fs.existsSync(eventPath) ? fs.readFileSync(eventPath, "utf8") : "";
+  assert.equal(eventsAfterMatch, eventsBeforeMatch);
+});
+
 test("reflect candidates rejects missing source audit unless explicitly overridden", () => {
   const dataDir = tmpDir("audit-gate");
   json(run(["init", "--data-dir", dataDir, "--json"]));
   const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
   const candidatesFile = path.join(dataDir, "auditless-candidates.json");
   fs.writeFileSync(candidatesFile, JSON.stringify({
-    candidates: [{
+    candidates: [currentCandidate({
       title: "Auditless candidate",
       summary: "This candidate has no source audit.",
       rule: "It should not pass silently.",
       triggers: ["retrospective"],
       topics: ["audit"],
-    }],
+    })],
   }), "utf8");
   const rejected = run(["reflect", "candidates", retrospective.runId, "--from-file", candidatesFile, "--data-dir", dataDir, "--json"]);
   assert.notEqual(rejected.status, 0);
@@ -635,6 +752,28 @@ test("init installs and uninstall removes global hook without project setup", ()
   assert.equal(after.installed, false);
 });
 
+test("hook status recognizes existing OME hook even when command options drift", () => {
+  const dataDir = path.join(tmpDir("hook-current"), "data");
+  const localCodexHome = tmpDir("codex-home-existing-hook");
+  fs.mkdirSync(localCodexHome, { recursive: true });
+  const existingCommand = "ome hook run --json --data-dir '/tmp/previous ome data'";
+  fs.writeFileSync(path.join(localCodexHome, "hooks.json"), JSON.stringify({
+    hooks: {
+      UserPromptSubmit: [{
+        hooks: [
+          { type: "command", command: existingCommand, timeout: 5 },
+          { type: "command", command: "echo keep-me", timeout: 5 },
+        ],
+      }],
+    },
+  }, null, 2));
+
+  const status = json(run(["hook", "status", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  assert.equal(status.installed, true);
+  assert.equal(status.installedCommand, existingCommand);
+  assert.equal(status.matchesExpectedCommand, false);
+});
+
 test("skill lifecycle protects user-owned targets", () => {
   const localCodexHome = tmpDir("skill-codex-home");
   const dataDir = tmpDir("skill-data");
@@ -723,7 +862,7 @@ test("hook no-hit succeeds without additionalContext", () => {
   assert.deepEqual(hook, {});
 });
 
-test("hook run applies project applicability from real cwd payload", () => {
+test("hook run applies project scope from real cwd payload", () => {
   const dataDir = tmpDir("hook-project-context");
   const projectDir = tmpDir("project-context");
   const appDir = path.join(projectDir, "app");
@@ -741,11 +880,11 @@ test("hook run applies project applicability from real cwd payload", () => {
     "--rule", "Recall only inside the app module.",
     "--triggers", "project cwd browser",
     "--topics", "ui",
-    "--applicability", "project",
+    "--scope-level", "project",
     "--project-key", "@eval/project",
     "--module-path", "app",
     "--allow-incomplete-audit",
-    "--incomplete-audit-reason", "project applicability fixture",
+    "--incomplete-audit-reason", "project scope fixture",
     "--data-dir", dataDir,
     "--json",
   ]));
@@ -758,6 +897,9 @@ test("hook run applies project applicability from real cwd payload", () => {
     input: JSON.stringify({ prompt: "project cwd browser", cwd: appDir, session_id: "s1" }),
   }));
   assert.ok(hit.hookSpecificOutput.additionalContext.includes("Project cwd browser card"));
+  assert.ok(hit.hookSpecificOutput.additionalContext.includes("**本次使用 N条 OME 经验卡：**"));
+  assert.ok(!hit.hookSpecificOutput.additionalContext.includes("本次挂载"));
+  assert.ok(hit.hookSpecificOutput.additionalContext.includes(`[Project cwd browser card](<${path.join(dataDir, "experiences", "active", `${cardId}.md`)}>)`));
   const miss = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
     input: JSON.stringify({ prompt: "project cwd browser", cwd: otherDir, session_id: "s2" }),
   }));
@@ -778,7 +920,7 @@ test("config can point to a custom data directory", () => {
   json(run(["init", "--data-dir", dataDir, "--json"]));
   const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
   const candidatesFile = path.join(dataDir, "data-dir-candidates.json");
-  fs.writeFileSync(candidatesFile, JSON.stringify({ audit: completeAudit(), candidates: [{ title: "Data directory card", summary: "P", rule: "C", triggers: ["switch config"], topics: ["config"], evidence: ["test"] }] }), "utf8");
+  fs.writeFileSync(candidatesFile, JSON.stringify({ audit: completeAudit(), candidates: [currentCandidate({ title: "Data directory card", summary: "P", rule: "C", triggers: ["switch config"], topics: ["config"], evidence: ["test"] })] }), "utf8");
   const candidates = json(run(["reflect", "candidates", retrospective.runId, "--from-file", candidatesFile, "--data-dir", dataDir, "--json"]));
   json(run(["reflect", "decide", retrospective.runId, candidates.candidates[0].id, "--action", "approve", "--data-dir", dataDir, "--json"]));
   const applied = json(run(["reflect", "apply", retrospective.runId, "--data-dir", dataDir, "--json"]));

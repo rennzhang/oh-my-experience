@@ -17,6 +17,9 @@ status: active
 用户可以把数据目录指向其他本地路径，包括 Obsidian 的某个子目录。OME 应使用专用
 子目录，而不是直接写入整个 vault 根目录。
 
+`dataDir` 是全局存储。项目级存储如果启用，则固定在项目旁边的
+`<project-root>/.oh-my-experience/`，并根据当前工作目录发现。
+
 ## 目录布局
 
 ```text
@@ -60,21 +63,14 @@ candidate -> draft -> active -> archived
 retrospective extraction -> candidate.category -> draft.category -> active.category
 ```
 
-CLI 接受复盘 candidate 上的 `category`，字段缺失时会推断一个。用户可以创建分类，
-并在 apply reflect run 前覆盖候选分类。`sources` 只保存证据和来源，不能作为分类
-传输通道。
+CLI 接受复盘 candidate 上的 `category`，字段缺失时会推断一个。用户可以在 apply
+reflect run 前覆盖候选分类。当前没有单独的 category registry 命令；新分类名称跟随
+candidate 和 card 流转。`sources` 只保存证据和来源，不能作为分类传输通道。
 
 ## 来源信息
 
-经验和候选经验同时保留人类可读来源和结构化来源：
-
-- `sources`：简短展示/证据字符串。
-- `origin`：source adapter、agent 家族、可选 model/session/project，以及条目来自
-  reflect run、starter lesson、import 还是 manual entry。
-- `sourceRefs`：指向 session、turn、file、retrospective、starter lesson 或 manual
-  source 的结构化引用。
-
-Matcher 当前把 provenance 用作证据和诊断信息。召回资格由经验状态和适用范围控制。
+Active 卡片聚焦召回和使用判断，不再把原始来源、日期、`origin` 或
+`sourceRefs` 作为核心卡片字段。来源信息保留在 retrospective run、operation log、备份和 source index 里。Matcher 使用 active 卡的 criteria、recall、scope 和 status。
 
 ## 来源索引
 
@@ -114,13 +110,33 @@ Session 导入不会把完整 transcript 复制进 OME。导入只向 `indexes/s
 提示词阶段召回不能依赖 session 正文；它只依赖 active experiences 和
 `indexes/experiences.json`。
 
+## 项目经验库布局
+
+项目经验库使用同一套已审阅卡片生命周期目录：
+
+```text
+<project-root>/.oh-my-experience/
+  README.md
+  .gitignore
+  experiences/
+    draft/
+    active/
+    archived/
+```
+
+项目提示词阶段召回会直接读取 `experiences/active/`，并把卡片标记为
+`libraryScope: project`。项目库不需要自己的配置文件。默认 `.gitignore` 会忽略项目
+`events.jsonl`、`retrospectives/` 和 `indexes/`；match 和 hook 召回不会写这些文件。
+带 `--scope project` 的生命周期命令可能写入项目 retrospectives 和 events，因为用户
+明确选择了创建或管理项目卡。
+
 ## 主题与适用范围
 
 经验把“内容匹配”和“项目适配”分开：
 
 - `topics`：经验所属的技术或工作流表面，例如 `frontend`、`git`、`runtime`、`review`
   或 `deployment`。
-- `applicability`：经验可在哪些地方被召回，级别包括 `global`、`project` 和
+- `scope`：经验可在哪些地方被召回，级别包括 `global`、`project` 和
   `project-family`。
 
 提示词阶段，运行时会根据当前工作目录、package metadata 和 Git remote 检测项目上下文，

@@ -11,7 +11,9 @@ title: 指南
 
 - [介绍](introduction.md)：OME 是什么、为什么 AGENTS.md 不够、怎么运作。
 - [快速开始](quickstart.md)：安装、初始化、检查健康状态并验证召回。
+- [实际案例](examples.md)：看一次真实 `/goal` prompt、命中的经验卡和实际压入的上下文。
 - [安装配置](setup.md)：数据目录、Hooks、skill 安装和卸载细节。
+- [全局与项目经验库](project-libraries.md)：选择全局存储、仓库存储，或两者并用。
 
 ## Agent 设置
 

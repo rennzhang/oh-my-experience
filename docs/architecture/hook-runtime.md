@@ -44,8 +44,11 @@ ome init --provider claude
 ```
 
 At prompt time, the shared runtime detects the current working directory,
-derives a project context, and applies each card's `applicability` before
-scoring.
+derives a project context, and applies each card's `scope` before scoring.
+
+If a project library exists at `<project-root>/.oh-my-experience/`, the runtime
+loads it together with the global `dataDir` library. The read path is fail-open:
+if the project library is missing or unreadable, global recall still works.
 
 ## Hot-Path Constraints
 
@@ -57,6 +60,7 @@ Hook runtime must:
 - avoid storing raw prompt by default;
 - record structured events for stats and debugging;
 - record sanitized project context for stats and debugging;
+- write hook events to the global `dataDir`, not to the project library;
 - finish under `retrieval.hookTimeoutMs` so large libraries fail open instead
   of blocking the agent prompt path.
 

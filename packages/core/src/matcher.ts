@@ -117,6 +117,12 @@ export function normalize(input: unknown): string {
   return stripNoise(String(input || "")).toLowerCase();
 }
 
+export function matchesLexicalTerm(input: unknown, termInput: unknown): boolean {
+  const normalized = normalize(input);
+  const tokenSet = new Set(tokenize(normalized));
+  return matchesTerm(normalized, termInput, tokenSet);
+}
+
 export function tokenize(input: unknown): string[] {
   const text = normalize(input);
   const tokens: string[] = [];
@@ -154,8 +160,9 @@ function detectLanguage(text: unknown): "en" | "zh" | "mixed" {
 
 function detectByDictionary(normalized: string, dictionary: Record<string, string[]>): string[] {
   const hits: string[] = [];
+  const tokenSet = new Set(tokenize(normalized));
   for (const [label, terms] of Object.entries(dictionary)) {
-    if (terms.some((term) => normalized.includes(normalize(term)))) hits.push(label);
+    if (terms.some((term) => matchesTerm(normalized, term, tokenSet))) hits.push(label);
   }
   return hits;
 }
@@ -165,12 +172,23 @@ function extractPaths(text: string): string[] {
 }
 
 function extractCommands(text: string): string[] {
-  return unique(String(text).match(/\b(?:npm|npx|pnpm|bun|node|git|ome|oh-my-experience|spool|codex|claude)\s+[^\n;`]+/g) || [])
-    .map((command) => command.trim().slice(0, 180));
+  const commands: string[] = [];
+  const commandNames = String.raw`(?:npm|npx|pnpm|bun|node|git|ome|oh-my-experience|spool|codex|claude)`;
+  for (const match of String(text).matchAll(/`([^`]+)`/g)) {
+    const value = (match[1] || "").trim();
+    if (new RegExp(`^${commandNames}\\s+(?=[A-Za-z0-9_./:@=-])`, "i").test(value)) commands.push(value);
+  }
+  const bareCommand = new RegExp(
+    String.raw`(?:^|[\n;]|\b(?:run|execute|use|using|call|invoke|运行|执行|使用|通过|调用)\s+)(${commandNames}\s+(?=[A-Za-z0-9_./:@=-])[^。\n;` + "`" + String.raw`，,]+)`,
+    "gi",
+  );
+  for (const match of String(text).matchAll(bareCommand)) commands.push(match[1] || "");
+  return unique(commands).map((command) => command.trim().slice(0, 180));
 }
 
 function extractPresent(normalized: string, terms: string[]): string[] {
-  return terms.filter((term) => normalized.includes(normalize(term)));
+  const tokenSet = new Set(tokenize(normalized));
+  return terms.filter((term) => matchesTerm(normalized, term, tokenSet));
 }
 
 function extractRisks(normalized: string): string[] {
@@ -178,7 +196,8 @@ function extractRisks(normalized: string): string[] {
 }
 
 function extractSurfaces(normalized: string): string[] {
-  return SURFACES.filter((term) => normalized.includes(term));
+  const tokenSet = new Set(tokenize(normalized));
+  return SURFACES.filter((term) => matchesTerm(normalized, term, tokenSet));
 }
 
 function extractKeywords(tokens: string[]): string[] {
@@ -231,6 +250,21 @@ function segmentCjkWords(value: string): string[] {
 function addVariant(variants: QueryVariant[], kind: string, text: unknown, weight: number): void {
   const value = String(text || "").trim();
   if (value) variants.push({ kind, text: value, weight });
+}
+
+function matchesTerm(normalizedText: string, rawTerm: unknown, tokenSet: Set<string>): boolean {
+  const term = normalize(rawTerm);
+  if (!term) return false;
+  if (/[\u4e00-\u9fff]/.test(term)) return normalizedText.includes(term);
+  const termTokens = tokenize(term);
+  if (!termTokens.length) return false;
+  if (/^[a-z0-9][a-z0-9._/-]*$/.test(term)) return tokenSet.has(term);
+  const boundary = new RegExp(`(^|[^a-z0-9])${escapeRegExp(term).replace(/\s+/g, "\\s+")}($|[^a-z0-9])`, "i");
+  return boundary.test(normalizedText);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function unique(values: unknown[]): string[] {
