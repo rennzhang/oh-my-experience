@@ -26,8 +26,15 @@ jobs:
         run: node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 8 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json
       - name: Hook eval gate
         run: |
-          node bin/ome.js eval hook --provider codex --json
-          node bin/ome.js eval hook --provider claude --json
+          DATA_DIR="$(node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 8 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json | node -e "const fs = require('fs'); const json = JSON.parse(fs.readFileSync(0, 'utf8')); console.log(json.fixtureDataDir);")"
+          printf '%s' '{"prompt":"Fix a frontend UI bug and validate the result in a real browser.","session_id":"ci-codex","turn_id":"1","cwd":"'"$PWD"'"}' \
+            | node bin/ome.js hook run --data-dir "$DATA_DIR" --json \
+            | tee /tmp/ome-codex-hook.json \
+            | grep browser-validation
+          printf '%s' '{"hook_event_name":"UserPromptSubmit","prompt":"Fix a frontend UI bug and validate the result in a real browser.","transcript_path":"/tmp/ome-claude-transcript.jsonl","cwd":"'"$PWD"'"}' \
+            | node bin/ome.js hook run --data-dir "$DATA_DIR" --json \
+            | tee /tmp/ome-claude-hook.json \
+            | grep browser-validation
       - run: npm run build:binary:bun
       - name: Bun binary smoke
         run: |
