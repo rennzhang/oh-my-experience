@@ -6,34 +6,28 @@ excludes this folder from the public documentation site.
 
 ## Public site
 
-- Cloudflare Pages project: `oh-my-experience`
+- Cloudflare Pages project: Git integration project for `rennzhang/oh-my-experience`
 - Production branch: `main`
 - Build command: `npm run docs:build`
 - Build output directory: `docs/.vitepress/dist`
 - Node.js: `20` or newer
 
-## One-command docs deploy
+## Standard deployment flow
 
-Create the Pages project once if it does not exist:
+Use the normal Cloudflare Pages Git integration flow. Do not use a local deploy
+script as the primary release path.
 
-```bash
-npx wrangler pages project create oh-my-experience --production-branch main
-```
+1. In Cloudflare Pages, create a Git-connected project.
+2. Connect the existing GitHub repository: `rennzhang/oh-my-experience`.
+3. Set the production branch to `main`.
+4. Set the build command to `npm run docs:build`.
+5. Set the output directory to `docs/.vitepress/dist`.
+6. Keep the root directory as the repository root.
+7. Push to `main`; Cloudflare builds and deploys the docs automatically.
 
-Then deploy:
-
-```bash
-npm run docs:deploy
-```
-
-The script always rebuilds the VitePress site before uploading
-`docs/.vitepress/dist` with Wrangler Direct Upload.
-
-Optional overrides:
-
-```bash
-CF_PAGES_PROJECT_NAME=oh-my-experience CF_PAGES_BRANCH=main npm run docs:deploy
-```
+Pull requests and non-production branches should use Cloudflare preview
+deployments from the same Git integration. Keep docs and product code in the
+same repository so examples, CLI behavior, and release notes move together.
 
 ## Future release preparation
 
@@ -45,15 +39,11 @@ npm run release:prepare -- 0.2.0
 
 `release:prepare` only updates `package.json` and `package-lock.json`, then runs
 the release validation and `npm pack --dry-run`. It does not commit, tag,
-publish to npm, push, or deploy docs. Those steps remain explicit maintainer
-actions.
+publish to npm, push, or deploy docs. Deployment is handled by Cloudflare after
+the release commit is pushed.
 
-## Preferred long-term setup
+## Manual deploys
 
-For public docs, prefer Cloudflare Pages Git integration:
-
-1. Connect the GitHub repository.
-2. Use `main` as the production branch.
-3. Set the build command to `npm run docs:build`.
-4. Set the output directory to `docs/.vitepress/dist`.
-5. Keep `npm run docs:deploy` as the manual fallback path.
+Avoid manual Direct Upload deploys for normal releases. Use them only for
+emergency recovery or Cloudflare incident work, and record the reason in the
+release notes or incident notes.

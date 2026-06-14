@@ -53,7 +53,6 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
-    "docs:deploy": "node scripts/deploy-docs-cloudflare.mjs",
     "release:prepare": "node scripts/prepare-release.mjs",
     "validate:dogfood": "node scripts/validate-dogfood.mjs",
     "validate:release": "node scripts/validate-dogfood.mjs",
