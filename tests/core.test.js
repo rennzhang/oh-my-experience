@@ -347,20 +347,21 @@ test("candidate to draft to active lifecycle is explicit", () => {
   });
   assert.equal(candidate.category, "产品与 UI");
   writeTestCandidates(dataDir, runId, [candidate]);
-  const reviewFile = path.join(layout(dataDir).retrospectives, runId, "retrospective.md");
+  const reviewFile = path.join(layout(dataDir).retrospectives, runId, "experience-review.md");
   const generatedReview = fs.readFileSync(reviewFile, "utf8");
   assert.match(generatedReview, /状态：candidates_generated/);
-  assert.match(generatedReview, /经验复盘/);
+  assert.match(generatedReview, /经验草稿审批/);
+  assert.match(generatedReview, new RegExp(`复盘编号：${runId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   assert.match(generatedReview, /### 经验总结/);
   assert.match(generatedReview, /### 触发时机/);
   assert.match(generatedReview, /### 可复用规则/);
   assert.match(generatedReview, /以下内容是激活后会进入 Agent 上下文的规则正文：/);
   assert.match(generatedReview, /```agent-rule\nOpen the real UI and check viewport and console\.\n```/);
   assert.match(generatedReview, /Open the real UI and check viewport and console/);
-  assert.match(generatedReview, /### 审批区/);
-  assert.match(generatedReview, /可写：通过 \/ 不通过 \/ 改成…… \/ 合并到……/);
-  assert.deepEqual(Array.from(generatedReview.matchAll(/^### (.+)$/gm), (match) => match[1]), ["经验总结", "触发时机", "可复用规则", "审批区"]);
-  assert.doesNotMatch(generatedReview, /\| # \| 经验 \| 审批状态 \|/);
+  assert.match(generatedReview, /### 审批意见/);
+  assert.match(generatedReview, /可写：通过 \/ 不通过 \/ 修改为…… \/ 合并到……/);
+  assert.deepEqual(Array.from(generatedReview.matchAll(/^### (.+)$/gm), (match) => match[1]), ["经验总结", "触发时机", "可复用规则", "审批意见"]);
+  assert.doesNotMatch(generatedReview, /\| # \| 经验 \| 状态 \|/);
   addDecision(dataDir, runId, { candidateId: candidate.id, action: "approve", reason: "useful" });
   const decidedReview = fs.readFileSync(reviewFile, "utf8");
   assert.match(decidedReview, /状态：decisions_recorded/);
@@ -413,7 +414,7 @@ test("retrospective candidates require source audit unless explicitly incomplete
     allowIncompleteAudit: true,
     incompleteAuditReason: "test override",
   });
-  const reviewFile = path.join(run.runDir, "retrospective.md");
+  const reviewFile = path.join(run.runDir, "experience-review.md");
   const generatedReview = fs.readFileSync(reviewFile, "utf8");
   assert.match(generatedReview, /审计：不完整：test override/);
 });
@@ -435,7 +436,7 @@ test("retrospective candidates persist complete source audit", () => {
   assert.equal(raw.audit.sourceCoverage, "all-accessible");
   assert.equal(raw.audit.searchedSources.length, 2);
   assert.equal(raw.audit.incomplete, false);
-  assert.match(fs.readFileSync(path.join(run.runDir, "retrospective.md"), "utf8"), /审计：coverage=all-accessible \/ focus=fixture focus \/ sources=2 \/ gaps=0/);
+  assert.match(fs.readFileSync(path.join(run.runDir, "experience-review.md"), "utf8"), /审计：coverage=all-accessible \/ focus=fixture focus \/ sources=2 \/ gaps=0/);
 });
 
 test("retrospective source audit requires explicit source coverage", () => {
@@ -718,7 +719,7 @@ test("hook context is neutral and carries scope hints", () => {
   });
   const matches = matchCards(dataDir, "neutral hook context");
   const context = renderAdditionalContext(matches, { maxChars: 2000 });
-  assert.match(context, /OME candidate experience cards/);
+  assert.match(context, /OME matched experience cards/);
   assert.match(context, /Matched does not mean used/);
   assert.match(context, /Final report: if you actually used any card/);
   assert.match(context, /\*\*本次使用 N条 OME 经验卡：\*\*/);
@@ -912,7 +913,7 @@ test("negative triggers disambiguate overloaded terms like goal", () => {
   assert.equal(docsExample.some((item) => item.card.id === "agent-goal-routine"), false);
 });
 
-test("starter review flow only recalls for OME review work", () => {
+test("starter draft approval flow only recalls for OME approval work", () => {
   const dataDir = tmpDir("starter-review-surface-gate");
   initializeDataDir({ dataDir });
   const docsSync = matchCards(
@@ -922,7 +923,7 @@ test("starter review flow only recalls for OME review work", () => {
   );
   assert.equal(docsSync.some((item) => item.card.id === "starter-ai-first-review-surface"), false);
 
-  const reviewSurface = matchCards(dataDir, "Design the OME AI-first review flow so users can review generated candidate lessons without manual card creation.");
+  const reviewSurface = matchCards(dataDir, "Design the OME AI-first draft approval flow so users can approve generated experience drafts without manual card creation.");
   assert.equal(reviewSurface[0]?.card.id, "starter-ai-first-review-surface");
   assert.ok(reviewSurface[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "ome_review_surface"));
 });

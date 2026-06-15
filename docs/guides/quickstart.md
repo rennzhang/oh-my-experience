@@ -57,7 +57,7 @@ not a green status screen.
 
 ## 4. Next steps
 
-- Create your first reviewed card: [First Experience Card](first-card.md)
+- Create your first approved card: [First Experience Card](first-card.md)
 - See the end-to-end `/goal` example: [Examples](examples.md)
 - Use a repository-local library: [Global And Project Libraries](project-libraries.md)
 - Configure Codex or Claude hooks directly: [Codex](codex.md), [Claude](claude.md)

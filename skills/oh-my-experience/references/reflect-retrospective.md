@@ -12,9 +12,9 @@ Agent 收到以下指令时执行本指南：
 
 1. 扫描所有可访问来源中的用户会话记录
 2. 复盘可复用的执行经验和用户偏好
-3. 将复盘结论整理为待审候选卡，停于 `review`
+3. 将复盘结论整理为经验草稿，停在“等待用户审批”
 
-**非职责**：安装、hook、故障排查（走其他 OME reference）；直接创建 active 卡（必须走 OME CLI）；替代用户审批。
+**非职责**：安装、hook、故障排查（走其他 OME reference）；直接创建 active 卡（必须走 OME CLI）；替用户做最终决定。
 
 需要执行 `ome` 命令时，先读 `references/cli.md`。本指南只规定扫描与复盘，不承担 CLI 手册职责。
 
@@ -46,8 +46,9 @@ Agent 收到以下指令时执行本指南：
 - **无来源审计不得写候选**：`sourceCoverage` 为 `unknown` 时禁止生成候选卡。
 - **证据不足标不完整**：剩余证据缺口存在时如实标注。
 - **OME CLI 是 OME 数据写入入口**：写入复盘候选、draft 或 active 卡时，不得绕过 CLI 直接改库文件。
-- **生命周期单向**：`candidate -> draft -> active -> archived`。
-- **补充材料默认修订当前 run**：候选生成后、用户审批前，如果用户继续提供链接、粘贴内容、口头纠正、反例或"可以参考吸收"之类反馈，默认是在优化当前扫描结果。不要新建独立 run 或新卡；应读取当前 run 的候选和用户补充，重写同一 run 的候选输入，再用 `ome reflect candidates <run-id> --from-file <file>` 覆盖候选，保持 review 入口不变。只有用户明确要求另开主题或另做一张卡时才创建新 run。
+- **内部生命周期单向**：`candidate -> draft -> active -> archived`。这是 Agent/CLI 约束，不是默认用户心智模型。
+- **用户心智模型保持简单**：用户只需要知道“复盘出来的是经验草稿；可以继续给意见优化；确认后才入库”。用户入口统一称为“经验草稿审批”。不要默认向用户解释 JSON、candidate、draft、active、runId 或内部文件。
+- **补充材料默认修订当前复盘**：经验生成后、用户确认入库前，如果用户继续提供链接、粘贴内容、口头纠正、反例或"可以参考吸收"之类反馈，默认是在优化当前扫描结果。不要新建独立 run 或新卡；应读取当前 run 的候选和用户补充，重写同一 run 的内部候选文件，再用 `ome reflect candidates <run-id> --from-file <file>` 覆盖候选，保持经验草稿审批入口不变。只有用户明确要求另开主题或另做一张卡时才创建新 run。
 
 ---
 
@@ -206,16 +207,16 @@ focusLens: <用户指定，无则 "">
 
 ## 候选后的继续迭代
 
-用户经常不会一次性给完反馈。候选已经生成但还没审批时，后续输入的默认含义是"把这条经验改得更准"，而不是"再创建一条经验"。
+用户经常不会一次性给完反馈。经验已经生成但还没确认入库时，后续输入的默认含义是"把这条经验改得更准"，而不是"再创建一条经验"。
 
 处理规则：
 
-1. 先定位最近或用户点名的 `runId`，读取 `ome reflect show <run-id> --json` 和现有候选。
+1. 先定位最近或用户点名的内部 `runId`，读取 `ome reflect show <run-id> --json` 和现有候选。
 2. 判断用户补充影响哪张候选：改 summary、触发条件、ignore 边界、rule、证据、冲突说明，还是应拒绝/合并。
-3. 用同一个 run 的 `candidates-input.json` 或新临时输入文件重写完整候选集合；保留未受影响的候选，修改受影响的候选。
+3. 用同一个 run 的内部候选文件或新临时文件重写完整候选集合；保留未受影响的候选，修改受影响的候选。候选 JSON 是 Agent/CLI 的机器输入，不是用户审批入口。
 4. 在 audit 里追加这次补充来源和 `userCorrections`，说明没有重新全盘扫描的原因；`sourceCoverage` 可以是原覆盖范围，若只处理用户补充则写清它是 refinement，不要伪装成新全盘扫描。
 5. 运行 `ome reflect candidates <run-id> --from-file <file>` 更新当前 review 文件。
-6. 明确告诉用户 review 的仍是同一个 run；没有 approve、apply 或 enable。
+6. 明确告诉用户审批的仍是同一次复盘；没有确认入库前，不执行 apply 或 enable。
 
 禁止动作：
 
@@ -249,7 +250,7 @@ focusLens: <用户指定，无则 "">
 - 候选卡只能从**可复用规则**派生，不得从最新提示词、单条记忆或零星命中直接生成。
 - `rule` 必须写成未来 Agent 可直接执行的 Markdown。单步规则可以是一句话；多步骤、执行协议、验收清单或 MUST/MUST NOT 约束必须用有序列表或分段列表，不得写成一整段长文。
 - 执行协议类 `rule` 优先用 Markdown 有序列表：每一项只表达一个动作、判断或验收点，能被 Agent 逐项执行和检查。
-- `rule` 字段本体只保存未来要压入 Agent 上下文的纯规则正文，不要包含外层代码块 fence。Review/worksheet 展示层应把 `rule` 包在 `agent-rule` fenced code block 里，让用户一眼看出这段会被复用；draft、active card、`ome experience show --section rule` 和 hook 注入仍使用去 fence 的纯规则正文。
+- `rule` 字段本体只保存未来要压入 Agent 上下文的纯规则正文，不要包含外层代码块 fence。经验草稿审批展示层应把 `rule` 包在 `agent-rule` fenced code block 里，让用户一眼看出这段会被复用；draft、active card、`ome experience show --section rule` 和 hook 注入仍使用去 fence 的纯规则正文。
 - 复盘结论先产出，候选卡后生成。
 
 ---
@@ -328,13 +329,13 @@ focusLens: <用户指定，无则 "">
 
 ## 语言规则
 
-- 候选卡和审批表使用一种主语言。
+- 候选卡和经验草稿审批使用一种主语言。
 - 用户工作语言是中文 → 中文。英文 → 英文。
 - 命令、标识符、API 名、产品名、直接引语保留原文。
 
 ---
 
-## 候选卡
+## 内部候选卡
 
 复盘结论的轻量输出格式。
 
@@ -362,33 +363,34 @@ focusLens: <用户指定，无则 "">
 
 ---
 
-## 审批表
+## 经验草稿审批
 
-`retrospective.md` 是审批表。每条经验只保留四段：经验总结、触发时机、可复用规则、审批区。
+`experience-review.md` 是用户审批经验草稿的入口。文件名保持稳定，但用户可见名称统一为“经验草稿审批”。每条经验只保留四段：经验总结、触发时机、可复用规则、审批意见。
 
-「可复用规则」段落是展示层，必须先写一句提示语，然后用 `agent-rule` fenced code block 展示 `rule` 正文。不要把 fence 写回候选卡字段；审批、草稿、active 卡和 prompt-time recall 使用的仍是纯规则正文。
+「可复用规则」段落是展示层，必须先写一句提示语，然后用 `agent-rule` fenced code block 展示 `rule` 正文。不要把 fence 写回候选卡字段；经验草稿审批、草稿、active 卡和 prompt-time recall 使用的仍是纯规则正文。
 
 来源审计、语气强度、适用性分析和证据细节写入候选卡字段，不新增可见章节。
 
 ## 交付输出
 
-复盘完成后，面向用户的结果必须给出可点击的 Markdown 链接，方便直接打开审批表 Review。
+复盘完成后，面向用户的结果必须给出可点击的 Markdown 链接，方便直接打开经验草稿审批。
 
 - CLI 人类输出的链接目标应相对当前命令工作目录；不要用相对 OME `dataDir` 的路径冒充可点击链接。
-- 至少包含审批表：`[retrospective.md](<relative-path-from-current-cwd>)`。
-- 如有候选 JSON、审计 JSON 或补充材料，也给同一基准的 Markdown 链接。
-- 链接文本保持短，例如 `retrospective.md`、`candidates.json`。
+- 只把经验草稿审批作为默认用户入口：`经验草稿审批：[查看](<relative-path-from-current-cwd>)`。
+- 不要默认展示、链接或要求用户阅读 `candidates.json`、`audit.json`、`candidates-input.json` 等机器输入。只有用户明确要求调试、核对 schema 或排查 CLI 写入时才给 JSON 路径。
+- 不要把 runId 当成主要结果；如需给定位信息，称为“复盘编号”。
+- 默认下一步只问用户是否通过、如何修改、是否继续补充，或是否确认入库；不要让用户自己处理 `RUN_ID`、`CANDIDATE_ID`、JSON 文件、draft 或 active。
 - 对话回复里如无法保证相对路径点击解析，补充真实文件链接；不能只给会跳错的相对路径。
 
 示例：
 
 ```markdown
-Review 文件：[retrospective.md](../../../../ren-vault/数字资产/AI系统/OME/retrospectives/2026-06-13T04-39-32-344Z-manual/retrospective.md)
-候选数据：[candidates.json](../../../../ren-vault/数字资产/AI系统/OME/retrospectives/2026-06-13T04-39-32-344Z-manual/candidates.json)
+经验草稿审批：[查看](../../../../ren-vault/数字资产/AI系统/OME/retrospectives/2026-06-13T04-39-32-344Z-manual/experience-review.md)
+复盘编号：2026-06-13T04-39-32-344Z-manual
 ```
 
 ---
 
 ## CLI 参考
 
-所有命令、flags、JSON 输出、候选写入、审批生命周期、doctor、hook、skill、eval 和卸载行为都见 `references/cli.md`。
+所有命令、flags、JSON 输出、候选写入、草稿审批生命周期、doctor、hook、skill、eval 和卸载行为都见 `references/cli.md`。

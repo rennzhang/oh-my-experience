@@ -32,6 +32,7 @@ type WriteCandidatesOptions = {
   allowIncompleteAudit?: boolean;
   incompleteAuditReason?: string;
 };
+const EXPERIENCE_REVIEW_FILE = "experience-review.md";
 
 export function createRetrospectiveRun(dataDir: string, {
   title = "retrospective",
@@ -60,7 +61,7 @@ export function createRetrospectiveRun(dataDir: string, {
   writeJsonAtomic(path.join(runDir, "input.json"), input, dataDir);
   writeJsonAtomic(path.join(runDir, "state.json"), { runId, state: "created", updatedAt: nowIso() }, dataDir);
   writeJsonAtomic(path.join(runDir, "candidates.json"), { runId, candidates: [] }, dataDir);
-  writeTextAtomic(path.join(runDir, "retrospective.md"), retrospectiveSkeleton(runId), dataDir);
+  writeTextAtomic(path.join(runDir, EXPERIENCE_REVIEW_FILE), retrospectiveSkeleton(runId), dataDir);
   operationLog(dataDir, "retrospective.create", { runId });
   return { runId, runDir, state: "created", focus: reviewFocus, sources: [], guideRef, guideHash };
 }
@@ -413,11 +414,12 @@ function cardExists(dataDir: string, id: string): boolean {
 }
 
 function retrospectiveSkeleton(runId: string): string {
-  return `# 经验复盘 ${runId}
+  return `# 经验草稿审批
 
 状态：created
+复盘编号：${runId}
 
-生成候选后，每条经验都会按「经验总结 / 触发时机 / 可复用规则 / 审批区」展示。审批前不会生效。
+生成草稿后，每条经验都会按「经验总结 / 触发时机 / 可复用规则 / 审批意见」展示。确认入库前不会生效。
 `;
 }
 
@@ -427,7 +429,7 @@ function refreshRetrospectiveMarkdown(dataDir: string, runId: string): void {
   const audit = readRetrospectiveAudit(dataDir, runId);
   const decisions = readDecisions(dataDir, runId);
   const state = deriveRetrospectiveState(runDir, candidates, decisions);
-  writeTextAtomic(path.join(runDir, "retrospective.md"), renderRetrospectiveMarkdown(runId, state, audit, candidates, decisions), dataDir);
+  writeTextAtomic(path.join(runDir, EXPERIENCE_REVIEW_FILE), renderRetrospectiveMarkdown(runId, state, audit, candidates, decisions), dataDir);
 }
 
 function renderRetrospectiveMarkdown(runId: string, state: string, audit: RetrospectiveAudit | null, candidates: RetrospectiveCandidate[], decisions: RetrospectiveDecision[]): string {
@@ -446,13 +448,14 @@ function renderRetrospectiveMarkdown(runId: string, state: string, audit: Retros
       "### 可复用规则",
       "以下内容是激活后会进入 Agent 上下文的规则正文：",
       fencedMarkdownBlock(candidate.rule, "agent-rule"),
-      "### 审批区",
+      "### 审批意见",
       renderDecisionBlock(latestDecision.get(candidate.id)),
     ].join("\n\n");
   });
   return [
-    `# 经验复盘 ${runId}`,
+    "# 经验草稿审批",
     `状态：${state}`,
+    `复盘编号：${runId}`,
     renderAuditStatus(audit),
     ...sections,
   ].filter(Boolean).join("\n\n").trimEnd() + "\n";
@@ -496,7 +499,7 @@ function renderDecisionBlock(decision: RetrospectiveDecision | undefined): strin
     return [
       "> 审批：待定",
       ">",
-      "> 可写：通过 / 不通过 / 改成…… / 合并到……",
+      "> 可写：通过 / 不通过 / 修改为…… / 合并到……",
     ].join("\n");
   }
   return [

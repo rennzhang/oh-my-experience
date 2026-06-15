@@ -151,9 +151,9 @@ ome reflect candidates <run-id> --from-file <file> --allow-incomplete-audit --in
 
 `sourceCoverage: unknown` 默认不得写候选。
 
-## 审批生命周期
+## 草稿审批生命周期
 
-候选审批：
+候选决定：
 
 ```bash
 ome reflect decide <run-id> <candidate-id> --action approve
@@ -197,7 +197,7 @@ ome experience migrate-legacy --scope project --dry-run
 ome experience migrate-legacy --scope project --backup
 ```
 
-分类由候选、审批和卡片内容自然产生；不要要求用户维护单独的 category 命令。Starter lessons 由 `init` 安装，后续治理走正常经验库 review 和 archive，不再暴露单独 starter 命令。
+分类由候选、审批意见和卡片内容自然产生；不要要求用户维护单独的 category 命令。Starter lessons 由 `init` 安装，后续治理走正常经验库 review 和 archive，不再暴露单独 starter 命令。
 `list --json` 默认返回完整卡片。只需要索引时使用 `--compact` 或
 `--index`，避免把完整规则正文拉进上下文。
 旧版卡缺少 `schema: ome-card` 时，不要手改 active；先运行

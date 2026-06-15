@@ -1,20 +1,20 @@
 ---
-title: Reflect and Review
+title: Reflect and Draft Approval
 type: guide
 priority: high
 ---
 
-# Reflect and Review
+# Reflect and Draft Approval
 
 OME's core value: turning the real corrections you make to your agent into
-reusable experience cards.
+reusable experience.
 
-This process is called a reflect scan. The agent inspects sessions where you
-corrected it, generates candidate cards, and you decide which ones enter the
-library. Active cards are then auto-injected on similar future tasks.
+This process is called a reflect scan. As a user, you only need to ask for a
+reflect, approve or refine the experience drafts, and confirm what should enter
+the library. JSON files, ids, drafts, and enable commands are the agent's job.
 
 ```text
-real work → reflect scan → candidates → you review → draft → active → prompt-time recall
+real work → agent reflects → draft approval → refine with feedback → confirm library add → future recall
 ```
 
 ## When to run a reflect
@@ -28,22 +28,19 @@ Not every session needs one. Good times:
 
 ## Running a reflect
 
-### Step 1: Start the scan
+### Step 1: Start the reflect
 
 Copy this to your agent:
 
 ```text
-Run an OME reflect scan over my recent coding sessions:
+Run an OME experience reflect focused on recent execution mistakes I corrected.
 
-1. Run `ome reflect start --focus "recent execution mistakes I corrected"`.
-2. Check recent sessions for places where I corrected you. Look for:
-   - You skipped a validation step (browser check, test run, etc.)
-   - You silently swallowed an error with a fallback
-   - You mixed in unrelated changes
-   - You forgot a project-specific process
-3. Generate candidates and write them to a file.
-4. Run `ome reflect candidates RUN_ID --from-file FILE`.
-5. Run `ome reflect show RUN_ID` to display all candidates.
+Requirements:
+1. Complete the OME reflect flow and source audit yourself. Do not ask me to read JSON or internal files.
+2. Extract only reusable lessons, at most 5 at a time.
+3. Give me the draft approval page link and a short summary when ready.
+4. If I add thoughts, examples, or corrections, refine the same reflect instead of starting a new one.
+5. Wait until I explicitly confirm adding the approved experiences to the library.
 ```
 
 ### Narrowing the focus
@@ -59,39 +56,28 @@ ome reflect start --focus "TypeScript strictness and error handling"
 The focus is not a filter. The agent still inspects all accessible sources —
 it just prioritizes the direction you specified.
 
-### What a good candidate looks like
+### What Draft Approval Should Show
 
-Each candidate must include:
+Each extracted experience should help you judge four things:
 
-| Field | Meaning | Example |
-|-------|---------|---------|
-| `summary` | One sentence covering failure mode, use case, ignore case, and expected action | UI changes need real browser validation; backend-only or docs-only work should ignore this card |
-| `criteria.use_when` | Natural-language standards for when the model should use the card | UI changes, frontend fixes, page style adjustments |
-| `criteria.ignore_when` | Natural-language near misses that should not use the card | Backend-only changes, database migrations, documentation examples |
-| `recall.triggers` | Compact matcher anchors, usually 3-5 short phrases from `use_when` | browser validation, UI acceptance |
-| `recall.topics` | Broad surfaces used for explainability and weighting | frontend, browser |
-| `scope` | Where the card can be recalled | `{ "level": "global" }` |
-| `rule` | Complete executable rule the agent reads after deciding the card applies | Launch real browser, check responsive states, interactions, loading, errors, and console |
+- What the lesson says.
+- When it should apply.
+- Which near misses should not apply.
+- What concrete rule the agent will follow later.
 
-**Good card:** one behavioral correction, precise triggers, will match accurately on future tasks.
-**Bad candidate:** too vague ("value code quality"), too narrow (only applies to one file), no actionable instruction for the agent.
+A good experience is a specific behavior correction. Vague principles, one-file
+details, or summaries without an actionable future rule should not enter the
+library.
 
-### Step 2: Review candidates
+### Step 2: Approve And Refine
 
-After the agent shows the candidates, decide one by one.
+After the agent shows the draft approval page, you can reply in plain language:
 
-Copy this to your agent:
-
-```text
-Show me all candidates from run RUN_ID one at a time. For each, show:
-
-- Summary
-- Use criteria
-- Ignore criteria
-- Complete rule text
-
-Then ask whether I want to approve, reject, merge, or rewrite.
-```
+- "Approve the first one."
+- "The second is too broad; make it more executable."
+- "Merge these two."
+- "Do not add this yet; here is a counterexample."
+- "Refine the same reflect with this feedback."
 
 For each candidate, ask three questions:
 1. Will this situation happen again?
@@ -100,33 +86,21 @@ For each candidate, ask three questions:
 
 ### Refining the same scan
 
-If you give the agent more context after the candidates appear, such as a link,
-a pasted conversation, a correction, or "use this as reference", that should
-revise the current run by default. The agent should update the same run's
-candidate file and run:
-
-```bash
-ome reflect candidates RUN_ID --from-file UPDATED_FILE
-```
-
-It should not start a new reflect run or create a sibling card unless you
-explicitly ask for a separate lesson. The review link should stay anchored to
-the same `RUN_ID` until you approve, reject, merge, or rewrite the candidates.
+If you give the agent more context after the experiences appear, such as a
+link, a pasted conversation, a correction, or "use this as reference", that
+should refine the current reflect by default. It should not start a new reflect
+or create a sibling lesson unless you explicitly ask for one.
 
 ### Step 3: Apply
 
-After deciding on each candidate, have the agent apply the results:
+After approving and refining, tell the agent:
 
 ```text
-Help me apply the review decisions:
-
-1. Run `ome reflect apply RUN_ID --dry-run` to preview the drafts that would be written.
-2. Run `ome reflect apply RUN_ID` to write drafts.
-3. For cards that should become active, run `ome experience enable DRAFT_ID`.
+Add the approved experiences from this reflect to the library.
 ```
 
-Applying creates drafts. Enabling makes them active. You can inspect and edit
-drafts in between.
+The agent should prepare and enable only the approved experiences. Nothing is
+recalled in future tasks until you explicitly confirm adding it.
 
 ### Step 4: Verify
 
@@ -139,14 +113,15 @@ Simulate a task similar to where the mistake happened and check whether the new 
 ome match "a realistic task description" --explain
 ```
 
-## Decision reference
+## Common Replies
 
-| Action | When to use | Command |
-|--------|------------|---------|
-| approve | The lesson is reusable, triggers are precise | `ome reflect decide RUN_ID CANDIDATE_ID --action approve` |
-| reject | Too vague, one-off, or already covered | `ome reflect decide RUN_ID CANDIDATE_ID --action reject` |
-| merge | Highly similar to another candidate | `ome reflect decide RUN_ID CANDIDATE_ID --action merge --target OTHER_ID` |
-| rewrite | Right direction, wrong wording | Edit the candidate file and resubmit |
+| What you want | Say this |
+|--------|----------|
+| Add this experience | `Approve the first one.` |
+| Skip it | `Reject the second one; it is too broad.` |
+| Combine two lessons | `Merge the first and third.` |
+| Refine wording or boundary | `Revise the second with this boundary: ...` |
+| Add more evidence first | `Do not add it yet; here is a counterexample.` |
 
 ## Keeping the library healthy
 
@@ -154,7 +129,7 @@ More cards is not better. A few long-term habits:
 
 - **Fewer, sharper cards.** 10 cards that recall precisely beat 50 vague rules.
 - **Check stats regularly.** `ome stats` shows which cards haven't matched — consider archiving them.
-- **Deduplicate.** If a new card feels similar to an old one, merge them.
+- **Deduplicate.** If a new experience feels similar to an old one, merge before adding it.
 - **Fix over-triggering.** If a card fires on unrelated tasks, tighten `criteria.ignore_when`, `recall.triggers`, topics, or scope.
 
 ---
@@ -166,13 +141,12 @@ Use this whenever you want to run a reflect scan:
 ```text
 Run an OME reflect scan over my recent [time period / project name] coding sessions.
 
-Steps:
-1. ome reflect start --focus "[focus area]"
-2. Check sessions for places where I corrected you, generate ≤5 candidates
-3. Write candidates to file, then ome reflect candidates RUN_ID --from-file FILE
-4. ome reflect show RUN_ID to display candidates
-5. Wait for me to approve/reject/merge/rewrite each one
+Requirements:
+1. Complete the OME reflect flow, source audit, and internal candidate write yourself.
+2. Inspect places where I corrected you and extract ≤5 experience drafts.
+3. Give me only the draft approval page link and a short summary. Do not ask me to read JSON, internal files, or candidate schemas.
+4. If I add thoughts, counterexamples, or edits, refine the same reflect instead of starting a new one.
+5. Wait until I explicitly confirm adding the approved experiences to the library.
 
-Each candidate must use the current OME candidate JSON shape: audit plus summary, criteria, recall, scope, and rule. Add engine_hints only when a concrete internal signal is needed.
-Only extract reusable execution judgment — don't turn one-off context into rules.
+Only extract reusable execution judgment. Do not turn one-off context into rules.
 ```

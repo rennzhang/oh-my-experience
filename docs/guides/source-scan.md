@@ -93,14 +93,12 @@ ome source scan spool --query "browser validation" --max-session-bytes 4194304
 ## After Source Scan
 
 Ask your agent to include scanned source records in the reflect source audit,
-then keep the normal reviewed lifecycle:
+then keep the normal draft approval flow:
 
-```bash
-ome reflect start
-ome reflect apply <run-id> --dry-run
-ome reflect apply <run-id>
-ome experience enable <draft-card-id>
+```text
+Run an OME reflect from the sources we just scanned. Give me only the draft approval page, not JSON.
+If I add feedback, refine the same reflect. Wait for my confirmation before adding approved experiences to the library.
 ```
 
-Scanned material should never bypass review. Spool expands the searchable source
-pool; it does not change OME's safety model.
+Scanned material should never bypass draft approval and confirmation. Spool expands the
+searchable source pool; it does not change OME's safety model.

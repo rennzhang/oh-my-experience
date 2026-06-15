@@ -50,11 +50,11 @@ Copy and paste this prompt:
 ```text
 Run an OME reflect scan over my recent coding sessions.
 
-1. Run ome reflect start --focus "recent execution mistakes I corrected"
-2. Check recent conversations for places where I corrected you
-3. Generate ≤5 candidates in the current OME candidate JSON shape: audit plus candidates with summary, criteria.use_when, criteria.ignore_when, recall, optional engine_hints, scope, and rule.
-4. Write candidates to candidates.json, then ome reflect candidates RUN_ID --from-file candidates.json
-5. ome reflect show RUN_ID to display candidates. Wait for my approval on each one.
+1. Use the OME reflect flow to check recent conversations for places where I corrected you.
+2. Extract ≤5 experience drafts, only keeping reusable execution judgment.
+3. Give me only the draft approval page link and a short summary. Do not ask me to read JSON, internal files, or candidate schemas.
+4. If I add thoughts, counterexamples, or edits, refine the same reflect instead of starting a new one.
+5. Wait until I explicitly say to add the approved experiences to the library.
 
 Only extract reusable execution judgment. Don't turn one-off context into experience cards.
 ```

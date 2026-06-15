@@ -6,8 +6,8 @@ status: active
 # First Experience Card
 
 OME becomes valuable when the library contains lessons from your own real
-corrections. Create those lessons through a reviewed retrospective flow, not by
-writing active cards directly.
+corrections. Create the first one through reflect and draft approval: the agent
+reflects, you approve or refine, then you confirm what enters the library.
 
 ## 1. Start a retrospective
 
@@ -16,63 +16,45 @@ Copy this to your agent:
 ```text
 Create an OME retrospective run for one reusable coding lesson:
 
-1. Run `ome reflect start --focus "recent coding correction that should become reusable"`.
-2. Scan the accessible coding-session sources deeply enough to find real user corrections, not just the last few messages.
-3. Produce no more than 3 candidate lessons.
-4. Only keep lessons that would change a future agent action.
+1. Use the OME reflect flow to scan accessible coding-session sources deeply enough to find real user corrections, not just the last few messages.
+2. Produce no more than 3 experience drafts.
+3. Only keep lessons that would change a future agent action.
+4. Give me only the draft approval page and a short summary, not JSON or internal files.
 ```
 
 `--focus` is a lens, not a shortcut. Unless you explicitly limit the source
 set, the agent should still inspect all accessible session sources relevant to
 the focus.
 
-## 2. Write candidates
+## 2. Approve And Refine
 
-The agent should write candidates with:
-
-- one clear `summary` that includes the trigger scene, failure mode, correct
-  action, and boundary;
-- natural-language `use_when` and `ignore_when`;
-- focused `triggers` and `topics`;
-- `engine_hints` only when a stable routed signal is needed;
-- the complete executable rule in `rule`.
-
-Then submit them:
-
-```bash
-ome reflect candidates RUN_ID --from-file candidates.json
-ome reflect show RUN_ID
-```
-
-## 3. Review before enabling
-
-Open the generated `retrospective.md`. Ask:
+Open the generated draft approval page. Ask:
 
 - Would this situation happen again?
 - Would seeing this card change the agent's next action?
 - Is it specific enough to avoid broad keyword matches?
 - Does it have clear ignore cases?
 
-Record decisions:
+Reply in plain language:
 
-```bash
-ome reflect decide RUN_ID CANDIDATE_ID --action approve
-ome reflect decide RUN_ID CANDIDATE_ID --action reject
-ome reflect decide RUN_ID CANDIDATE_ID --action merge --target OTHER_ID
+```text
+Approve the first one.
+The second is too broad; refine it with the boundary I just gave.
+Merge these two.
+Do not add it yet; here is a counterexample.
 ```
 
-## 4. Apply and enable
+## 3. Confirm Library Add
 
-```bash
-ome reflect apply RUN_ID --dry-run
-ome reflect apply RUN_ID
-ome experience enable DRAFT_ID
+When it looks right, tell the agent:
+
+```text
+Add the approved experiences to the library.
 ```
 
-Only active cards are recalled by hooks. Candidates and drafts stay out of the
-agent prompt until you explicitly enable them.
+Nothing is recalled in future tasks until you explicitly confirm adding it.
 
-## 5. Verify recall
+## 4. Verify Recall
 
 Use a realistic future prompt, not the exact wording from the card:
 

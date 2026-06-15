@@ -111,10 +111,10 @@ the user explicitly constrained the source set.
 
 `ome reflect candidates` requires a source audit before it writes candidates.
 Use `--allow-incomplete-audit` only for an explicit incomplete review; the
-generated worksheet will show the incomplete audit status.
+generated draft approval page will show the incomplete audit status.
 
 Add `--scope project` when the retrospective should write candidates, drafts,
-and review files into the current project's `.oh-my-experience/` library.
+and draft approval pages into the current project's `.oh-my-experience/` library.
 
 ## Project Libraries
 

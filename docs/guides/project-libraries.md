@@ -41,7 +41,7 @@ OME creates:
 
 The default `.gitignore` excludes runtime files such as `events.jsonl`,
 `retrospectives/`, and `indexes/`. Commit active project cards when you want
-the project to carry its own reviewed working rules.
+the project to carry its own approved working rules.
 
 Check the detected project and library state:
 
@@ -51,18 +51,16 @@ ome project status
 
 ## Write Project Cards
 
-Use the same review lifecycle, with `--scope project`:
+Use the same draft approval flow, but tell the agent to write the approved experiences
+to the current project library:
 
-```bash
-ome reflect start --scope project --focus "release validation"
-ome reflect candidates RUN_ID --scope project --from-file candidates.json
-ome reflect decide RUN_ID CANDIDATE_ID --scope project --action approve
-ome reflect apply RUN_ID --scope project
-ome experience enable DRAFT_ID --scope project
+```text
+Reflect on this project and write approved lessons to the current project library.
+Give me only the draft approval page; wait for my confirmation before enabling approved project experiences.
 ```
 
 Do not hand-write files into `experiences/active/` unless you are doing a
-manual migration and have already reviewed the card. The CLI keeps the
+manual migration and have already approved the card. The CLI keeps the
 candidate, draft, active, and archive lifecycle visible.
 
 ## How Recall Works
@@ -102,11 +100,11 @@ To find the project key OME will use:
 ome project status --cwd /path/to/project --json
 ```
 
-For a manual global card, keep the normal global lifecycle and set project
-scope on the candidate:
+For an advanced manual path, keep the normal global lifecycle and set project
+scope on the experience draft:
 
 ```bash
-ome reflect add RUN_ID \
+ome reflect add <reflect-id> \
   --title "Release checklist for this repo" \
   --summary "Use this repository's release gate before publishing." \
   --rule "Run the project release validation before claiming readiness." \
@@ -116,7 +114,7 @@ ome reflect add RUN_ID \
   --module-path "."
 ```
 
-Retrospective candidate files can set the same `scope` object directly.
+Internal candidate files can set the same `scope` object directly.
 These cards stay in the global `dataDir`, but OME filters them by the detected
 project before scoring.
 

@@ -35,7 +35,7 @@ export function auditStorage(dataDir: string) {
   const entries = [
     entry(dataDir, l.config, "runtime config", true),
     entry(dataDir, l.experiences, "experience library", true),
-    entry(dataDir, l.retrospectives, "review runs", true),
+    entry(dataDir, l.retrospectives, "draft approval runs", true),
     entry(dataDir, l.indexes, "indexes", true),
     entry(dataDir, l.experienceIndex, "active experience recall cache", true),
     entry(dataDir, l.sourceIndex, "source pointer catalog", true),

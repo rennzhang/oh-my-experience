@@ -11,7 +11,7 @@ between a generic rule file and a conditional experience card.
 
 ## Example: `/goal` Starts Full-Closure Delivery
 
-Assume your active library contains a reviewed card for goal execution. In this
+Assume your active library contains a approved card for goal execution. In this
 example the card is named `Enter full-closure delivery mode when a goal
 starts`. Its usage criteria say to use it when `/goal`, `create a goal`, or
 `start now` begins a real execution task, and to ignore it for documentation
@@ -37,7 +37,7 @@ Claude receive one stable instruction shape. The card content stays in the
 language stored on the card.
 
 ```text
-OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
+OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
 Final report: if you actually used any card, add one final line `**OME experience cards used in this response: N** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
 1. [high risk][must] Enter full-closure delivery mode when a goal starts (agent-goal-execution)
    Summary: When a user starts real execution with /goal, create a goal, or start now, a common failure is only creating goal copy or implementing a small slice; the agent should enter full-closure delivery and ignore docs examples, feature explanations, or business-goal discussion.

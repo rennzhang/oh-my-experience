@@ -94,8 +94,8 @@ The current scoring model is local and deterministic:
 - dampen stale or low-confidence cards;
 - collapse near-duplicate cards within the same scope so the hook
   context does not repeat the same lesson;
-- also collapse a starter card into a reviewed card when they share the same
-  explicit rule signal; two reviewed cards are not collapsed merely because
+- also collapse a starter card into a approved card when they share the same
+  explicit rule signal; two approved cards are not collapsed merely because
   they share a broad signal;
 - prefer a project card when a near-duplicate exists in both global and project
   layers;
@@ -226,7 +226,7 @@ prefers concise, high-impact lessons over long card bodies.
 The rendered hook context stays neutral:
 
 ```text
-OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
+OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
 Final report: if you actually used any card, add one final line `**OME experience cards used in this response: N** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
 1. [high risk][must] Browser validation (browser-validation)
    Summary: ...

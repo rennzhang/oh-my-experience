@@ -40,7 +40,7 @@ session/source-scan/retrospective
 ## 产品规则
 
 不要在 setup 阶段要求用户手动分类每条经验。`init` 负责完成设置；reflect
-候选经验携带推断出的适用范围，`ome reflect decide` 可以在创建草稿前修正它。
+生成的经验草稿会携带推断出的适用范围，`ome reflect decide` 可以在创建草稿前修正它。
 
 手动编辑卡片是辅助路径。reflect 指南应先根据来源上下文推断适用范围；用户只在
 推断范围错误时修正。

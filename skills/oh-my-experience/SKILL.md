@@ -1,12 +1,12 @@
 ---
 name: oh-my-experience
 description: >-
-  Use this skill when Codex needs to work with Oh My Experience for AI coding-agent execution lessons: set up a local OME library, install or inspect Codex hooks, recall active experience cards before medium or complex work, scan coding sessions for retrospective candidates, create or inspect retrospective candidates, review and govern an existing experience library, run recall evaluation, or troubleshoot OME data directories, hooks, stats, Spool source scans, and doctor failures.
+  Use this skill when Codex needs to work with Oh My Experience for AI coding-agent execution lessons: set up a local OME library, install or inspect Codex hooks, recall active experience cards before medium or complex work, scan coding sessions for experience drafts, create or inspect draft approval pages, review and govern an existing experience library, run recall evaluation, or troubleshoot OME data directories, hooks, stats, Spool source scans, and doctor failures.
 ---
 
 # Oh My Experience
 
-Oh My Experience (OME) turns real AI coding sessions into reviewed, prompt-time experience recall.
+Oh My Experience (OME) turns real AI coding sessions into approved, prompt-time experience recall.
 
 Use the `ome` / `oh-my-experience` CLI as the source of truth. Do not reimplement storage, matching, hook writes, retrospective lifecycle, or card mutation in the skill.
 
@@ -19,7 +19,7 @@ Read only the reference needed for the user request:
 | Need exact CLI commands, flags, JSON behavior, lifecycle commands, or safe command routing | [cli.md](references/cli.md) |
 | Install, initialize, configure, hook setup | [setup.md](references/setup.md) |
 | Recall prior lessons for the current task, inspect match quality | [recall.md](references/recall.md) |
-| Scan sessions, run retrospective, inspect candidates, approve cards | [reflect-retrospective.md](references/reflect-retrospective.md) |
+| Scan sessions, run retrospectives, create draft approval pages, refine experiences, confirm library add | [reflect-retrospective.md](references/reflect-retrospective.md) |
 | Review, refine, merge, archive, or de-conflict existing experience cards | [experience-library-review.md](references/experience-library-review.md) |
 | Doctor failures, hook status, stats, eval, dogfood validation | [troubleshoot-eval.md](references/troubleshoot-eval.md) |
 

@@ -6,6 +6,22 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.1.2 - 2026-06-15
+
+### Changed
+
+- Reworked the reflect flow language around experience drafts, draft approval,
+  and explicit library confirmation.
+- Updated English and Chinese docs, skill references, and LLM docs to match the
+  simplified reflect lifecycle.
+- Refined OME starter lesson wording from review-surface language to draft
+  approval language.
+
+### Fixed
+
+- Changed human CLI output for draft approval pages to use Markdown-safe links
+  so paths with spaces or special characters stay clickable.
+
 ## 0.1.1 - 2026-06-15
 
 ### Changed

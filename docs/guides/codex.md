@@ -53,12 +53,12 @@ Codex agents can run the full reflect flow. Copy and paste this prompt:
 ```text
 Run an OME reflect scan over my recent coding sessions.
 
-1. Run ome reflect start --focus "recent execution mistakes I corrected"
-2. Check sessions under ~/.codex/sessions and the current conversation
-3. Find places where I corrected you (skipped validation, swallowed errors, mixed in unrelated changes, etc.)
-4. Generate ≤5 candidates in the current OME candidate JSON shape: audit plus candidates with summary, criteria.use_when, criteria.ignore_when, recall, optional engine_hints, scope, and rule.
-5. Write candidates to candidates.json, then run ome reflect candidates RUN_ID --from-file candidates.json
-6. ome reflect show RUN_ID to display candidates. Wait for my approval on each one.
+1. Use the OME reflect flow to inspect recent sessions under ~/.codex/sessions and the current conversation.
+2. Find places where I corrected you (skipped validation, swallowed errors, mixed in unrelated changes, etc.).
+3. Extract ≤5 experience drafts, only keeping reusable execution judgment.
+4. Give me only the draft approval page link and a short summary. Do not ask me to read JSON, internal files, or candidate schemas.
+5. If I add thoughts, counterexamples, or edits, refine the same reflect instead of starting a new one.
+6. Wait until I explicitly say to add the approved experiences to the library.
 
 Only extract reusable execution judgment. Don't turn one-off context into experience cards.
 ```

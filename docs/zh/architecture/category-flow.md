@@ -27,7 +27,7 @@ session/source
 - `sources` 只记录证据和来源。不要把分类写成 source 值。
 - reflect candidate generation 应提供 category。如果缺失，CLI 会根据 title、topics、triggers、summary 和 rule 推断。
 - 分类是 candidate 和 card 携带的自由文本 metadata。当前没有单独的 category registry 命令。
-- Review 默认路径必须轻：在 worksheet 中展示分类，只在推断分类错误时覆盖。
+- 经验草稿审批默认路径必须轻：展示分类，只在推断分类错误时覆盖。
 
 ## 默认分类
 

@@ -6,7 +6,7 @@ site.
 ## High priority
 
 - /guides/quickstart - install, initialize, verify one recall explanation.
-- /guides/first-card - turn one real correction into a reviewed card.
+- /guides/first-card - turn one real correction into an approved card.
 - /guides/examples - real prompt-time recall examples, including exact injected additional context.
 - /guides/setup - data directory, hook install, skill install, uninstall.
 - /guides/project-libraries - global dataDir, project libraries, and project-scoped global cards.

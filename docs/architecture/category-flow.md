@@ -29,7 +29,7 @@ session/source
   from title, topics, triggers, summary, and rule.
 - Categories are free-form metadata carried by candidates and cards. There is no
   separate category registry command.
-- Review should keep the default path light: show the category in the worksheet
+- Draft approval should keep the default path light: show the category in the draft approval page
   and expose override only when the inferred category is wrong.
 
 ## Default Categories

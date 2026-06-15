@@ -35,5 +35,5 @@ npm test
 
 修改 provider adapters 或 hook runtime behavior 前应运行这些检查。fixture 检查
 优先使用隔离 dataDir，provider-specific adapter 覆盖交给项目测试套件。有效的
-hook 结果必须包含 `hookSpecificOutput.additionalContext`、候选经验卡链接，以及提示 Agent
+hook 结果必须包含 `hookSpecificOutput.additionalContext`、匹配到的经验卡链接，以及提示 Agent
 最终只披露实际使用卡片的说明。

@@ -48,4 +48,4 @@ Matched:
   Rule: ome experience show agent-goal-execution --section rule
 ```
 
-OME 不是每轮都加载所有经验，而是在 prompt 真的像某个工作流时，才挂载相关候选经验。
+OME 不是每轮都加载所有经验，而是在 prompt 真的像某个工作流时，才挂载相关经验。

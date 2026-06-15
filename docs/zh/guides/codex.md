@@ -55,12 +55,12 @@ Codex Agent 可以独立完成整个 reflect 流程。
 ```text
 帮我对最近编码会话做一次 OME reflect 复盘扫描。
 
-1. 先 ome reflect start --focus "最近纠正过的执行错误"
-2. 检查 ~/.codex/sessions 中的近期会话和当前对话
-3. 找到我纠正过你的地方（跳过验证、掩盖错误、混入无关改动等）
-4. 生成 ≤5 条 当前 OME 候选 JSON：包含 audit，以及 summary、criteria.use_when、criteria.ignore_when、recall、可选 engine_hints、scope、rule
-5. 写入 candidates.json 后运行 ome reflect candidates RUN_ID --from-file candidates.json
-6. ome reflect show RUN_ID 展示，等我逐条审批
+1. 用 OME reflect 流程检查 ~/.codex/sessions 中的近期会话和当前对话。
+2. 找到我纠正过你的地方（跳过验证、掩盖错误、混入无关改动等）。
+3. 提炼 ≤5 条经验草稿，只保留以后能复用的执行判断。
+4. 完成后只给我经验草稿审批链接和简短说明，不要让我看 JSON、内部文件或候选 schema。
+5. 如果我继续补充想法、反例或修改意见，就优化同一次复盘，不要另开一轮。
+6. 等我明确说“确认入库”后，再把通过的经验入库。
 
 只提取真正能复用的执行判断。不要把一次性上下文写成经验卡。
 ```

@@ -47,17 +47,14 @@ ome project status
 
 ## 写入项目卡
 
-仍然走同一条审核生命周期，只是加上 `--scope project`：
+仍然走同一条复盘和草稿审批链路，只是告诉 Agent 这次经验要写入当前项目库：
 
-```bash
-ome reflect start --scope project --focus "发版验证"
-ome reflect candidates RUN_ID --scope project --from-file candidates.json
-ome reflect decide RUN_ID CANDIDATE_ID --scope project --action approve
-ome reflect apply RUN_ID --scope project
-ome experience enable DRAFT_ID --scope project
+```text
+帮我把这次复盘出来的经验写入当前项目库。完成后只给我经验草稿审批；
+等我确认入库后，再把通过的经验启用为项目经验。
 ```
 
-除非是在做已审阅过的手工迁移，否则不要直接往 `experiences/active/` 写文件。CLI 会把
+除非是在做已确认过的手工迁移，否则不要直接往 `experiences/active/` 写文件。CLI 会把
 candidate、draft、active、archived 的生命周期留在明面上，避免出现两套真相。
 
 ## 召回顺序
@@ -92,10 +89,10 @@ ome experience show CARD_ID --scope project --section rule
 ome project status --cwd /path/to/project --json
 ```
 
-如果是手工添加一张全局项目限定卡，仍然走全局库生命周期，只是在 candidate 上声明项目适用范围：
+如果是高级手工路径，也仍然走全局库生命周期，只是在经验草稿上声明项目适用范围：
 
 ```bash
-ome reflect add RUN_ID \
+ome reflect add <复盘编号> \
   --title "这个仓库的发版检查" \
   --summary "发布前必须跑本仓库的发版 gate。" \
   --rule "声称发版就绪前，先跑项目发版验证。" \
@@ -105,7 +102,7 @@ ome reflect add RUN_ID \
   --module-path "."
 ```
 
-复盘候选文件也可以直接写同样的 `scope` 对象。这类卡仍保存在全局 `dataDir`，
+内部候选文件也可以直接写同样的 `scope` 对象。这类卡仍保存在全局 `dataDir`，
 但召回时会先按当前项目过滤，再进入评分。
 
 经验应该跟仓库一起走时，用项目经验库。经验属于个人、涉及隐私，或暂时不适合进入仓库

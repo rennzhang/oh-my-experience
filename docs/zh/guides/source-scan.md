@@ -85,13 +85,11 @@ ome source scan spool --query "browser validation" --max-session-bytes 4194304
 
 ## 扫描之后
 
-让 Agent 在 reflect source audit 中纳入已扫描记录，然后继续走正常审核生命周期：
+让 Agent 在 reflect source audit 中纳入已扫描记录，然后继续走正常复盘和草稿审批流程：
 
-```bash
-ome reflect start
-ome reflect apply <run-id> --dry-run
-ome reflect apply <run-id>
-ome experience enable <draft-card-id>
+```text
+基于刚才扫描到的来源做 OME 复盘。完成后只给我经验草稿审批，不要让我看 JSON。
+如果我继续补充意见，优化同一次复盘；等我确认入库后，再把通过的经验入库。
 ```
 
-扫描材料不能绕过审核。Spool 只是扩大可搜索来源池，不改变 OME 的安全模型。
+扫描材料不能绕过草稿审批和确认。Spool 只是扩大可搜索来源池，不改变 OME 的安全模型。

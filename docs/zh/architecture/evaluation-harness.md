@@ -64,7 +64,7 @@ runtime hook 配置。
 - output schema 是否符合 provider；
 - 默认不保存 raw prompt；
 - fixture card 命中时 additional context 是否存在；
-- 候选经验卡链接是否存在，以及最终只披露实际使用卡片的说明是否清楚；
+- 匹配到的经验卡链接是否存在，以及最终只披露实际使用卡片的说明是否清楚；
 - hook logs 是否包含 recall evidence。
 
 运行时验证路径：

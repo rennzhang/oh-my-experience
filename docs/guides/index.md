@@ -6,13 +6,13 @@ title: Guides
 
 Most users only need the introduction, quickstart, and the guide for their
 agent. Open the library-building guides when you are ready to turn real
-corrections into reviewed cards.
+corrections into approved cards.
 
 ## Getting started
 
 - [Introduction](introduction.md): what OME is, why AGENTS.md isn't enough, and how it works.
 - [Quickstart](quickstart.md): install, initialize, and verify one recall explanation.
-- [First experience card](first-card.md): turn one real correction into a reviewed card.
+- [First experience card](first-card.md): turn one real correction into a approved card.
 - [Examples](examples.md): see a real `/goal` prompt, the matched card, and the exact injected context.
 
 ## Agent setup
@@ -24,6 +24,6 @@ corrections into reviewed cards.
 ## Build the library
 
 - [Source scan](source-scan.md): index Codex sessions and optional Spool search results.
-- [Reflect and review](reflect-review.md): turn real work into reviewed cards.
+- [Reflect and draft approval](reflect-review.md): turn real work into approved cards.
 - [Global and project libraries](project-libraries.md): choose global storage, repository storage, or both.
 - [Evaluation](evaluation.md): test recall quality without polluting your real library.

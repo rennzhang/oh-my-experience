@@ -13,7 +13,7 @@ status: active
 Oh My Experience (OME) helps your agent understand your way of working over
 time. It is a local-first experience recall layer for AI coding agents. It
 turns real Codex and Claude corrections, rework, and delivery lessons into
-reviewed experience cards, then recalls the most relevant reminder when a
+approved experience cards, then recalls the most relevant reminder when a
 similar task appears again.
 
 OME is not about writing more rules. It is about timing: showing the right
@@ -29,7 +29,7 @@ OME helps you:
 - Keep `AGENTS.md` and `CLAUDE.md` small.
 - Stop losing hard-won execution lessons in chat history.
 - Help agents remember the right skill, check, or release gate.
-- Review every lesson before it becomes active.
+- Approve and confirm every lesson before it can be recalled later.
 - Stay local by default.
 
 ## Each Layer Has A Job
@@ -53,7 +53,7 @@ recalled lightly when the current task matches, so rule files stay small and
 lessons do not get lost.
 
 OME is not a memory store for facts, not a replacement for `AGENTS.md` or
-`CLAUDE.md`, and not a skill runner. It recalls reviewed execution lessons only
+`CLAUDE.md`, and not a skill runner. It recalls approved execution lessons only
 when the task needs them.
 
 See [Examples](examples.md) for a concrete `/goal` case that shows the matched
@@ -62,40 +62,40 @@ experience card and the exact context mounted into the agent prompt.
 ## How It Works
 
 ```text
-real work -> reflect scan -> candidates -> human review -> active cards
+real work -> reflect scan -> draft approval -> refine -> confirm library add
 -> prompt-time recall -> match stats -> ongoing maintenance
 ```
 
 1. **Scan sources** from local Codex history, or optionally from Spool.
 2. **Run a reflect scan** so the agent finds places where you corrected it.
-3. **Review candidates** one by one: approve, reject, merge, or rewrite.
-4. **Activate cards** only after they are confirmed.
+3. **Approve and refine** the extracted experience drafts in the draft approval page.
+4. **Confirm library add** before anything can be recalled later.
 5. **Recall at prompt time** when the hook matches active cards to the current task.
 6. **Maintain the library** with stats and evals for coverage, stale cards, and noisy matches.
 
 ## What You Get
 
-- A local Markdown library of reviewed experience cards.
+- A local Markdown library of approved experience cards.
 - Optional project libraries at `<project-root>/.oh-my-experience/`.
 - Codex and Claude hooks for prompt-time recall.
 - Project-aware matching from one local hook.
 - Explicit ignore criteria for noisy words such as "goal", "review", and "release".
 - Explainable recall: matched cards, scores, reasons, and rendered context.
-- A Markdown-first review loop for candidates before they become active.
+- A Markdown-first draft approval loop before extracted experiences can be recalled.
 - Isolated evaluation so retrieval changes do not pollute your real library.
 
-## Local And Reviewed By Default
+## Local And Confirmed By Default
 
 The hook path does not call an LLM, use the network, or require an API key. If
 recall fails, it fails open and returns empty context so your agent still runs.
 
 By default, hook events store prompt hashes and task summaries, not raw prompts.
-Candidates created by reflect scans never become active automatically. Nothing
-bypasses human review to enter prompt-time recall.
+Experiences created by reflect scans never become recallable automatically.
+Nothing bypasses human confirmation to enter prompt-time recall.
 
 ## Next
 
 Start with the [Quickstart](/guides/quickstart) to install OME and verify your
 first recall. Use [Global And Project Libraries](/guides/project-libraries) if
-you want repository-level cards. Then read [Reflect and Review](/guides/reflect-review)
+you want repository-level cards. Then read [Reflect and Draft Approval](/guides/reflect-review)
 to turn real corrections into reusable experience.

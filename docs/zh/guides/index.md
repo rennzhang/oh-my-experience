@@ -11,7 +11,7 @@ title: 指南
 
 - [介绍](introduction.md)：OME 是什么、为什么 AGENTS.md 不够、怎么运作。
 - [快速开始](quickstart.md)：安装、初始化，并验证一次召回解释。
-- [第一张经验卡](first-card.md)：把一次真实纠正变成经过审阅的经验卡。
+- [第一张经验卡](first-card.md)：把一次真实纠正变成经过审批的经验草稿。
 - [实际案例](examples.md)：看一次真实 `/goal` prompt、命中的经验卡和实际压入的上下文。
 
 ## Agent 设置
@@ -23,6 +23,6 @@ title: 指南
 ## 建设经验库
 
 - [来源扫描](source-scan.md)：索引 Codex 会话和可选的 Spool 搜索结果。
-- [复盘与审阅](reflect-review.md)：把真实工作转成经过审阅的卡片。
+- [复盘与草稿审批](reflect-review.md)：把真实工作转成经过确认的经验卡。
 - [全局与项目经验库](project-libraries.md)：选择全局存储、仓库存储，或两者并用。
 - [评估](evaluation.md)：在不污染真实经验库的前提下测试召回质量。

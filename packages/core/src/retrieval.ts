@@ -323,7 +323,7 @@ function signalReasonLabel(signal: string): string {
     information_design: "task needs attention hierarchy or lower mental load",
     architecture_quality: "task asks for cohesive architecture, clean logic, or a root-cause fix",
     high_risk_action: "task involves irreversible or high-risk action",
-    ome_review_surface: "task is about OME review flow or experience-library governance",
+    ome_review_surface: "task is about OME draft approval flow or experience-library governance",
   };
   return labels[signal] || "matched by an internal recall hint";
 }
@@ -359,7 +359,7 @@ function contextBlock(result: MatchResult, index: number, copy: ContextCopy): st
 
 function contextCopy(): ContextCopy {
   return {
-    heading: "OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.",
+    heading: "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.",
     finalReport: "Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.",
     summary: "Summary",
     scope: "Scope",

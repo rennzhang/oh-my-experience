@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Oh My Experience
   text: Stop teaching your agent the same lesson twice.
-  tagline: Turn real coding corrections into reviewed experience cards that surface at prompt time — only when the task actually needs them.
+  tagline: Turn real coding corrections into approved experience cards that surface at prompt time — only when the task actually needs them.
   image:
     src: /ome-logo.png
     alt: Oh My Experience logo
@@ -19,8 +19,8 @@ hero:
 features:
   - title: Conditional recall, not always-on bloat
     details: Hook decomposes prompts into task envelopes with deterministic BM25-like matching. Cards inject only when triggered — otherwise nothing.
-  - title: Nothing enters without review
-    details: Cards follow candidate → draft → active → archived. AI-generated candidates go through your approval first. Only active cards are recalled.
+  - title: Nothing enters without draft approval
+    details: Cards follow candidate → draft → active → archived. AI-generated drafts wait for your approval first. Only active cards are recalled.
   - title: One library, Codex and Claude
     details: Same cards, same retrieval engine, shared across providers. Install each hook once.
   - title: Local-first, private by default

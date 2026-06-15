@@ -196,7 +196,7 @@ lessons，而不是长 card bodies。
 渲染后的 hook context 保持中立：
 
 ```text
-OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
+OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
 Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
 1. [high risk][must] Browser validation (browser-validation)
    Summary: ...

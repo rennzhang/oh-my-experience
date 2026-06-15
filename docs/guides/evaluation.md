@@ -37,6 +37,6 @@ npm test
 Use this before changing provider adapters or hook runtime behavior. Prefer an
 isolated dataDir for fixture checks, and use the project test suite for
 provider-specific adapter coverage. A valid hook result must include
-`hookSpecificOutput.additionalContext`, candidate card links, and the final
+`hookSpecificOutput.additionalContext`, matched card links, and the final
 usage-disclosure instruction that tells the agent to mention only cards it
 actually used.

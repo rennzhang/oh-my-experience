@@ -37,7 +37,7 @@ events.jsonl
 ```
 
 数据目录只有一条可见存储模型。`experiences/` 保存审核后的经验文件，
-`retrospectives/` 保存复盘审批工作区，`indexes/` 保存可重建的查询索引，
+`retrospectives/` 保存复盘与草稿审批工作区，`indexes/` 保存可重建的查询索引，
 `events.jsonl` 是可选的追加事件流，用于 hook、operation、stats 和 eval 事件。
 
 运行锁和安全备份放在操作系统临时目录下。它们是实现细节，不是经验库资产。
@@ -48,8 +48,8 @@ events.jsonl
 candidate -> draft -> active -> archived
 ```
 
-- `candidate`：复盘生成的候选经验。
-- `draft`：用户接受候选经验进入库，但还不会被召回。
+- `candidate`：复盘生成的经验草稿。
+- `draft`：用户接受经验草稿进入库，但还不会被召回。
 - `active`：可以被召回的经验。
 - `archived`：保留历史，但不参与召回。
 
@@ -112,7 +112,7 @@ Session 扫描不会把完整 transcript 复制进 OME。扫描只向 `indexes/s
 
 ## 项目经验库布局
 
-项目经验库使用同一套已审阅卡片生命周期目录：
+项目经验库使用同一套已确认卡片生命周期目录：
 
 ```text
 <project-root>/.oh-my-experience/

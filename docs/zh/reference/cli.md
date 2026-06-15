@@ -5,7 +5,7 @@ status: active
 
 # CLI 参考
 
-本页记录 `ome` 的公开命令表面。CLI 刻意保持克制：设置、召回、复盘审阅、经验库治理、来源扫描、诊断和卸载。
+本页记录 `ome` 的公开命令表面。CLI 刻意保持克制：设置、召回、复盘与草稿审批、经验库治理、来源扫描、诊断和卸载。
 
 ## 输出契约
 
@@ -90,9 +90,9 @@ ome reflect apply <run-id>
 
 `ome reflect start --focus <text>` 只是本次分析镜头。除非用户明确限制来源集合，否则它不能缩小来源覆盖、跳过 source audit 或降低证据标准。
 
-`ome reflect candidates` 写入候选前必须带 source audit。只有明确接受不完整审计时才使用 `--allow-incomplete-audit`；生成的 worksheet 会显示审计不完整。
+`ome reflect candidates` 写入候选前必须带 source audit。只有明确接受不完整审计时才使用 `--allow-incomplete-audit`；生成的经验草稿审批会显示审计不完整。
 
-需要把复盘候选、draft 和 review 文件写入当前项目的 `.oh-my-experience/` 时，加
+需要把复盘候选、draft 和经验草稿审批文件写入当前项目的 `.oh-my-experience/` 时，加
 `--scope project`。
 
 ## 项目经验库

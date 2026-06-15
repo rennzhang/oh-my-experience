@@ -110,5 +110,5 @@ Matched:
 Prepare one sentence:
 
 ```text
-Oh My Experience is a local prompt-time recall layer for reviewed coding-agent lessons.
+Oh My Experience is a local prompt-time recall layer for approved coding-agent lessons.
 ```

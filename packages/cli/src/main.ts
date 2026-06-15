@@ -59,6 +59,7 @@ import { runHook } from "../../hook-runtime/src/run.js";
 type CliFlags = Record<string, any>;
 type ParsedArgs = { flags: CliFlags; positionals: string[] };
 const RETROSPECTIVE_GUIDE_REF = "skills/oh-my-experience/references/reflect-retrospective.md";
+const EXPERIENCE_REVIEW_FILE = "experience-review.md";
 const SPOOL_CLI_PACKAGE = "@spool-lab/cli";
 const SPOOL_GITHUB_URL = "https://github.com/spool-lab/spool";
 
@@ -780,7 +781,7 @@ function initCopy() {
     heroCta: "先用内置示例经验体验召回。",
     heroBody: "选择经验库位置；OME 默认安装 Codex 召回 hook。",
     pillarLocal: "Local-first",
-    pillarReview: "Review-first",
+    pillarReview: "Draft approval-first",
     pillarRecall: "Prompt-time recall",
     controls: "路径可回车使用推荐值 · 确认需输入 y/n · Ctrl+C 退出",
     modeNew: "首次设置",
@@ -796,7 +797,7 @@ function initCopy() {
     recallStepPrompt: "安装 Codex 经验召回",
     recallStepDescription: "OME 会配置两个本地入口，让 Codex 能在任务开始时加载相关经验。",
     recallHookParagraph: "OME 会把 {hook} hook 写入 {hookFile}，用于在你向 Codex 发送任务时按需召回 {library} 中的经验。",
-    recallSkillParagraph: "OME 还会把 {skill} skill 安装到 {skillDir}，让 Codex 知道如何扫描会话、生成候选经验并维护经验库。",
+    recallSkillParagraph: "OME 还会把 {skill} skill 安装到 {skillDir}，让 Codex 知道如何扫描会话、生成经验草稿并维护经验库。",
     doneTitle: "设置完成",
     doneDataDir: "经验库就绪:",
     doneConfig: "配置文件:",
@@ -857,7 +858,7 @@ function initCopy() {
     heroCta: "Start with built-in starter lessons today.",
     heroBody: "Choose a library path; OME installs Codex recall by default.",
     pillarLocal: "Local-first",
-    pillarReview: "Review-first",
+    pillarReview: "Draft approval-first",
     pillarRecall: "Prompt-time recall",
     controls: "Enter accepts path defaults · confirmation requires y/n · Ctrl+C cancels",
     modeNew: "first-time setup",
@@ -873,7 +874,7 @@ function initCopy() {
     recallStepPrompt: "Install Codex experience recall",
     recallStepDescription: "OME will configure two local entry points so Codex can load relevant experience at task time.",
     recallHookParagraph: "OME will add the {hook} hook to {hookFile}. It recalls experiences from {library} when you send a task to Codex.",
-    recallSkillParagraph: "OME will also install the {skill} skill to {skillDir}. The skill tells Codex how to scan sessions, create retrospective candidates, and maintain the experience library.",
+    recallSkillParagraph: "OME will also install the {skill} skill to {skillDir}. The skill tells Codex how to scan sessions, create experience drafts, and maintain the experience library.",
     doneTitle: "Setup complete",
     doneDataDir: "Library ready:",
     doneConfig: "Config file:",
@@ -1208,7 +1209,7 @@ function createReflectRun(dataDir: string, args: ParsedArgs) {
   });
   return print(withReviewPaths(dataDir, {
     ...run,
-    nextStep: "Use the OME retrospective skill reference to complete the source audit and synthesis, then write candidates for review.",
+    nextStep: "Use the OME retrospective skill reference to complete the source audit and synthesis, then write experience drafts for approval.",
   }), args);
 }
 
@@ -1238,7 +1239,7 @@ function withReviewPaths<T extends Record<string, any>>(dataDir: string, record:
     ...record,
     runId,
     runDir: record.runDir || runDir,
-    reviewFile: path.join(runDir, "retrospective.md"),
+    reviewFile: path.join(runDir, EXPERIENCE_REVIEW_FILE),
   };
 }
 
@@ -1646,7 +1647,7 @@ function renderInitResult(record: Record<string, any>, zh: boolean): string {
     lines.push("");
     lines.push(zh ? "下一步:" : "Next step:");
     lines.push(`  ${zh ? "先把一个真实任务发给 Agent，体验内置示例经验的提示词阶段召回。" : "Send a real task to your agent first and feel prompt-time recall with the starter lessons."}`);
-    lines.push(`  ${zh ? "第一次召回体验后，再进入第一张经验卡或完整复盘流程；候选会进入 Markdown 审批文件，不会自动启用。" : "After the first recall, move to the first-card or full retrospective flow; candidates go to a Markdown review file and are not enabled automatically."}`);
+    lines.push(`  ${zh ? "第一次召回体验后，再进入第一张经验卡或完整复盘流程；复盘出来的经验会进入经验草稿审批，不会自动启用。" : "After the first recall, move to the first-card or full retrospective flow; extracted experiences go to draft approval and are not enabled automatically."}`);
     if (hooks.some((hook) => asRecord(hook).provider === "codex" && asRecord(hook).installed)) {
       lines.push(`  ${zh ? "Codex App 可能会要求你信任新的 UserPromptSubmit hook。" : "Codex App may ask you to trust the new UserPromptSubmit hook."}`);
     }
@@ -1788,8 +1789,8 @@ function renderReflectResult(record: Record<string, any>, zh: boolean): string {
     return renderRetrospectiveResult(record, zh);
   }
   return [
-    zh ? "经验审批批次" : "Experience approval run",
-    `runId: ${record.runId || record.id || ""}`,
+    zh ? "本次经验复盘" : "Experience review",
+    `${zh ? "复盘编号" : "Reflect id"}: ${record.runId || record.id || ""}`,
     reviewFileLine(record, zh),
     record.nextStep ? `${zh ? "下一步" : "Next"}: ${record.nextStep}` : "",
     jsonHint(zh),
@@ -1800,16 +1801,16 @@ function renderRetrospectiveResult(record: Record<string, any>, zh: boolean): st
   const candidates = Array.isArray(record.candidates) ? record.candidates.length : 0;
   const drafts = Array.isArray(record.drafts) ? record.drafts.length : 0;
   const retrospectives = Array.isArray(record.retrospectives) ? record.retrospectives.length : 0;
-  const lines = [zh ? "经验审批结果" : "Experience approval result"];
-  if (record.runId) lines.push(`runId: ${record.runId}`);
-  if (retrospectives) lines.push(`${zh ? "经验审批批次" : "Experience approval runs"}: ${retrospectives}`);
-  if (candidates) lines.push(`${zh ? "候选经验" : "Candidate experiences"}: ${candidates}`);
-  if (drafts) lines.push(`${zh ? "经验草稿" : "Experience drafts"}: ${drafts}`);
-  if (record.candidate?.id) lines.push(`candidate: ${record.candidate.id}`);
+  const lines = [zh ? "经验复盘结果" : "Experience review result"];
+  if (record.runId) lines.push(`${zh ? "复盘编号" : "Reflect id"}: ${record.runId}`);
+  if (retrospectives) lines.push(`${zh ? "经验复盘" : "Experience reviews"}: ${retrospectives}`);
+  if (candidates) lines.push(`${zh ? "经验草稿" : "Experience drafts"}: ${candidates}`);
+  if (drafts) lines.push(`${zh ? "待入库草稿" : "Drafts ready to add"}: ${drafts}`);
+  if (record.candidate?.id) lines.push(`${zh ? "经验编号" : "Experience id"}: ${record.candidate.id}`);
   const reviewLine = reviewFileLine(record, zh);
   if (reviewLine) lines.push(reviewLine);
-  if (record.dryRun) lines.push(zh ? "这是 dry-run，没有写入经验草稿。" : "Dry run only; no experience drafts were written.");
-  else if (drafts) lines.push(zh ? "经验草稿尚未参与召回；确认无误后运行 ome experience enable <draft-experience-id> 启用。" : "Experience drafts are not recalled yet; run ome experience enable <draft-experience-id> to enable them.");
+  if (record.dryRun) lines.push(zh ? "这是 dry-run，没有准备入库草稿。" : "Dry run only; no drafts were prepared for the library.");
+  else if (drafts) lines.push(zh ? "这些草稿还不会参与召回；确认入库后再启用。" : "These drafts are not recalled yet. Enable them only after confirmation.");
   else if (candidates) lines.push(retrospectiveNextStep(record, zh));
   lines.push(jsonHint(zh));
   return lines.join("\n");
@@ -1818,36 +1819,40 @@ function renderRetrospectiveResult(record: Record<string, any>, zh: boolean): st
 function reviewFileLine(record: Record<string, any>, zh: boolean): string {
   if (!record.reviewFile) return "";
   const relative = reviewRelativePath(record);
-  const label = zh ? "审批文件" : "Approval file";
-  return `${label}: [retrospective.md](${relative})`;
+  const label = zh ? "经验草稿审批" : "Draft approval";
+  return `${label}: [${zh ? "查看" : "Review"}](<${markdownLinkTarget(relative)}>)`;
 }
 
 function reviewRelativePath(record: Record<string, any>): string {
   if (record.reviewFile) return normalizeMarkdownPath(path.relative(process.cwd(), String(record.reviewFile)));
-  if (record.runId) return normalizeMarkdownPath(path.join("retrospectives", String(record.runId), "retrospective.md"));
+  if (record.runId) return normalizeMarkdownPath(path.join("retrospectives", String(record.runId), EXPERIENCE_REVIEW_FILE));
   if (record.runFile && record.runDir) return normalizeMarkdownPath(path.relative(process.cwd(), String(record.runFile)));
-  return "retrospective.md";
+  return EXPERIENCE_REVIEW_FILE;
 }
 
 function normalizeMarkdownPath(value: string): string {
   return value.split(path.sep).join("/");
 }
 
+function markdownLinkTarget(value: string): string {
+  return value.replaceAll(">", "%3E");
+}
+
 function retrospectiveNextStep(record: Record<string, any>, zh: boolean): string {
   const state = String(record.state || "");
   if (state === "applied_to_drafts") {
     return zh
-      ? "已生成经验草稿；草稿不会参与召回，确认无误后运行 ome experience enable <draft-experience-id> 启用。"
-      : "Approved candidates have been converted into experience drafts; drafts are not recalled until you run ome experience enable <draft-experience-id>.";
+      ? "已准备好待入库草稿；它们还不会参与召回。确认入库后再启用。"
+      : "The approved drafts are ready to add. They are not recalled yet; enable them only after confirmation.";
   }
   if (state === "decisions_recorded") {
     return zh
-      ? "已有审批区记录；运行 ome reflect apply <runId> 生成经验草稿。"
-      : "Approval decisions are recorded; run ome reflect apply <runId> to create experience drafts.";
+      ? "已有审批意见；确认后让 Agent 把通过的经验准备入库。"
+      : "Approval notes are recorded; after confirmation, have the agent prepare accepted drafts for the library.";
   }
   return zh
-    ? "先在审批文件中回复通过 / 不通过 / 合并 / 改写，再运行 ome reflect apply <runId>。"
-    : "Approve candidate experiences in the review file, then run ome reflect apply <runId>.";
+    ? "查看经验草稿审批；请确认：通过 / 不通过 / 修改 / 合并 / 补充边界。确认后再入库。"
+    : "Review the experience drafts; reply approve, reject, revise, merge, or add boundaries. Add to the library only after confirmation.";
 }
 
 function renderExperienceResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
@@ -2091,7 +2096,7 @@ function printHelp() {
 
 输出:
   默认输出给人看；脚本、hook、测试请加 --json。
-  --reset-config 只覆盖运行配置，不删除经验、来源索引或审批记录。
+  --reset-config 只覆盖运行配置，不删除经验、来源索引或草稿审批记录。
   如果 init 没有出现向导，先运行 ome version 确认当前二进制，再用 ome init --interactive。
 
 文档:
@@ -2124,7 +2129,7 @@ Core commands:
 
 Output:
   Human-readable by default. Use --json for scripts, hooks, and tests.
-  --reset-config only overwrites runtime config. It does not delete experiences, source indexes, or approval runs.
+  --reset-config only overwrites runtime config. It does not delete experiences, source indexes, or draft approval runs.
   If init does not show a wizard, run ome version first, then ome init --interactive.
 
 Docs:

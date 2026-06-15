@@ -38,7 +38,7 @@ events.jsonl
 ```
 
 The data directory intentionally has one visible storage model. `experiences/`
-contains reviewed lesson files, `retrospectives/` contains review workspaces,
+contains approved lesson files, `retrospectives/` contains draft approval workspaces,
 `indexes/` contains rebuildable lookup files, and `events.jsonl` is the optional
 append-only event stream for hook, operation, stats, and eval events.
 
@@ -122,7 +122,7 @@ experiences and `indexes/experiences.json`.
 
 ## Project Library Layout
 
-A project library uses the same reviewed-card lifecycle folders:
+A project library uses the same approved-card lifecycle folders:
 
 ```text
 <project-root>/.oh-my-experience/
