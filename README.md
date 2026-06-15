@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/ome-logo-lockup.png" alt="Oh My Experience (OME)" width="560">
+  <img src="docs/public/brand/ome-logo-lockup.png" alt="Oh My Experience (OME)" width="560">
 </p>
 
 <h1 align="center">Oh My Experience</h1>
@@ -103,6 +103,24 @@ cards, not because you keep making one giant rule file.
 - Explainable recall: matched cards, scores, reasons, and rendered context.
 - A Markdown-first review loop for candidate lessons before they become active.
 - Isolated evaluation so retrieval changes can be tested without polluting your real library.
+
+## Repository Layout
+
+The repository root keeps the public project surface visible:
+
+```text
+bin/        CLI entry point
+packages/   TypeScript source packages
+docs/       guides, reference, architecture, and docs assets
+skills/     bundled agent-facing OME skill
+templates/  reusable card template
+examples/   sample experience cards
+tests/      unit, integration, and CLI tests
+scripts/    release and validation helpers
+.github/    CI, contribution, and security policy
+```
+
+OME is a Node.js CLI package. Python package metadata is intentionally absent.
 
 ## How It Works
 
@@ -281,6 +299,12 @@ prompt logging is opt-in.
 - [Retrieval Engine](docs/architecture/retrieval-engine.md)
 - [Documentation](docs/index.md)
 - [中文文档](docs/zh/index.md)
+
+## Contributing And Security
+
+- [Contributing](.github/CONTRIBUTING.md)
+- [Security policy](.github/SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

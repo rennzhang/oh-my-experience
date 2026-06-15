@@ -28,7 +28,6 @@
     "skills/",
     "templates/",
     "examples/",
-    "assets/",
     "docs/*.md",
     "docs/architecture/",
     "docs/guides/",
@@ -39,6 +38,7 @@
     "docs/.vitepress/theme/",
     "README.md",
     "README.zh-CN.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
