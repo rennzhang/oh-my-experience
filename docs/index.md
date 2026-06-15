@@ -10,11 +10,11 @@ hero:
     alt: Oh My Experience logo
   actions:
     - theme: brand
-      text: Get started
-      link: /guides/introduction
-    - theme: alt
-      text: Quickstart
+      text: Try in 2 minutes
       link: /guides/quickstart
+    - theme: alt
+      text: See real recall
+      link: /guides/examples
 
 features:
   - title: Conditional recall, not always-on bloat
@@ -30,3 +30,23 @@ features:
   - title: Survives context compression
     details: AGENTS.md injects once then gets compressed away. OME's hook re-injects on every UserPromptSubmit.
 ---
+
+## Choose Your Path
+
+- New to OME? Start with [Quickstart](/guides/quickstart).
+- Want proof first? See the [`/goal` recall example](/guides/examples).
+- Evaluating the design? Read [Retrieval Engine](/architecture/retrieval-engine).
+
+## A Real Recall Shape
+
+```text
+$ ome match "create a goal and finish this feature end to end" --explain
+
+Matched:
+- Enter full-closure delivery mode when a goal starts
+  Why: task looks like real goal execution
+  Rule: ome experience show agent-goal-execution --section rule
+```
+
+OME does not load every lesson all the time. It mounts the relevant candidate
+when the prompt looks like the workflow that needs it.

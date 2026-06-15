@@ -13,7 +13,7 @@ schema: ome-card
 id: browser-validation
 status: active
 title: Browser Validation
-category: 测试验收
+category: Testing
 summary: When a UI-facing change can affect visible behavior, the common mistake is to stop at static checks or internal calls; validate the real user path in a browser and ignore backend-only work.
 criteria:
   use_when:

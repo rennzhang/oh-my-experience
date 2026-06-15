@@ -9,6 +9,18 @@ status: active
 
 ## 安装 CLI
 
+当前 `0.1.0` 发布到 npm 前，先用源码试用：
+
+```bash
+git clone https://github.com/rennzhang/oh-my-experience.git
+cd oh-my-experience
+npm install
+npm run build
+node bin/ome.js init
+```
+
+`0.1.0` 发布后，可以改用 npm 安装：
+
 ```bash
 npm install -g oh-my-experience
 ome init
@@ -17,10 +29,10 @@ ome init
 第一行安装全局 `ome` 命令；第二行启动初始化向导。初始化会选择经验库路径、
 安装默认 provider 的 hook，并写入内置示例卡，方便你马上验证召回。
 
-如果不想全局安装，也可以用 `npx` 直接运行：
+发布后如果不想全局安装，也可以用 `npx` 直接运行：
 
 ```bash
-npx oh-my-experience init
+npx oh-my-experience@latest init
 ```
 
 **让 Agent 帮你初始化：**

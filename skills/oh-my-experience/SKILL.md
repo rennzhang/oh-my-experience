@@ -46,7 +46,7 @@ setup -> recall -> retrospective -> draft -> active -> eval -> maintenance
 ## Non-Negotiable Rules
 
 - Keep the lifecycle explicit: `candidate -> draft -> active -> archived`.
-- Never create or edit active cards directly; create retrospective runs with `ome reflect start`, manage existing runs with `ome reflect ...`, then use `ome experience promote`.
+- Never create or edit active cards directly; create retrospective runs with `ome reflect start`, manage existing runs with `ome reflect ...`, then use `ome experience enable`.
 - Use `--scope project` only when the user wants cards written to the current project's `.oh-my-experience/` library.
 - Never install or overwrite real Codex hooks unless the user explicitly confirms.
 - Never store raw prompt text in events unless the user explicitly opts into that behavior.
@@ -60,8 +60,8 @@ setup -> recall -> retrospective -> draft -> active -> eval -> maintenance
 
 ```bash
 ome init
+ome match "<task>" --explain
 ome doctor
-ome match "<task>" --json
 ```
 
 For package-local development, replace `ome` with `node bin/ome.js` after `npm install && npm run build`.

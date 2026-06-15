@@ -12,15 +12,16 @@ between a generic rule file and a conditional experience card.
 ## Example: `/goal` Starts Full-Closure Delivery
 
 Assume your active library contains a reviewed card for goal execution. In this
-example the card is named `创建目标时进入完整闭环交付模式`. Its usage criteria say
-to use it when `/goal`, `创建目标`, or `开干` starts a real execution task, and
-to ignore it for documentation examples, feature explanations, or business-goal
-discussion.
+example the card is named `Enter full-closure delivery mode when a goal
+starts`. Its usage criteria say to use it when `/goal`, `create a goal`, or
+`start now` begins a real execution task, and to ignore it for documentation
+examples, feature explanations, or business-goal discussion.
 
 When the user sends:
 
 ```text
-创建目标，开干，把这个功能完整做完并自己验证
+Based on the checkout redesign plan, create a goal and start now. Finish the
+whole feature end to end and verify it yourself.
 ```
 
 OME decomposes the prompt into a task envelope. It detects goal execution
@@ -37,15 +38,15 @@ language stored on the card.
 
 ```text
 OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
-Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
-1. [high risk][must] 创建目标时进入完整闭环交付模式 (创建目标时进入完整闭环交付模式-40383753)
-   Summary: 当用户用 /goal、创建目标或开干启动真实长任务时，常见误判是只建目标或做局部切片；应进入完整闭环交付，并排除文档示例、概念解释和业务目标讨论。
+Final report: if you actually used any card, add one final line `**OME experience cards used in this response: N** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
+1. [high risk][must] Enter full-closure delivery mode when a goal starts (agent-goal-execution)
+   Summary: When a user starts real execution with /goal, create a goal, or start now, a common failure is only creating goal copy or implementing a small slice; the agent should enter full-closure delivery and ignore docs examples, feature explanations, or business-goal discussion.
    Scope: global
-   Use if: /goal 开始执行; 创建目标开干; 使用 goal 跑长任务
-   Ignore if: 文档或案例里展示 /goal; 解释 goal 功能但不执行
+   Use if: /goal starts execution; create a goal and start; use goal for a long task
+   Ignore if: /goal appears in docs or examples; explaining goal without executing
    Matched by: task looks like a real goal-execution start
-   Rule: ome experience show 创建目标时进入完整闭环交付模式-40383753 --section rule
-   Final link if used: [创建目标时进入完整闭环交付模式](<~/.oh-my-experience/experiences/active/创建目标时进入完整闭环交付模式-40383753.md>)
+   Rule: ome experience show agent-goal-execution --section rule
+   Final link if used: [Enter full-closure delivery mode when a goal starts](<~/.oh-my-experience/experiences/active/agent-goal-execution.md>)
 ```
 
 The linked path is rendered from the user's own library. A global library uses
@@ -54,45 +55,67 @@ the user's `dataDir`; a project library uses
 
 ## What The Agent Reads Next
 
-The mounted context intentionally stays short. If the lesson applies, the agent
+The injected context intentionally stays short. If the lesson applies, the agent
 then fetches the rule body:
 
 ```bash
-ome experience show 创建目标时进入完整闭环交付模式-40383753 --section rule
+ome experience show agent-goal-execution --section rule
 ```
 
 The rule says:
 
 ```text
-当用户说 `/goal`、`创建目标`、`使用 goal`、`开干`、`开始执行目标`、`跑长任务`，或要求把一批需求压进目标推进时，必须把这视为执行启动协议，而不是普通目标文案。默认执行规则如下：
+When the user says `/goal`, `create a goal`, `use goal`, `start now`,
+`start executing the goal`, `run a long task`, or asks to move a set of
+requirements into goal execution, treat it as an execution startup protocol,
+not as ordinary goal copy. Default execution rules:
 
-1. 启动前先明确目标、范围、非范围、真实完成标准和逐项验收清单；如果目标被切得太小，先指出范围风险并把用户已确认的一批需求纳入同一目标。
-2. 按完整计划系统推进，锚定 source of truth、story、roadmap、设计方案或用户原话；执行中不能方向漂移，不能只做第一个可见切片。
-3. 所有计划内功能点都要完整闭环，不交半成品；禁止只做 happy path、UI 壳、接口半截、placeholder、fake route、隐藏测试入口、内存替代、假外部动作或 fallback 制造两套真相。
-4. 实现时同步保证可维护性、可扩展性、稳健性和鲁棒性：模块按真实边界拆分，职责清楚，必要时清理直接相关的脏逻辑和死代码；不要为了假想未来做空泛抽象。
-5. 验证必须走真实入口和真实用户路径；命令、功能、状态、文档或证据要逐项覆盖。工具成功、局部 smoke、代码写完都不能单独代表完成。
-6. 对复杂或高风险目标，完成后主动做自检；必要时 dispatch 外部模型或 review 流程，重点检查方向是否漂移、功能是否完整、实际可用性、架构质量和可维护性。
-7. 完成判断必须 fail closed：只要还有计划功能未做完、验收未通过、证据缺失、环境阻塞未说明或风险未交代，就不能把目标标记为 complete；应继续修复或明确 blocked。
-8. 最终交付要面向用户说明体验变化、已验证证据、风险限制和待确认项。
+1. Before starting, clarify the goal, scope, non-scope, real completion
+   criteria, and itemized acceptance checklist. If the goal is cut too small,
+   call out the scope risk and include the user-confirmed requirements in the
+   same goal.
+2. Execute systematically from the full plan, anchored to the source of truth,
+   story, roadmap, design plan, or user wording. Do not drift in direction or
+   stop after the first visible slice.
+3. Close every planned feature end to end. Do not ship half-finished work, happy
+   paths only, UI shells, partial APIs, placeholders, fake routes, hidden test
+   entries, in-memory substitutes, fake external actions, or fallbacks that
+   create two versions of the truth.
+4. Keep implementation maintainable, extensible, robust, and resilient. Split
+   modules on real boundaries, keep responsibilities clear, and clean directly
+   related dead or dirty logic when needed. Do not add abstract layers for an
+   imagined future.
+5. Validate through real entries and real user paths. Commands, features,
+   states, docs, and evidence must cover the checklist. A successful command,
+   local smoke test, or finished code change is not completion by itself.
+6. For complex or high-risk goals, run a self-review after implementation. When
+   needed, dispatch an external model or review flow to check direction drift,
+   feature completeness, real usability, architecture quality, and
+   maintainability.
+7. Completion must fail closed. If any planned feature is unfinished,
+   acceptance evidence is missing, validation failed, environment blockers are
+   unexplained, or risks are not stated, do not mark the goal complete. Continue
+   fixing it or clearly mark it blocked.
+8. Final delivery should explain the user-facing change, verified evidence,
+   risks or limits, and open confirmations.
 ```
 
 The result is not "always add more rules." The agent sees this as a candidate
-only when the current prompt looks like goal execution. If it actually uses the
-card, the final response can include `**本次使用 1条 OME 经验卡：** ...`. If the user
-is only discussing business goals, OKRs, or asking what `/goal` means, the card
-is ignored and does not appear in the final usage line.
+only when the current prompt looks like goal execution. If the user is only
+discussing business goals, OKRs, or asking what `/goal` means, the card is
+ignored and does not appear in the final usage line.
 
 ## Try It Yourself
 
 Use `ome match` to inspect the same path without sending a real agent prompt:
 
 ```bash
-ome match "创建目标，开干，把这个功能完整做完并自己验证" --explain
+ome match "Based on the checkout redesign plan, create a goal and start now. Finish the whole feature end to end and verify it yourself." --explain
 ```
 
 Use `--json` when you want to inspect the task envelope, reasons, and rendered
 `additionalContext` programmatically:
 
 ```bash
-ome match "创建目标，开干，把这个功能完整做完并自己验证" --explain --json
+ome match "Based on the checkout redesign plan, create a goal and start now. Finish the whole feature end to end and verify it yourself." --explain --json
 ```

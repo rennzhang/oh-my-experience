@@ -130,8 +130,8 @@ ome experience list --compact --json
 ome experience show <card-id>
 ome experience show <card-id> --scope project --section rule
 ome experience show <card-id> --section rule
-ome experience promote <card-id>
-ome experience promote <card-id> --scope project
+ome experience enable <card-id>
+ome experience enable <card-id> --scope project
 ome experience archive <card-id> --reason "superseded"
 ```
 
@@ -149,7 +149,7 @@ can be recalled.
 
 ```bash
 ome eval recall --suite <file>
-ome eval recall --suite tests/fixtures/eval/core.json --limit 8
+ome eval recall --suite tests/fixtures/eval/core.json --limit 4
 ome eval recall --suite my-suite.json --use-current-library
 ome eval recall --compare before.json after.json
 ```

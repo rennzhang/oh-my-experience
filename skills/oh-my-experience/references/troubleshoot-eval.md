@@ -50,8 +50,17 @@ npm test
 For recall and hook behavior:
 
 ```bash
-ome eval recall --suite tests/fixtures/eval/core.json --limit 8 --threshold 40
+ome eval recall --suite tests/fixtures/eval/core.json --limit 4 --threshold 40
 ome hook run --json
+```
+
+For recall engine changes, also prove the noisy-library path. The core test
+suite includes a scale/noise fixture with one real card and many broad decoys;
+it must keep precision and over-recall at the strict gate.
+
+```bash
+npm test
+node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 4 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json
 ```
 
 For release or dogfood validation:

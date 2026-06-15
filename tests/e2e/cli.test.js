@@ -152,7 +152,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const ruleShow = run(["experience", "show", cardId, "--section", "rule", "--data-dir", dataDir]);
   assert.equal(ruleShow.status, 0, `${ruleShow.stderr}\n${ruleShow.stdout}`);
   assert.match(ruleShow.stdout, /Use browser validation and console check/);
-  json(run(["experience", "promote", cardId, "--data-dir", dataDir, "--json"]));
+  json(run(["experience", "enable", cardId, "--data-dir", dataDir, "--json"]));
   const match = json(run(["match", "修复 UI 并做 浏览器验证", "--data-dir", dataDir, "--json"]));
   assert.equal(match.matches.length, 1);
   const explained = json(run(["match", "修复 UI 并做 浏览器验证", "--explain", "--data-dir", dataDir, "--json"]));
@@ -250,7 +250,7 @@ test("project library participates in CLI recall without writing project events"
   json(run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--scope", "project", "--json"], { cwd: projectRoot }));
   const applied = json(run(["reflect", "apply", retrospective.runId, "--scope", "project", "--json"], { cwd: projectRoot }));
   const cardId = applied.drafts[0].id;
-  json(run(["experience", "promote", cardId, "--scope", "project", "--json"], { cwd: projectRoot }));
+  json(run(["experience", "enable", cardId, "--scope", "project", "--json"], { cwd: projectRoot }));
 
   const eventPath = path.join(projectRoot, ".oh-my-experience", "events.jsonl");
   const eventsBeforeMatch = fs.existsSync(eventPath) ? fs.readFileSync(eventPath, "utf8") : "";
@@ -303,7 +303,7 @@ test("reflect candidates rejects missing source audit unless explicitly overridd
 test("retrospective run creation rejects session-scoped CLI design", () => {
   const dataDir = tmpDir("retrospective-no-session");
   json(run(["init", "--data-dir", dataDir, "--json"]));
-  const result = run(["create-reflect", "--from-session", "abc123", "--data-dir", dataDir, "--json"]);
+  const result = run(["reflect", "start", "--from-session", "abc123", "--data-dir", dataDir, "--json"]);
   assert.notEqual(result.status, 0);
   const error = JSON.parse(result.stdout);
   assert.match(error.error.message, /does not accept --from-session/);
@@ -434,7 +434,7 @@ test("init reset-config overwrites setup files but keeps experience assets", () 
   assert.equal(reset.plan.resetConfig, true);
   const nextConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
   assert.equal(nextConfig.privacy.saveRawPrompt, false);
-  assert.equal(nextConfig.retrieval.maxCards, 8);
+  assert.equal(nextConfig.retrieval.maxCards, 4);
   assert.deepEqual(fs.readdirSync(path.join(dataDir, "experiences", "active")).sort(), cardsBefore);
   assert.equal(fs.existsSync(path.join(runDir, "candidates.json")), true);
   assert.equal(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8"), sourceIndexBefore);
@@ -468,10 +468,10 @@ test("interactive init exposes first-run choices without migration prompts", () 
   assert.match(result.stdout, /Create a single HTML file for a Kanban board page/);
   assert.match(result.stdout, /not a landing page or a full app/);
   assert.match(result.stdout, /Linear-inspired, work-focused style/);
-  assert.match(result.stdout, /After the task summary, naturally ask whether I want to start an OME retrospective scan/);
+  assert.match(result.stdout, /After the task summary, tell me whether OME surfaced any relevant lesson/);
   assert.match(result.stdout, /```/);
   assert.match(result.stdout, /After the first recall:/);
-  assert.match(result.stdout, /ask whether to start the OME retrospective scan/);
+  assert.match(result.stdout, /move on to the first-card guide or a fuller retrospective/);
   assert.match(result.stdout, /After setup \(optional\):/);
   assert.match(result.stdout, /Import more agent histories with Spool/);
   assert.match(result.stdout, /Claude CLI, Gemini CLI, opencode/);
@@ -862,6 +862,20 @@ test("hook no-hit succeeds without additionalContext", () => {
   assert.deepEqual(hook, {});
 });
 
+test("hook does not suppress OME product work prompts", () => {
+  const dataDir = tmpDir("hook-ome-product-work");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const hit = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
+    input: JSON.stringify({ prompt: "帮我优化 OME 召回引擎，要求高内聚低耦合，逻辑干净，不要历史包袱。" }),
+  }));
+  assert.ok(hit.hookSpecificOutput.additionalContext.includes("starter-code-kiss-root-cause"));
+
+  const maintenance = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
+    input: JSON.stringify({ prompt: "ome doctor --json" }),
+  }));
+  assert.deepEqual(maintenance, {});
+});
+
 test("hook run applies project scope from real cwd payload", () => {
   const dataDir = tmpDir("hook-project-context");
   const projectDir = tmpDir("project-context");
@@ -892,7 +906,7 @@ test("hook run applies project scope from real cwd payload", () => {
   json(run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--data-dir", dataDir, "--json"]));
   const applied = json(run(["reflect", "apply", retrospective.runId, "--data-dir", dataDir, "--json"]));
   const cardId = applied.drafts[0].id;
-  json(run(["experience", "approve", cardId, "--data-dir", dataDir, "--json"]));
+  json(run(["experience", "enable", cardId, "--data-dir", dataDir, "--json"]));
   const hit = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
     input: JSON.stringify({ prompt: "project cwd browser", cwd: appDir, session_id: "s1" }),
   }));
@@ -924,7 +938,7 @@ test("config can point to a custom data directory", () => {
   const candidates = json(run(["reflect", "candidates", retrospective.runId, "--from-file", candidatesFile, "--data-dir", dataDir, "--json"]));
   json(run(["reflect", "decide", retrospective.runId, candidates.candidates[0].id, "--action", "approve", "--data-dir", dataDir, "--json"]));
   const applied = json(run(["reflect", "apply", retrospective.runId, "--data-dir", dataDir, "--json"]));
-  json(run(["experience", "approve", applied.drafts[0].id, "--data-dir", dataDir, "--json"]));
+  json(run(["experience", "enable", applied.drafts[0].id, "--data-dir", dataDir, "--json"]));
   const result = json(run(["config", "set", "dataDir", nextDir, "--data-dir", dataDir, "--json"]));
   assert.equal(result.changed, true);
   assert.equal(result.next, nextDir);

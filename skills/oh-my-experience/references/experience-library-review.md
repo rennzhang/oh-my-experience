@@ -146,7 +146,7 @@ ome experience archive <card-id> --reason "<reason>" --json
 4. 用户已明确授权时，走：
    - `ome reflect decide <run-id> <candidate-id> --action approve --json`
    - `ome reflect apply <run-id> --json`
-   - `ome experience promote <draft-id> --json`
+   - `ome experience enable <draft-id> --json`
 5. 验证新卡命中正例、避开反例。
 6. 归档被替代旧卡。
 7. 更新人工索引或 Obsidian 索引入口，但不手改 active 卡正文。

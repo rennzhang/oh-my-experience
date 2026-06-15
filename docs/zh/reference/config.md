@@ -25,7 +25,7 @@ status: active
     "saveRawPrompt": false
   },
   "retrieval": {
-    "maxCards": 8,
+    "maxCards": 4,
     "minScore": 40,
     "additionalContextMaxChars": 6000,
     "hookTimeoutMs": 4000

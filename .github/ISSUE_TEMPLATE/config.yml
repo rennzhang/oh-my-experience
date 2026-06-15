@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: mailto:zhangren.aidev@gmail.com
+    about: Please report prompt, hook, local-data, or path exposure issues privately.

@@ -20,7 +20,7 @@ type EvaluatedCase = ReturnType<typeof evaluateCase>;
 type MetricKey = keyof ReturnType<typeof evaluateCase>["metrics"];
 
 export function evaluateRecallSuite(dataDir: string, suiteFile: string, options: EvalOptions = {}) {
-  const { limit = 8, threshold = 40, persist = false } = options;
+  const { limit = 4, threshold = 40, persist = false } = options;
   const suite = loadSuite(suiteFile);
   const fixture = prepareFixtureDataDir(dataDir, suiteFile, suite, options);
   const cases: EvaluatedCase[] = suite.cases.map((item: EvalCase) => evaluateCase(fixture.dataDir, item, { limit, threshold }));

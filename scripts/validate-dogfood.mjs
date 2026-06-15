@@ -17,7 +17,7 @@ fs.mkdirSync(runRoot, { recursive: true });
 step("build", "npm", ["run", "build"]);
 step("check", "npm", ["run", "check"]);
 step("test", "npm", ["test"]);
-const recallGate = jsonStep("recall-gate", "node", ["bin/ome.js", "eval", "recall", "--suite", "tests/fixtures/eval/core.json", "--limit", "8", "--threshold", "40", "--min-pass-rate", "1", "--min-recall", "1", "--min-precision", "1", "--max-over-recall", "0", "--json"]);
+const recallGate = jsonStep("recall-gate", "node", ["bin/ome.js", "eval", "recall", "--suite", "tests/fixtures/eval/core.json", "--limit", "4", "--threshold", "40", "--min-pass-rate", "1", "--min-recall", "1", "--min-precision", "1", "--max-over-recall", "0", "--json"]);
 const hookDataDir = recallGate.fixtureDataDir;
 const hookPrompt = "Fix a frontend UI bug and validate the result in a real browser.";
 jsonStep("codex-hook-run", "node", ["bin/ome.js", "hook", "run", "--data-dir", hookDataDir, "--json"], {

@@ -41,7 +41,7 @@ Commands:
 
 ```bash
 ome eval recall --suite <suite.json>
-ome eval recall --suite <suite.json> --limit 8 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0
+ome eval recall --suite <suite.json> --limit 4 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0
 ome eval recall --compare before.json after.json
 ```
 

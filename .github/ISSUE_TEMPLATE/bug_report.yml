@@ -1,0 +1,52 @@
+name: Bug report
+description: Report something that failed or behaved incorrectly.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please avoid posting private prompt text, local paths, source code, or session logs unless they are already public or carefully redacted.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the visible behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Run ...
+        2. Send prompt ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OME version
+      description: Run `ome version` or include the commit SHA if using source.
+      placeholder: "oh-my-experience 0.1.0"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - init / setup
+        - Codex hook
+        - Claude hook
+        - recall / matching
+        - retrospective / review
+        - project library
+        - docs
+        - packaging
+        - other
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste redacted output from `ome doctor --json`, `ome match --explain --json`, or failing commands when useful.
+      render: shell

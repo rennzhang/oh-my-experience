@@ -10,6 +10,7 @@
 - 运行测试、eval 或验证命令时优先隔离 dataDir，不污染真实经验库。
 - 涉及删除经验库、覆盖 hooks、覆盖 skill、卸载数据时必须先得到用户确认。
 - 包内开发时可用 `node bin/ome.js` 替代全局 `ome`。
+- 默认第一成功路径是 `ome init -> ome match "<真实任务>" --explain`。不要把深度复盘、导入历史、项目库和 eval 一次性塞给新用户。
 
 ## 初始化与配置
 
@@ -83,10 +84,6 @@ ome reflect start --scope project
 ome reflect start --focus "<关注点>"
 ```
 
-兼容说明：
-
-- `ome create-reflect` 仍可用于旧脚本，但新流程优先使用 `ome reflect start`。
-
 规则：
 
 - `--focus` 是主题镜头，不是来源范围。
@@ -156,22 +153,18 @@ ome reflect apply <run-id>
 ome reflect apply <run-id> --scope project
 ```
 
-晋升 active：
+启用 active：
 
 ```bash
-ome experience promote <card-id>
-ome experience promote <card-id> --scope project
+ome experience enable <card-id>
+ome experience enable <card-id> --scope project
 ```
-
-兼容说明：
-
-- `ome experience approve <card-id>` 仍可用，但新流程优先说 `promote`。
 
 规则：
 
 - 生命周期必须显式：`candidate -> draft -> active -> archived`。
 - 复盘流程只能先生成 review/candidate；不要直接创建 active 卡。
-- 用户审批前不要替用户完成晋升。
+- 用户审批前不要替用户启用 draft。
 
 ## 卡片查看与治理
 
@@ -210,7 +203,7 @@ ome match "<task>" --cwd <project-root> --explain
 
 ```bash
 ome eval recall --suite <file>
-ome eval recall --suite tests/fixtures/eval/core.json --limit 8
+ome eval recall --suite tests/fixtures/eval/core.json --limit 4
 ome eval recall --suite tests/fixtures/eval/core.json --experiences tests/fixtures/eval/core.cards.json
 ome eval recall --suite my-suite.json --use-current-library
 ome eval recall --compare before.json after.json

@@ -57,18 +57,24 @@ const englishSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "Introduction", link: "/guides/introduction" },
         { text: "Quickstart", link: "/guides/quickstart" },
+        { text: "First experience card", link: "/guides/first-card" },
         { text: "Examples", link: "/guides/examples" },
-        { text: "Setup", link: "/guides/setup" },
+      ],
+    },
+    {
+      text: "Build the library",
+      items: [
+        { text: "Import sources", link: "/guides/import-sources" },
+        { text: "Reflect and review", link: "/guides/reflect-review" },
         { text: "Global and project libraries", link: "/guides/project-libraries" },
       ],
     },
     {
       text: "Agent setup",
       items: [
+        { text: "Setup", link: "/guides/setup" },
         { text: "Codex", link: "/guides/codex" },
         { text: "Claude", link: "/guides/claude" },
-        { text: "Import sources", link: "/guides/import-sources" },
-        { text: "Reflect and review", link: "/guides/reflect-review" },
       ],
     },
     {
@@ -109,18 +115,24 @@ const englishSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "Introduction", link: "/guides/introduction" },
         { text: "Quickstart", link: "/guides/quickstart" },
+        { text: "First experience card", link: "/guides/first-card" },
         { text: "Examples", link: "/guides/examples" },
-        { text: "Setup", link: "/guides/setup" },
+      ],
+    },
+    {
+      text: "Build the library",
+      items: [
+        { text: "Import sources", link: "/guides/import-sources" },
+        { text: "Reflect and review", link: "/guides/reflect-review" },
         { text: "Global and project libraries", link: "/guides/project-libraries" },
       ],
     },
     {
-      text: "Operate",
+      text: "Agent setup",
       items: [
+        { text: "Setup", link: "/guides/setup" },
         { text: "Codex", link: "/guides/codex" },
         { text: "Claude", link: "/guides/claude" },
-        { text: "Import sources", link: "/guides/import-sources" },
-        { text: "Reflect and review", link: "/guides/reflect-review" },
         { text: "Evaluation", link: "/guides/evaluation" },
       ],
     },
@@ -134,18 +146,24 @@ const chineseSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "介绍", link: "/zh/guides/introduction" },
         { text: "快速开始", link: "/zh/guides/quickstart" },
+        { text: "第一张经验卡", link: "/zh/guides/first-card" },
         { text: "实际案例", link: "/zh/guides/examples" },
-        { text: "安装配置", link: "/zh/guides/setup" },
+      ],
+    },
+    {
+      text: "建设经验库",
+      items: [
+        { text: "导入源", link: "/zh/guides/import-sources" },
+        { text: "复盘与审阅", link: "/zh/guides/reflect-review" },
         { text: "全局与项目经验库", link: "/zh/guides/project-libraries" },
       ],
     },
     {
       text: "Agent 设置",
       items: [
+        { text: "安装配置", link: "/zh/guides/setup" },
         { text: "Codex", link: "/zh/guides/codex" },
         { text: "Claude", link: "/zh/guides/claude" },
-        { text: "导入源", link: "/zh/guides/import-sources" },
-        { text: "复盘与审阅", link: "/zh/guides/reflect-review" },
       ],
     },
     {
@@ -186,18 +204,24 @@ const chineseSidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "总览", link: "/zh/" },
         { text: "快速开始", link: "/zh/guides/quickstart" },
+        { text: "第一张经验卡", link: "/zh/guides/first-card" },
         { text: "实际案例", link: "/zh/guides/examples" },
-        { text: "安装配置", link: "/zh/guides/setup" },
+      ],
+    },
+    {
+      text: "建设经验库",
+      items: [
+        { text: "导入源", link: "/zh/guides/import-sources" },
+        { text: "复盘与审阅", link: "/zh/guides/reflect-review" },
         { text: "全局与项目经验库", link: "/zh/guides/project-libraries" },
       ],
     },
     {
-      text: "运行",
+      text: "Agent 设置",
       items: [
+        { text: "安装配置", link: "/zh/guides/setup" },
         { text: "Codex", link: "/zh/guides/codex" },
         { text: "Claude", link: "/zh/guides/claude" },
-        { text: "导入源", link: "/zh/guides/import-sources" },
-        { text: "复盘与审阅", link: "/zh/guides/reflect-review" },
         { text: "评估", link: "/zh/guides/evaluation" },
       ],
     },

@@ -417,7 +417,7 @@ export function promoteDraft(dataDir: string, id: string): ExperienceCard {
     writeTextAtomic(target, serializeCard(rendered), dataDir);
     fs.rmSync(source);
     rebuildCardIndex(dataDir);
-    operationLog(dataDir, "card.approve", { id });
+    operationLog(dataDir, "card.enable", { id });
     return rendered;
   });
 }

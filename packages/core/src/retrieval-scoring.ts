@@ -194,6 +194,7 @@ function negativeSignalTargetsCard(signalId: string, requiredSignals: Set<string
     goal_example_discussion: ["goal_execute"],
     business_goal_discussion: ["goal_execute"],
     ui_surface_noise: ["ui_surface"],
+    ui_example_discussion: ["ui_surface"],
     git_source_noise: ["git_operation", "worktree_diff_operation"],
   };
   return (targets[signalId] || []).some((target) => requiredSignals.has(target));

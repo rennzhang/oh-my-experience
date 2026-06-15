@@ -10,6 +10,10 @@ status: active
 Retrieval quality is the core product asset. A good reflect workflow creates
 cards, but a good retrieval engine makes those cards matter during real work.
 
+The product optimizes for precise prompt-time candidates, not maximum recall.
+A matched card is not a command; it is a compact candidate that the agent must
+apply only when the workflow meaning fits the current task.
+
 ## Pipeline
 
 ```text
@@ -99,6 +103,28 @@ The current scoring model is local and deterministic:
 
 No external search service is required.
 
+## Current Limits
+
+The current engine is deliberately sparse, local, and deterministic. It does
+not claim full semantic understanding. Its largest failure mode is broad
+keyword overlap: a card can look relevant because the prompt mentions the same
+surface words while the actual workflow is different.
+
+Mitigations are layered:
+
+- keep the default hot-path limit small;
+- gate cards with stable routing signals when a trigger word is ambiguous;
+- write `use_when` and `ignore_when` as natural language so the agent can make
+  the final judgment;
+- collapse near-duplicates before rendering context;
+- treat documentation/example prompts as near misses for workflow cards such as
+  UI validation and `/goal` execution;
+- require evals to track precision and over-recall, not only recall.
+
+Recall engine changes are not considered safe unless both the core fixture and
+the noisy-library path pass. The noisy-library test keeps one real card among
+many broad decoys and verifies that the final context stays precise.
+
 ## Engine Hints
 
 OME runs on the agent hot path, so the production retrieval path stays local,
@@ -123,7 +149,8 @@ Examples:
 - A Spool handoff card uses `historical_session_lookup` as a strong positive
   hint. Saying that Spool is an optional import source is not enough.
 - A browser validation card uses `ui_surface` as a strong positive hint and is
-  suppressed when UI words are explicitly described as noise.
+  suppressed when UI words are explicitly described as noise, documentation,
+  examples, or explanation-only content.
 - An architecture-quality card uses `architecture_quality` when the user asks
   for cohesive modules, clean logic, low coupling, or root-cause fixes. A
   provider-boundary card should not win merely because the prompt contains the
@@ -200,7 +227,7 @@ The rendered hook context stays neutral:
 
 ```text
 OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
-Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
+Final report: if you actually used any card, add one final line `**OME experience cards used in this response: N** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
 1. [high risk][must] Browser validation (browser-validation)
    Summary: ...
    Use if: ...

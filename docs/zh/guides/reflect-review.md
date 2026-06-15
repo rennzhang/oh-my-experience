@@ -105,10 +105,10 @@ Agent 展示候选后，你逐条决定。
 
 1. 运行 `ome reflect apply RUN_ID --dry-run` 预览将要写入的 draft。
 2. 确认无误后运行 `ome reflect apply RUN_ID`。
-3. 对需要设为 active 的卡片，逐个运行 `ome experience promote DRAFT_ID`。
+3. 对需要设为 active 的卡片，逐个运行 `ome experience enable DRAFT_ID`。
 ```
 
-入库是两步设计，apply 之后卡片是 draft 状态，promote 之后才是 active。中间
+入库是两步设计，apply 之后卡片是 draft 状态，enable 之后才是 active。中间
 你可以随时检查和修改 draft。
 
 ### 步骤 4：验证

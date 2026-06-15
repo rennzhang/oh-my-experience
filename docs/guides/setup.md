@@ -10,6 +10,18 @@ install and configuration details.
 
 ## Install the CLI
 
+Before the current `0.1.0` package is published to npm, use the source checkout:
+
+```bash
+git clone https://github.com/rennzhang/oh-my-experience.git
+cd oh-my-experience
+npm install
+npm run build
+node bin/ome.js init
+```
+
+After `0.1.0` is published, the npm path is:
+
 ```bash
 npm install -g oh-my-experience
 ome init
@@ -19,10 +31,10 @@ The first command installs the global `ome` command. The second starts the setup
 wizard, which chooses a library path, installs the default provider hook, and
 writes starter cards so you can verify recall immediately.
 
-If you do not want a global install, run it with `npx`:
+If you do not want a global install after publication, run it with `npx`:
 
 ```bash
-npx oh-my-experience init
+npx oh-my-experience@latest init
 ```
 
 **Have your agent do it:**

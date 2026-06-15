@@ -18,10 +18,10 @@ evaluation command.
     {
       "id": "frontend-browser-validation",
       "difficulty": "easy",
-      "prompt": "修复 UI 后请在浏览器里验证",
+      "prompt": "After fixing the UI, validate it in the browser",
       "expectedCards": ["browser-validation"],
       "unexpectedCards": ["git-commit-safety"],
-      "tags": ["frontend", "zh-CN"]
+      "tags": ["frontend", "en"]
     }
   ]
 }
@@ -36,7 +36,7 @@ Experience fixture file:
       "id": "browser-validation",
       "status": "active",
       "title": "Browser Validation",
-      "category": "测试验收",
+      "category": "Testing",
       "summary": "UI changes need real browser validation, while backend-only or documentation-only work should not recall this card.",
       "criteria": {
         "use_when": ["frontend visible change", "real browser validation"],
@@ -50,7 +50,7 @@ Experience fixture file:
         "policy": "must",
         "risk": "high",
         "confidence": "high",
-        "triggers": ["browser validation", "浏览器验证"],
+        "triggers": ["browser validation", "browser check"],
         "topics": ["frontend", "test"]
       },
       "scope": { "level": "global" },

@@ -78,7 +78,7 @@ then keep the normal reviewed lifecycle:
 ome reflect start
 ome reflect apply <run-id> --dry-run
 ome reflect apply <run-id>
-ome experience promote <draft-card-id>
+ome experience enable <draft-card-id>
 ```
 
 Imported material should never bypass review. Spool expands the source pool; it

@@ -68,7 +68,7 @@ Each candidate must include:
 | `summary` | One sentence covering failure mode, use case, ignore case, and expected action | UI changes need real browser validation; backend-only or docs-only work should ignore this card |
 | `criteria.use_when` | Natural-language standards for when the model should use the card | UI changes, frontend fixes, page style adjustments |
 | `criteria.ignore_when` | Natural-language near misses that should not use the card | Backend-only changes, database migrations, documentation examples |
-| `recall.triggers` | Compact matcher anchors, usually 3-5 short phrases from `use_when` | browser validation, UI验收 |
+| `recall.triggers` | Compact matcher anchors, usually 3-5 short phrases from `use_when` | browser validation, UI acceptance |
 | `recall.topics` | Broad surfaces used for explainability and weighting | frontend, browser |
 | `scope` | Where the card can be recalled | `{ "level": "global" }` |
 | `rule` | Complete executable rule the agent reads after deciding the card applies | Launch real browser, check responsive states, interactions, loading, errors, and console |
@@ -107,15 +107,15 @@ Help me apply the review decisions:
 
 1. Run `ome reflect apply RUN_ID --dry-run` to preview the drafts that would be written.
 2. Run `ome reflect apply RUN_ID` to write drafts.
-3. For cards that should become active, run `ome experience promote DRAFT_ID`.
+3. For cards that should become active, run `ome experience enable DRAFT_ID`.
 ```
 
-Applying creates drafts. Promoting makes them active. You can inspect and edit
+Applying creates drafts. Enabling makes them active. You can inspect and edit
 drafts in between.
 
 ### Step 4: Verify
 
-Verify immediately after promoting:
+Verify immediately after enabling:
 
 ```text
 Use `ome match` to verify the new cards.

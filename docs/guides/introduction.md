@@ -52,6 +52,10 @@ It is not always-on project guidance, and it is not a tool manual. It is
 recalled lightly when the current task matches, so rule files stay small and
 lessons do not get lost.
 
+OME is not a memory store for facts, not a replacement for `AGENTS.md` or
+`CLAUDE.md`, and not a skill runner. It recalls reviewed execution lessons only
+when the task needs them.
+
 See [Examples](examples.md) for a concrete `/goal` case that shows the matched
 experience card and the exact context mounted into the agent prompt.
 

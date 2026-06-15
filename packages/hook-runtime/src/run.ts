@@ -119,20 +119,19 @@ function safeReadLibraryStackCards(stack: ReturnType<typeof resolveLibraryStack>
 function isOmeMaintenancePrompt(prompt: string): boolean {
   const text = prompt.toLowerCase();
   return [
-    "oh-my-experience",
     "ome init",
-    "ome create-reflect",
-    "retrospective run",
+    "ome uninstall",
     "ome import",
     "ome source",
-    "ome starter",
     "ome doctor",
     "ome config",
     "ome experience",
     "ome hook",
-    "experience library",
-    "经验库",
-    "复盘",
+    "ome project",
+    "ome reflect",
+    "oh-my-experience init",
+    "oh-my-experience hook",
+    "retrospective run",
   ].some((needle) => text.includes(needle));
 }
 

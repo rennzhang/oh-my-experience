@@ -28,7 +28,7 @@ export function createDefaultConfig(dataDir: string): Config {
       debugRawPromptTtlHours: 24,
     },
     retrieval: {
-      maxCards: 8,
+      maxCards: 4,
       minScore: 40,
       additionalContextMaxChars: 6000,
       hookTimeoutMs: 4000,
@@ -104,11 +104,6 @@ function repairConfig(dataDir: string): void {
   const currentRecord = current as JsonRecord;
   const normalized = ConfigSchema.parse({
     ...currentRecord,
-    sources: currentRecord.sources || {
-      spool: {
-        mode: currentRecord.spool?.enabled ? "enabled" : "off",
-      },
-    },
     dataDir: path.resolve(dataDir),
   });
   if (JSON.stringify(current) === JSON.stringify(normalized)) return;

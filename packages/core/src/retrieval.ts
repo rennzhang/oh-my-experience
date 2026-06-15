@@ -78,7 +78,7 @@ export function matchCardEntries(cardsInput: CardIndexEntry[], prompt: string, o
   }
   if (timedOut && options.failOpenOnTimeout) return [];
   scored.sort(compareMatchScore);
-  const matches = diversify(collapseSimilar(scored)).slice(0, options.limit ?? 8);
+  const matches = diversify(collapseSimilar(scored)).slice(0, options.limit ?? 4);
   return matches.map((match) => ({
     ...match,
     envelope,
@@ -112,7 +112,7 @@ function explainMatchedCards(prompt: string, matches: MatchResult[], options: Ma
   return {
     ok: true,
     threshold: options.threshold ?? 4,
-    limit: options.limit ?? 8,
+    limit: options.limit ?? 4,
     projectContext: options.projectContext || null,
     libraries: (metadata.libraries || []).map((library) => ({
       scope: library.scope,

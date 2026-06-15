@@ -5,300 +5,165 @@
 <h1 align="center">Oh My Experience</h1>
 
 <p align="center"><strong>Stop teaching your agent the same lesson twice.</strong></p>
+<p align="center">A local prompt-time recall layer for reviewed coding-agent lessons.</p>
+
+<p align="center">
+  <a href="https://github.com/rennzhang/oh-my-experience/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/rennzhang/oh-my-experience/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <img alt="Node.js >=20" src="https://img.shields.io/badge/node-%3E%3D20-339933.svg">
+  <img alt="Local-first" src="https://img.shields.io/badge/local--first-yes-111827.svg">
+</p>
 
 <p align="center">
   <a href="README.md">English</a> ·
-  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.zh-CN.md">Chinese</a> ·
   <a href="docs/index.md">Documentation</a>
 </p>
 
 Oh My Experience is a local-first experience layer for AI coding agents. It
-turns real Codex and Claude sessions into reviewed experience cards, then
-recalls the right lessons at prompt time before the next skipped browser check,
-bad fallback, mixed Git diff, forgotten release gate, or repeated correction.
+turns real Codex and Claude corrections into reviewed experience cards, then
+recalls the right lesson at prompt time before the agent repeats the same
+mistake.
 
-Start with built-in starter lessons today.
+## Quick Try
 
 ```bash
-# From this checkout
+git clone https://github.com/rennzhang/oh-my-experience.git
+cd oh-my-experience
 npm install
 npm run build
 node bin/ome.js init
+node bin/ome.js match "fix UI and validate in browser" --explain
 ```
 
-## Why Developers Use It
+After the current `0.1.0` release is published to npm:
 
-AI agents are getting better at writing code, but they still lack durable
-execution judgment for your way of working.
+```bash
+npx oh-my-experience@latest init
+npx oh-my-experience@latest match "fix UI and validate in browser" --explain
+```
 
-- Keep `AGENTS.md` and `CLAUDE.md` small.
-- Stop losing hard-won execution lessons in chat history.
-- Help agents remember the right skill, check, or release gate.
-- Review every lesson before it becomes active.
-- Stay local by default.
-
-The result is not more instructions stuffed into every prompt. It is better
-timing: the right lesson, shown to the agent when it can still change the next
-action.
-
-## The Missing Layer Between Memory And Skills
-
-Memory remembers facts. Skills package repeatable workflows. Oh My Experience
-remembers execution judgment.
-
-For example:
-
-- Memory may know that you care about UI quality.
-- A skill may know how to run Playwright.
-- An experience card reminds the agent not to call a UI task done until the
-  real browser, responsive states, interactions, loading states, errors, and
-  console have been checked.
-
-That is the layer most coding agents still miss: not facts, not tools, but
-judgment from the last time the work went wrong.
-
-## Keep Rule Files Small
-
-`AGENTS.md` and `CLAUDE.md` should contain only the rules that must always be
-loaded. Most lessons are conditional: they matter for UI work, release work,
-Git work, review work, or one specific project.
-
-Oh My Experience keeps those conditional lessons out of always-on context and
-recalls them only when they are likely to matter.
-
-## Make Skills Appear At The Right Moment
-
-If your workspace has many small skills, agents may forget which one matters
-for the current task. Experience cards can carry related skill hints, so recall
-can say:
-
-> This task looks like a browser validation case. Consider using the browser
-> validation skill before closing it.
-
-Oh My Experience does not replace skills or orchestrate a skill marketplace. It
-helps the agent notice the relevant operational lesson before the moment passes.
-
-## A Self-Evolving Experience Loop
-
-Every serious coding-agent workflow produces corrections: "do not hide that
-error", "run the browser", "dry-run before writing", "this project has a special
-release gate".
-
-Oh My Experience gives those corrections a lifecycle:
+Expected shape:
 
 ```text
-real work -> retrospective -> review -> active card -> prompt-time recall -> stats -> refinement
+Matched:
+- Validate UI changes in a real browser
+  Why: task has a real UI or browser-visible surface
+  Rule: ome experience show browser-validation --section rule
 ```
 
-Your agent gets better because your workflow keeps producing better experience
-cards, not because you keep making one giant rule file.
+Release validation currently covers typecheck, tests, docs build, package
+dry-run, and dogfood install smoke.
+
+## Why OME
+
+`AGENTS.md` and `CLAUDE.md` are good for stable project maps and always-on
+rules. Skills package repeatable workflows. Memory stores facts and long-term
+context.
+
+OME stores a different thing: execution judgment from real work.
+
+OME is not a replacement for memory, `AGENTS.md`, `CLAUDE.md`, or skills. It
+recalls reviewed execution lessons only when the current task needs them.
+
+Most hard-won lessons are conditional: they matter for UI validation, release
+work, Git safety, review, or one specific project. OME keeps those lessons out
+of always-on context and recalls them only when the current task is likely to
+need them.
 
 ## What You Get
 
-- A local Markdown library of reviewed experience cards.
-- Optional project libraries at `<project-root>/.oh-my-experience/`.
-- Codex and Claude hooks that recall relevant lessons at prompt time.
-- Project-aware matching from one local hook.
-- Explicit ignore criteria for overloaded words like "goal", "review", or "release".
-- Explainable recall: matched cards, scores, reasons, and rendered context.
-- A Markdown-first review loop for candidate lessons before they become active.
-- Isolated evaluation so retrieval changes can be tested without polluting your real library.
-
-## Repository Layout
-
-The repository root keeps the public project surface visible:
-
-```text
-bin/        CLI entry point
-packages/   TypeScript source packages
-docs/       guides, reference, architecture, and docs assets
-skills/     bundled agent-facing OME skill
-templates/  reusable card template
-examples/   sample experience cards
-tests/      unit, integration, and CLI tests
-scripts/    release and validation helpers
-.github/    CI, contribution, and security policy
-```
-
-OME is a Node.js CLI package. Python package metadata is intentionally absent.
-
-## How It Works
-
-### 1. Capture real sessions
-
-Import local coding-agent sessions from Codex, or optionally from the official
-Spool CLI. Spool is a local AI session index for turning Claude, Codex, Gemini,
-and other agent histories into one searchable pool. Without it, OME uses the
-current conversation and explicitly imported Codex sessions; with it, OME can
-look up evidence first instead of dumping raw sessions into context, saving
-tokens and keeping retrospectives cleaner. Interactive `ome init` can offer to
-install only the Spool CLI package (`npm install -g @spool-lab/cli`) after core
-setup; it does not install the Spool desktop client.
-
-```bash
-ome import codex --sessions <codex-session-dir>
-```
-
-### 2. Turn mistakes into candidates
-
-Ask your agent to run an OME reflect scan over the relevant available sources
-and prior work. The output is a reflect run, not an active rule.
-Nothing is recalled until you approve it.
-
-### 3. Review before activation
-
-Apply candidates in two steps, then approve the experiences that should become
-recallable.
-
-Review the generated Markdown worksheet or ask your agent to apply approved
-candidates. Draft experiences still need explicit approval before they become
-recallable.
-
-### 4. Recall at prompt time
-
-When a prompt enters Codex or Claude, the hook builds a small task envelope,
-matches active experiences, filters by project scope, and injects a compact
-additional context block.
-
-```bash
-ome match "fix UI and validate in browser" --explain
-```
-
-The hook path is local, fast, and fail-open. It does not call an LLM or write
-new active cards.
-
-## Example: `/goal` Recall In Practice
-
-When you tell an agent:
-
-```text
-创建目标，开干，把这个功能完整做完并自己验证
-```
-
-OME can match a reviewed goal-execution card and mount this compact context
-before the agent starts work:
-
-```text
-OME candidate experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
-Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
-1. [high risk][must] 创建目标时进入完整闭环交付模式 (创建目标时进入完整闭环交付模式-40383753)
-   Summary: 当用户用 /goal、创建目标或开干启动真实长任务时，常见误判是只建目标或做局部切片；应进入完整闭环交付，并排除文档示例、概念解释和业务目标讨论。
-   Scope: global
-   Use if: /goal 开始执行; 创建目标开干; 使用 goal 跑长任务
-   Ignore if: 文档或案例里展示 /goal; 解释 goal 功能但不执行
-   Matched by: task looks like a real goal-execution start
-   Rule: ome experience show 创建目标时进入完整闭环交付模式-40383753 --section rule
-   Final link if used: [创建目标时进入完整闭环交付模式](<~/.oh-my-experience/experiences/active/创建目标时进入完整闭环交付模式-40383753.md>)
-```
-
-The agent then reads the full card rule and treats `/goal` as an execution
-startup protocol: define scope, complete the planned work, validate through real
-paths, and fail closed until evidence is clear. See
-[Examples](docs/guides/examples.md) for the full walkthrough.
-
-## Install
-
-After npm publication:
-
-```bash
-npx oh-my-experience init
-npx oh-my-experience doctor
-```
-
-Or install globally:
-
-```bash
-npm install -g oh-my-experience
-ome init
-ome doctor
-```
-
-From this checkout:
-
-```bash
-npm install
-npm run build
-node bin/ome.js init
-node bin/ome.js doctor
-```
-
-`ome init` opens a short setup flow for the library path, installs Codex recall
-by default, and writes built-in starter lessons. The first copied prompt is a
-normal coding/product task so you can feel prompt-time recall before asking an
-agent to scan your real sessions. After that, ask the agent to start a reflect
-scan and create your own candidates. Remove the starter lessons later with
-normal `ome experience archive` governance if they are no longer useful.
-Interactive init may offer the optional Spool CLI stage; scripted init never installs it. For optional Spool imports, see
-[Import Sources](docs/guides/import-sources.md).
-
-## Global And Project Libraries
-
-`dataDir` is your global library. It can stay in the default location or move to
-a dedicated local folder such as an Obsidian subfolder.
-
-When a repository should carry its own reviewed cards, initialize a project
-library:
-
-```bash
-ome project init
-ome project status
-```
-
-OME reads both layers at prompt time. Global project-scoped cards still work
-without adding repository files; use `.oh-my-experience/` only when the lesson
-should travel with the project.
-
-## Manage Agent Hooks
-
-Agent recall is configured during `ome init`. Use these commands when you want
-to set up Codex, Claude, or both:
-
-```bash
-ome init --provider codex
-ome init --provider claude
-ome init --provider all
-```
-
-Use `ome hook status` and `ome doctor` when you need to inspect the installed
-state. Claude uses the same recall runtime:
-
-```bash
-ome hook status --provider claude
-```
-
-Codex App may still ask you to trust the hook in its UI.
-
-## What An Experience Card Looks Like
-
-An experience card is a behavioral correction, not a note dump.
-
-It records:
-
-- the human-readable experience summary;
-- the executable reusable rule;
-- when to recall it;
-- when not to recall it;
-- which projects it applies to;
-- the evidence behind it.
-
-Only active experiences are recalled by hooks.
+- Local-first recall: no network calls on the prompt-time path.
+- Reviewed cards: `candidate -> draft -> active -> archived`.
+- Codex and Claude hooks using the same local runtime.
+- Global libraries plus optional project libraries at `.oh-my-experience/`.
+- Explainable matching with scores, reasons, and compact injected context.
+- Evaluation fixtures for checking missed or noisy recall before release.
 
 ## Local By Default
 
-Experiences, reflect runs, indexes, and the event stream live on your machine.
-Hook events store prompt hashes and task envelopes by default, not raw prompts. Raw
-prompt logging is opt-in.
+- No cloud service or account.
+- No embedding API.
+- No LLM call on the hook path.
+- Raw prompt logging is opt-in.
+- Hook failures fail open so your agent is not blocked.
+
+## Example
+
+When you use Codex with a `/goal`-style request:
+
+```text
+Based on the checkout redesign plan, create a goal and start now. Finish the
+whole feature end to end and verify it yourself.
+```
+
+OME can recall the reviewed card `Enter full-closure delivery mode when a goal
+starts` before Codex starts. The agent then reads the card's core rule:
+
+```text
+When the user says `/goal`, `create a goal`, `use goal`, `start now`,
+`start executing the goal`, `run a long task`, or asks to move a set of
+requirements into goal execution, treat it as an execution startup protocol,
+not as ordinary goal copy. Default execution rules:
+
+1. Before starting, clarify the goal, scope, non-scope, real completion
+   criteria, and itemized acceptance checklist. If the goal is cut too small,
+   call out the scope risk and include the user-confirmed requirements in the
+   same goal.
+2. Execute systematically from the full plan, anchored to the source of truth,
+   story, roadmap, design plan, or user wording. Do not drift in direction or
+   stop after the first visible slice.
+3. Close every planned feature end to end. Do not ship half-finished work, happy
+   paths only, UI shells, partial APIs, placeholders, fake routes, hidden test
+   entries, in-memory substitutes, fake external actions, or fallbacks that
+   create two versions of the truth.
+4. Keep implementation maintainable, extensible, robust, and resilient. Split
+   modules on real boundaries, keep responsibilities clear, and clean directly
+   related dead or dirty logic when needed. Do not add abstract layers for an
+   imagined future.
+5. Validate through real entries and real user paths. Commands, features,
+   states, docs, and evidence must cover the checklist. A successful command,
+   local smoke test, or finished code change is not completion by itself.
+6. For complex or high-risk goals, run a self-review after implementation. When
+   needed, dispatch an external model or review flow to check direction drift,
+   feature completeness, real usability, architecture quality, and
+   maintainability.
+7. Completion must fail closed. If any planned feature is unfinished,
+   acceptance evidence is missing, validation failed, environment blockers are
+   unexplained, or risks are not stated, do not mark the goal complete. Continue
+   fixing it or clearly mark it blocked.
+8. Final delivery should explain the user-facing change, verified evidence,
+   risks or limits, and open confirmations.
+```
+
+The key point is timing: this rule is not always loaded. It appears when the
+task actually looks like goal execution. See the full injected context in
+[Examples](docs/guides/examples.md).
+
+## How It Works
+
+```text
+real session -> retrospective -> reviewed card -> prompt-time recall -> stats -> refinement
+```
+
+1. Import or inspect real coding-agent sessions.
+2. Turn repeated corrections into candidate experience cards.
+3. Review, merge, rewrite, or reject candidates before activation.
+4. Let hooks recall active cards when a matching task appears.
+
+Only `active` cards are recalled. OME does not silently turn AI-generated notes
+into permanent rules.
 
 ## Documentation
 
 - [Quickstart](docs/guides/quickstart.md)
+- [First Experience Card](docs/guides/first-card.md)
 - [Examples](docs/guides/examples.md)
 - [Setup](docs/guides/setup.md)
 - [Global and project libraries](docs/guides/project-libraries.md)
 - [CLI Reference](docs/reference/cli.md)
 - [Retrieval Engine](docs/architecture/retrieval-engine.md)
-- [Documentation](docs/index.md)
-- [中文文档](docs/zh/index.md)
+- [Chinese documentation](docs/zh/index.md)
 
 ## Contributing And Security
 

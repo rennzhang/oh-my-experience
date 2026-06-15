@@ -278,7 +278,7 @@ test("init resetConfig overwrites runtime config without deleting the experience
   assert.equal(result.plan.resetConfig, true);
   const reset = JSON.parse(fs.readFileSync(configPath, "utf8"));
   assert.equal(reset.privacy.saveRawPrompt, false);
-  assert.equal(reset.retrieval.maxCards, 8);
+  assert.equal(reset.retrieval.maxCards, 4);
   assert.deepEqual(listCards(dataDir).map((card) => card.id).sort(), cardsBefore);
   assert.equal(fs.existsSync(path.join(retrospectiveDir, "candidates.json")), true);
   assert.equal(fs.readFileSync(layout(dataDir).sourceIndex, "utf8"), sourceIndexBefore);
@@ -550,6 +550,78 @@ test("recall eval measures multilingual long prompts without AI calls", () => {
   const report = evaluateRecallSuite(dataDir, suite, { limit: 4, useCurrentLibrary: true });
   assert.equal(report.ok, true);
   assert.equal(report.metrics.recallAtK, 1);
+});
+
+test("recall eval keeps precision when the library has many noisy cards", () => {
+  const dataDir = tmpDir("eval-scale-noise");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  const baseCard = {
+    status: "active",
+    category: "测试验收",
+    aliases: {},
+    applicability: { level: "global", projectKey: null, modulePath: null, confidence: "medium", rationale: "" },
+    intentModes: { include: [], exclude: [] },
+    blockedSignals: [],
+    language: "auto",
+    recallPolicy: "should",
+    risk: "medium",
+    confidence: "medium",
+    staleAfter: null,
+    sources: ["scale-noise-fixture"],
+    origin: { adapter: "manual", agent: "unknown", model: null, sessionId: null, projectKey: null, createdBy: "manual" },
+    sourceRefs: [{ type: "manual", ref: "scale-noise-fixture" }],
+    body: "",
+    createdAt: now,
+    updatedAt: now,
+  };
+  writeCard(dataDir, {
+    ...baseCard,
+    id: "scale-browser-validation",
+    title: "Real browser validation before UI delivery",
+    summary: "Use when a UI task changes visible behavior and the agent must verify the real browser state before reporting completion.",
+    rule: "Open the real browser path, inspect responsive state, loading state, error state, and console output before saying a UI task is complete.",
+    triggers: ["real browser validation", "frontend UI delivery", "visible page check"],
+    negativeTriggers: ["documentation example", "just explain browser validation"],
+    topics: ["frontend", "ui", "validation"],
+    requiredSignals: ["ui_surface"],
+    recallPolicy: "must",
+    risk: "high",
+  });
+  const signalPool = ["worktree_diff_operation", "historical_session_lookup", "package_install_validation", "source_truth_chain", "external_model_review", "rule_governance"];
+  for (let index = 0; index < 72; index += 1) {
+    writeCard(dataDir, {
+      ...baseCard,
+      id: `scale-noise-${String(index).padStart(2, "0")}`,
+      title: `Noise card ${index} for agent delivery notes`,
+      summary: "This decoy contains broad agent, delivery, validation, review, docs, and workflow words but belongs to another workflow.",
+      rule: "Do not use this decoy unless its exact routed workflow is present.",
+      triggers: ["agent delivery", "validation", "review", "workflow", `noise-${index}`],
+      negativeTriggers: ["frontend UI delivery", "real browser validation"],
+      topics: ["docs", "review", "workflow"],
+      requiredSignals: [signalPool[index % signalPool.length]],
+    });
+  }
+  const suite = path.join(dataDir, "scale-suite.json");
+  fs.writeFileSync(suite, JSON.stringify({
+    name: "scale-noise",
+    cases: [{
+      id: "ui-hit-with-noise",
+      prompt: "修复设置页面 UI，真实浏览器里检查桌面和移动端状态，确认控制台没有错误再交付。",
+      expectedCards: ["scale-browser-validation"],
+      unexpectedCards: Array.from({ length: 72 }, (_, index) => `scale-noise-${String(index).padStart(2, "0")}`),
+    }, {
+      id: "docs-near-miss",
+      prompt: "给文档补一个 browser validation 示例，只解释用户会看到什么，不运行 UI。",
+      expectNoMatches: true,
+    }],
+  }), "utf8");
+
+  const report = evaluateRecallSuite(dataDir, suite, { limit: 4, threshold: 40, useCurrentLibrary: true });
+  assert.equal(report.ok, true);
+  assert.equal(report.metrics.precisionAtK, 1);
+  assert.equal(report.metrics.overRecallRate, 0);
 });
 
 test("recall eval uses isolated fixture libraries by default", () => {

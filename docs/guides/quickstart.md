@@ -5,172 +5,85 @@ status: active
 
 # Quickstart
 
-This guide gets you from installation to your first verified recall. You only
-need to install the CLI yourself; the remaining steps can be copied to Codex or
-Claude and run by your agent.
+This guide gets you to the first useful OME moment: install the CLI, initialize
+the library, and see which experience card would be recalled for a real coding
+task.
 
-## 1. Install the CLI
+## 1. Install
 
 ```bash
-npm install -g oh-my-experience
+git clone https://github.com/rennzhang/oh-my-experience.git
+cd oh-my-experience
+npm install
+npm run build
 ```
 
-This installs the `ome` command globally so terminals and agents can run
-`ome init`, `ome doctor`, and `ome match` directly. If you prefer not to install
-globally, use the `npx` path in the [Setup Guide](setup.md).
+This uses the current checkout before the `0.1.0` package is published to npm.
+After that release is available, the shorter path will be:
 
-## 2. Initialize the library
-
-Copy this to your agent (Codex or Claude):
-
-```text
-Help me set up Oh My Experience:
-
-1. Run `ome init` and accept the default library path.
-2. Run `ome doctor` to verify the library, config, and hook state.
-3. Run `ome hook status --provider codex` to confirm the Codex hook is installed.
-
-Report each result and call out anything that needs my confirmation.
+```bash
+npx oh-my-experience@latest init
 ```
 
-After initialization, your library has a few built-in starter cards so you can
-experience recall immediately. If you no longer want one, archive it through the
-normal library flow with `ome experience archive <starter-card-id> --reason
-"no longer needed"`.
-
-## 3. Verify recall
+## 2. Initialize
 
 Copy this to your agent:
 
 ```text
-Test recall with `ome match`:
+Help me set up Oh My Experience:
 
-ome match "fix login page UI and validate in browser" --explain
-
-Tell me which cards matched, why they scored, and what additional context would be injected.
+1. Run `node bin/ome.js init` and keep the default library path unless there is a clear reason to change it.
+2. Report whether Codex or Claude hook installation needs my confirmation.
+3. Do not start a retrospective scan yet.
 ```
 
-`--explain` shows detected task signals, per-card scoring reasons, similar
-cards, and the final rendered context block. If the matches don't feel right,
-that tells you which cards need tighter trigger conditions.
+`init` creates your local experience library, installs the OME Codex skill, and
+can install the prompt-time hook for supported agents. It is safe to rerun.
 
-## 4. Optional: add a project library
+## 3. See a recall explanation
 
-Use this only when a repository should carry its own reviewed lessons:
-
-```bash
-cd /path/to/your/project
-ome project init
-ome project status
-```
-
-`dataDir` remains your global library. The project library lives at
-`<project-root>/.oh-my-experience/`. When a task runs inside that project, OME
-reads both layers and prefers the project card when the same lesson exists in
-both places. See [Global And Project Libraries](project-libraries.md) for the
-full model.
-
-## 5. Run your first reflect scan
-
-Now have the agent scan your recent coding sessions for lessons. Copy this:
+Copy this to your agent:
 
 ```text
-Run an OME reflect scan over my recent coding sessions:
+Show me one OME recall example:
 
-1. Run `ome reflect start --focus "recent error patterns I corrected"`.
-2. Check recent sessions for places where I corrected you.
-3. Generate `candidates.json` using the current candidate shape:
-   - `audit`: source coverage, searched sources, rejected interpretations, and evidence gaps
-   - `candidates[].summary`: one clear sentence covering failure mode, use case, ignore case, and expected action
-   - `candidates[].criteria.use_when` / `ignore_when`: natural-language usage standards
-   - `candidates[].recall.policy/risk/confidence/triggers/topics`
-   - `candidates[].engine_hints`: only internal signal ids when they are truly needed
-   - `candidates[].scope`
-   - `candidates[].rule`: the complete executable rule
-4. Run `ome reflect candidates RUN_ID --from-file candidates.json`.
-5. Run `ome reflect show RUN_ID` to display all candidates.
+node bin/ome.js match "fix login page UI and validate in browser" --explain
 
-No more than 5 candidates. Only extract reusable execution judgment; don't turn one-off context into rules.
+Explain which card matched, why it matched, and what compact context would be injected.
 ```
 
-The agent shows the candidates. You review them.
+The built-in starter cards make this work before you have written your own
+cards. The match output is intentionally a candidate list: the agent must still
+judge whether the card fits the current task before using the full rule.
 
-## 6. Review candidates
+## 4. Check health when needed
 
-For each candidate, ask: will this situation happen again? If the agent sees
-this card next time, will it avoid the same mistake?
-
-If a candidate is useful:
-
-```text
-Help me apply these candidates:
-
-1. Run `ome reflect apply RUN_ID --dry-run` to preview the drafts that would be written.
-2. If the preview is correct, run `ome reflect apply RUN_ID`.
-3. For each draft that should become active, run `ome experience promote DRAFT_ID`.
-```
-
-If a candidate is too vague, not general enough, or already covered, reject it:
+Use health checks when setup looks wrong or before a release:
 
 ```bash
-ome reflect decide RUN_ID CANDIDATE_ID --action reject
+node bin/ome.js doctor
+node bin/ome.js hook status --provider codex
+node bin/ome.js hook status --provider claude
 ```
 
-If two candidates are similar, merge them:
+`doctor` checks the library, config, package identity, hooks, and card schema.
+It is useful for troubleshooting, but the first product proof should be recall,
+not a green status screen.
 
-```bash
-ome reflect decide RUN_ID CANDIDATE_ID --action merge --target OTHER_ID
-```
+## 5. Next steps
 
-Only active cards are recalled by hooks. Unapproved candidates never appear
-in your agent's prompts.
-
-## 7. Verify the new card works
-
-After approval, verify with a realistic task:
-
-```text
-Use `ome match` to verify the newly promoted cards.
-Simulate a task similar to the scenario where the mistake happened, and check whether the new card matches.
-```
-
-```bash
-ome match "a task description" --explain
-```
-
-## 8. Iterate
-
-From now on, relevant cards are injected at prompt time automatically. Check
-the health of your library:
-
-```text
-Run `ome stats`.
-Show me the recall coverage rate, which cards have not matched recently, and whether any cards are stale.
-```
-
-If recall is noisy, improve cards instead of disabling the system:
-
-- Tighten `criteria.use_when` and `recall.triggers` with workflow-specific terms
-- Add `criteria.ignore_when` for ambiguous keywords
-- Narrow project scope
-- Merge near-duplicate cards
-- Archive cards that haven't matched in a long time
-
----
+- Create your first reviewed card: [First Experience Card](first-card.md)
+- See the end-to-end `/goal` example: [Examples](examples.md)
+- Use a repository-local library: [Global And Project Libraries](project-libraries.md)
+- Configure Codex or Claude hooks directly: [Codex](codex.md), [Claude](claude.md)
 
 ## Quick reference
 
-Common commands when asking your agent for help:
-
-| I want to... | Tell your agent |
-|-------------|-----------------|
-| Test recall | `ome match "task description" --explain` |
-| Check health | `ome doctor` |
-| View stats | `ome stats` |
-| Start a scan | `ome reflect start --focus "focus area"` |
-| Initialize project library | `ome project init` |
-| Show candidates | `ome reflect show RUN_ID` |
-| Preview apply | `ome reflect apply RUN_ID --dry-run` |
-| Apply | `ome reflect apply RUN_ID` |
-| Promote card | `ome experience promote DRAFT_ID` |
-| Archive card | `ome experience archive CARD_ID` |
+| I want to... | Command |
+|-------------|---------|
+| Initialize OME | `node bin/ome.js init` |
+| Test recall | `node bin/ome.js match "task description" --explain` |
+| Check health | `node bin/ome.js doctor` |
+| Inspect hooks | `node bin/ome.js hook status --provider codex` |
+| Create a project library | `node bin/ome.js project init` |
+| Start a retrospective | `node bin/ome.js reflect start --focus "focus area"` |

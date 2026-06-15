@@ -8,7 +8,7 @@ status: active
 ## Recall Eval
 
 ```bash
-ome eval recall --suite tests/fixtures/eval/core.json --limit 8 --threshold 40
+ome eval recall --suite tests/fixtures/eval/core.json --limit 4 --threshold 40
 ```
 
 Use this before changing scoring logic. Recall eval is isolated by default:
@@ -23,7 +23,9 @@ ome eval recall --suite my-suite.json --use-current-library
 
 The first quality gate is not just "did the expected card appear". Track
 `precisionAtK`, `overRecallRate`, `noHitRate`, and context size because
-over-recall is the easiest way to pollute the hook context.
+over-recall is the easiest way to pollute the hook context. Recall engine
+changes should also pass the scale/noise tests in `npm test`, where broad
+decoy cards must not crowd into the final context.
 
 ## Hook Runtime Validation
 

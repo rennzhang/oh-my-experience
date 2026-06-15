@@ -4,17 +4,17 @@ layout: home
 hero:
   name: Oh My Experience
   text: 别再把同一条教训讲第二遍。
-  tagline: 把真实编码中踩过的坑沉淀为经验卡，在 prompt 阶段自动召回——只在用得上的时候出现。
+  tagline: 把真实编码纠正沉淀为经验卡，在 prompt 阶段自动召回——只在用得上的时候出现。
   image:
     src: /ome-logo.png
     alt: Oh My Experience logo
   actions:
     - theme: brand
-      text: 开始了解
-      link: /zh/guides/introduction
-    - theme: alt
-      text: 快速开始
+      text: 2 分钟试用
       link: /zh/guides/quickstart
+    - theme: alt
+      text: 看真实召回
+      link: /zh/guides/examples
 
 features:
   - title: 按需召回，不撑爆上下文
@@ -30,3 +30,22 @@ features:
   - title: 上下文压缩也丢不掉
     details: AGENTS.md 只在开头注入一次，压缩后就丢了。OME 的 hook 每次 UserPromptSubmit 重新注入。
 ---
+
+## 选择你的路径
+
+- 第一次了解 OME：看 [快速开始](/zh/guides/quickstart)。
+- 想先看真实效果：看 [`/goal` 实际案例](/zh/guides/examples)。
+- 想评估设计：看 [召回引擎](/zh/architecture/retrieval-engine)。
+
+## 一次真实召回长什么样
+
+```text
+$ ome match "创建目标开干，把这个功能完整做完并自己验证" --explain
+
+Matched:
+- 创建目标时进入完整闭环交付模式
+  Why: task looks like real goal execution
+  Rule: ome experience show agent-goal-execution --section rule
+```
+
+OME 不是每轮都加载所有经验，而是在 prompt 真的像某个工作流时，才挂载相关候选经验。

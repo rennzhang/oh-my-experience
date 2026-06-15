@@ -5,8 +5,9 @@ site.
 
 ## High priority
 
-- /guides/quickstart - install, initialize, check health, verify recall.
-- /guides/examples - real prompt-time recall examples, including exact mounted additional context.
+- /guides/quickstart - install, initialize, verify one recall explanation.
+- /guides/first-card - turn one real correction into a reviewed card.
+- /guides/examples - real prompt-time recall examples, including exact injected additional context.
 - /guides/setup - data directory, hook install, skill install, uninstall.
 - /guides/project-libraries - global dataDir, project libraries, and project-scoped global cards.
 - /guides/codex - Codex prompt-time recall setup and status checks.

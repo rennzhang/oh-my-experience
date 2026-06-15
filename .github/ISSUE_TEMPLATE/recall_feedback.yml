@@ -1,0 +1,45 @@
+name: Recall quality feedback
+description: Report a missed, noisy, or surprising experience-card match.
+title: "[Recall]: "
+labels: ["recall"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Recall quality is the core product surface. Please redact private code, local paths, and prompt text before sharing.
+  - type: textarea
+    id: task
+    attributes:
+      label: Task shape
+      description: Describe the task in enough detail to understand the workflow. A redacted paraphrase is fine.
+    validations:
+      required: true
+  - type: dropdown
+    id: problem
+    attributes:
+      label: What went wrong?
+      options:
+        - Relevant card was missed
+        - Unrelated card was recalled
+        - Too many cards were recalled
+        - Correct card ranked too low
+        - Final context was unclear
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: command-output
+    attributes:
+      label: `ome match --explain` output
+      description: Paste redacted output if available.
+      render: shell
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Which card should have matched, or which card should have been ignored?
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Mention language, provider, project library, or relevant card fields if they matter.

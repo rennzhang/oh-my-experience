@@ -47,7 +47,7 @@ ome match "<task>" --explain
 ome match "<task>" --cwd /path/to/project --explain
 ```
 
-只有 active 卡会被召回。复盘生成的 draft 在 promote 之前不会影响提示词阶段召回。
+只有 active 卡会被召回。复盘生成的 draft 在 `ome experience enable` 之前不会影响提示词阶段召回。
 
 当当前工作目录位于某个项目内时，召回会同时读取全局 `dataDir` 和项目根目录下可选的
 `<project-root>/.oh-my-experience/`。脚本需要测试特定项目上下文时，可以传 `--cwd`。
@@ -112,8 +112,8 @@ ome experience list --compact --json
 ome experience show <card-id>
 ome experience show <card-id> --scope project --section rule
 ome experience show <card-id> --section rule
-ome experience promote <card-id>
-ome experience promote <card-id> --scope project
+ome experience enable <card-id>
+ome experience enable <card-id> --scope project
 ome experience archive <card-id> --reason "superseded"
 ```
 
@@ -129,7 +129,7 @@ ome experience archive <card-id> --reason "superseded"
 
 ```bash
 ome eval recall --suite <file>
-ome eval recall --suite tests/fixtures/eval/core.json --limit 8
+ome eval recall --suite tests/fixtures/eval/core.json --limit 4
 ome eval recall --suite my-suite.json --use-current-library
 ome eval recall --compare before.json after.json
 ```

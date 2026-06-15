@@ -58,7 +58,7 @@ ome reflect start --scope project --focus "release validation"
 ome reflect candidates RUN_ID --scope project --from-file candidates.json
 ome reflect decide RUN_ID CANDIDATE_ID --scope project --action approve
 ome reflect apply RUN_ID --scope project
-ome experience promote DRAFT_ID --scope project
+ome experience enable DRAFT_ID --scope project
 ```
 
 Do not hand-write files into `experiences/active/` unless you are doing a

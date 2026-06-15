@@ -35,6 +35,9 @@ are reported with `libraryScope: project`, and their full-card command uses
 
 ## Quality Rules
 
+- Prefer precision over volume on the hot path. The default context budget is
+  intentionally small; add cards only when they materially change the next
+  action.
 - Treat `goal`, `review`, `release`, and similar overloaded terms carefully; they may be ordinary business words, not agent workflow triggers.
 - Treat matched cards as candidates, not commands. Apply a card only when its workflow meaning fits the current task.
 - Use the natural-language `Use if` and `Ignore if` lines as the main decision boundary.
@@ -43,6 +46,8 @@ are reported with `libraryScope: project`, and their full-card command uses
 - Project-specific cards should only affect matching projects or project families.
 - Project-library cards are already physically scoped by repository; do not add fragile project-key requirements unless the card should also be copied elsewhere and still filter itself.
 - If recall feels noisy, tune `criteria.use_when`, `criteria.ignore_when`, `recall.triggers`, `engine_hints`, category, or scope before changing scoring code.
+- If scoring code changes, prove both normal fixtures and noisy-library
+  behavior. A fix that only passes one clean prompt is not enough.
 
 ## Retrieval Eval
 

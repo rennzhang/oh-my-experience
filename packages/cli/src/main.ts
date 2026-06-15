@@ -60,7 +60,6 @@ const SPOOL_GITHUB_URL = "https://github.com/spool-lab/spool";
 const KNOWN_COMMANDS = [
   "experience",
   "config",
-  "create-reflect",
   "doctor",
   "eval",
   "help",
@@ -75,7 +74,7 @@ const KNOWN_COMMANDS = [
   "uninstall",
   "version",
 ];
-const SUGGESTED_COMMANDS = KNOWN_COMMANDS.filter((command) => !["create-reflect", "reflect"].includes(command));
+const SUGGESTED_COMMANDS = KNOWN_COMMANDS.filter((command) => command !== "reflect");
 
 export async function runCli(argv: string[]) {
   const args = parseArgs(argv);
@@ -87,7 +86,6 @@ export async function runCli(argv: string[]) {
   if (command === "init") return initCommand(dataDir, args);
   if (command === "doctor") return doctorCommand(dataDir, args);
   if (command === "config") return configCommand(dataDir, subcommand, args);
-  if (command === "create-reflect") return createReflectCommand(scopedExperienceDataDir(dataDir, args), subcommand, args);
   if (command === "import") return importCommand(dataDir, subcommand, args);
   if (command === "reflect") return reflectCommand(scopedExperienceDataDir(dataDir, args), subcommand, args);
   if (command === "source") return sourceCommand(dataDir, subcommand, args);
@@ -201,7 +199,7 @@ function runInitSetup(dataDir: string, args: ParsedArgs) {
       hooks: installInitHooks(dataDir, args),
       skill: installInitSkill(args),
       starterCards: listStarterCards(dataDir).map((card) => ({ id: card.id, title: card.title, category: card.category })),
-      nextStep: "Ask your agent to start an OME retrospective scan, then review generated candidates from the Markdown review file.",
+      nextStep: "Run `ome match \"fix UI and validate in browser\" --explain` to inspect the first recall before starting a retrospective.",
     };
   }
   return { ...result, hooks: hookPlan, skill: skillPlan };
@@ -716,11 +714,11 @@ function initCopy() {
       "Only build the board page, not a landing page or a full app.",
       "Use a Linear-inspired, work-focused style with clear columns, readable task cards,",
       "obvious status, and low visual noise.",
-      "After the task summary, naturally ask whether I want to start an OME retrospective scan,",
-      "and ask what focus or preference I want to use.",
+      "After the task summary, tell me whether OME surfaced any relevant lesson,",
+      "and whether it changed your implementation or validation choices.",
     ].join("\n"),
     afterRecallTitle: "第一次召回体验后:",
-    afterRecallIntro: "Agent 会先停下来询问是否开始 OME 复盘扫描，以及本次扫描的关注方向。",
+    afterRecallIntro: "如果这次召回符合预期，再进入第一张经验卡或更完整的复盘流程。",
     importSourcesRecommendation: "用 Spool 导入更多 Agent 历史",
     importSourcesDescription: "导入 Claude CLI、Gemini CLI、opencode 等会话；不安装也不影响 Codex 默认召回。",
     importSourcesGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/import-sources.md",
@@ -793,11 +791,11 @@ function initCopy() {
       "Only build the board page, not a landing page or a full app.",
       "Use a Linear-inspired, work-focused style with clear columns, readable task cards,",
       "obvious status, and low visual noise.",
-      "After the task summary, naturally ask whether I want to start an OME retrospective scan,",
-      "and ask what focus or preference I want to use.",
+      "After the task summary, tell me whether OME surfaced any relevant lesson,",
+      "and whether it changed your implementation or validation choices.",
     ].join("\n"),
     afterRecallTitle: "After the first recall:",
-    afterRecallIntro: "The agent should stop and ask whether to start the OME retrospective scan, including the focus for that scan.",
+    afterRecallIntro: "If the recall feels right, move on to the first-card guide or a fuller retrospective.",
     importSourcesRecommendation: "Import more agent histories with Spool",
     importSourcesDescription: "Import Claude CLI, Gemini CLI, opencode, and other supported histories. Codex recall works without it.",
     importSourcesGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/import-sources.md",
@@ -1006,11 +1004,6 @@ function importCommand(dataDir: string, subcommand: string | undefined, args: Pa
   throw new Error("usage: ome import codex|spool");
 }
 
-function createReflectCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
-  if (subcommand) throw new Error("usage: ome create-reflect");
-  return createReflectRun(dataDir, args);
-}
-
 function reflectCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
   if (!subcommand || subcommand === "start" || subcommand === "create") return createReflectRun(dataDir, args);
   if (subcommand === "resume") {
@@ -1114,7 +1107,7 @@ function reflectAuditOptions(args: ParsedArgs, audit: Record<string, any> | null
 }
 
 function createReflectRun(dataDir: string, args: ParsedArgs) {
-  if (args.flags["from-session"]) throw new Error("ome create-reflect does not accept --from-session; create a run container and let the agent inspect provider session records during source audit");
+  if (args.flags["from-session"]) throw new Error("ome reflect start does not accept --from-session; create a run container and let the agent inspect provider session records during source audit");
   const focus = args.flags.focus || args.flags["review-focus"] || args.flags["scan-focus"] || "";
   const guideText = readSkillReference("reflect-retrospective.md");
   const run = createRetrospectiveRun(dataDir, {
@@ -1200,9 +1193,9 @@ function experienceCommand(dataDir: string, subcommand: string | undefined, args
     console.log(cardSection(card, args.flags.section) || card.body);
     return;
   }
-  if (subcommand === "approve" || subcommand === "promote") {
+  if (subcommand === "enable") {
     const id = args.positionals[2];
-    if (!id) throw new Error("usage: ome experience promote <id>");
+    if (!id) throw new Error("usage: ome experience enable <id>");
     return print(promoteDraft(targetDataDir, id), args);
   }
   if (subcommand === "archive") {
@@ -1210,7 +1203,7 @@ function experienceCommand(dataDir: string, subcommand: string | undefined, args
     if (!id) throw new Error("usage: ome experience archive <id> [--reason <reason>]");
     return print(archiveCard(targetDataDir, id, args.flags.reason || "archived"), args);
   }
-  throw new Error("usage: ome experience list|show|promote|archive");
+  throw new Error("usage: ome experience list|show|enable|archive");
 }
 
 function scopedExperienceDataDir(dataDir: string, args: ParsedArgs): string {
@@ -1435,7 +1428,6 @@ function renderHumanOutput(value: unknown, args: ParsedArgs): string {
   if (command === "hook") return renderHookResult(record, zh);
   if (command === "config") return renderConfigResult(record, subcommand, zh);
   if (command === "import" || command === "source") return renderImportResult(record, subcommand, zh);
-  if (command === "create-reflect") return renderCreateReflectResult(record, zh);
   if (command === "reflect") return renderReflectResult(record, zh);
   if (command === "experience") return renderExperienceResult(record, subcommand, zh);
   if (command === "match") return renderMatchResult(record, Boolean(args.flags.explain), zh);
@@ -1467,7 +1459,7 @@ function renderInitResult(record: Record<string, any>, zh: boolean): string {
     lines.push("");
     lines.push(zh ? "下一步:" : "Next step:");
     lines.push(`  ${zh ? "先把一个真实任务发给 Agent，体验内置示例经验的提示词阶段召回。" : "Send a real task to your agent first and feel prompt-time recall with the starter lessons."}`);
-    lines.push(`  ${zh ? "第一次召回体验后，让 Agent 使用 OME 生成候选经验；候选会进入 Markdown 审批文件，不会自动启用。" : "After the first recall, ask the agent to generate OME candidate experiences; candidates go to a Markdown review file and are not enabled automatically."}`);
+    lines.push(`  ${zh ? "第一次召回体验后，再进入第一张经验卡或完整复盘流程；候选会进入 Markdown 审批文件，不会自动启用。" : "After the first recall, move to the first-card or full retrospective flow; candidates go to a Markdown review file and are not enabled automatically."}`);
     if (hooks.some((hook) => asRecord(hook).provider === "codex" && asRecord(hook).installed)) {
       lines.push(`  ${zh ? "Codex App 可能会要求你信任新的 UserPromptSubmit hook。" : "Codex App may ask you to trust the new UserPromptSubmit hook."}`);
     }
@@ -1560,16 +1552,6 @@ function renderImportResult(record: Record<string, any>, subcommand: string, zh:
   ].join("\n");
 }
 
-function renderCreateReflectResult(record: Record<string, any>, zh: boolean): string {
-  return [
-    zh ? "复盘工作目录已准备" : "Retrospective workspace prepared",
-    `runId: ${record.runId || record.id || ""}`,
-    reviewFileLine(record, zh),
-    record.nextStep ? `${zh ? "下一步" : "Next"}: ${record.nextStep}` : "",
-    jsonHint(zh),
-  ].filter(Boolean).join("\n");
-}
-
 function renderReflectResult(record: Record<string, any>, zh: boolean): string {
   if (Array.isArray(record.retrospectives) || Array.isArray(record.candidates) || Array.isArray(record.drafts)) {
     return renderRetrospectiveResult(record, zh);
@@ -1596,7 +1578,7 @@ function renderRetrospectiveResult(record: Record<string, any>, zh: boolean): st
   const reviewLine = reviewFileLine(record, zh);
   if (reviewLine) lines.push(reviewLine);
   if (record.dryRun) lines.push(zh ? "这是 dry-run，没有写入经验草稿。" : "Dry run only; no experience drafts were written.");
-  else if (drafts) lines.push(zh ? "经验草稿尚未参与召回；确认无误后运行 ome experience promote <draft-experience-id> 启用。" : "Experience drafts are not recalled yet; run ome experience promote <draft-experience-id> to enable them.");
+  else if (drafts) lines.push(zh ? "经验草稿尚未参与召回；确认无误后运行 ome experience enable <draft-experience-id> 启用。" : "Experience drafts are not recalled yet; run ome experience enable <draft-experience-id> to enable them.");
   else if (candidates) lines.push(retrospectiveNextStep(record, zh));
   lines.push(jsonHint(zh));
   return lines.join("\n");
@@ -1624,8 +1606,8 @@ function retrospectiveNextStep(record: Record<string, any>, zh: boolean): string
   const state = String(record.state || "");
   if (state === "applied_to_drafts") {
     return zh
-      ? "已生成经验草稿；草稿不会参与召回，确认无误后运行 ome experience promote <draft-experience-id> 启用。"
-      : "Approved candidates have been converted into experience drafts; drafts are not recalled until you run ome experience promote <draft-experience-id>.";
+      ? "已生成经验草稿；草稿不会参与召回，确认无误后运行 ome experience enable <draft-experience-id> 启用。"
+      : "Approved candidates have been converted into experience drafts; drafts are not recalled until you run ome experience enable <draft-experience-id>.";
   }
   if (state === "decisions_recorded") {
     return zh
@@ -1871,7 +1853,7 @@ function printHelp() {
   ome source status|connect spool|import spool
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume
-  ome experience list|show|promote|archive
+  ome experience list|show|enable|archive
   ome project init|status
   ome eval recall --suite <file>
   ome hook run|status
@@ -1905,7 +1887,7 @@ Core commands:
   ome source status|connect spool|import spool
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume
-  ome experience list|show|promote|archive
+  ome experience list|show|enable|archive
   ome project init|status
   ome eval recall --suite <file>
   ome hook run|status

@@ -74,7 +74,7 @@ ome import spool --query "browser validation" --source codex
 ome reflect start
 ome reflect apply <run-id> --dry-run
 ome reflect apply <run-id>
-ome experience promote <draft-card-id>
+ome experience enable <draft-card-id>
 ```
 
 导入材料不能绕过审核。Spool 只是扩大素材池，不改变 OME 的安全模型。

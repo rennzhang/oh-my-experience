@@ -44,7 +44,7 @@ export const ConfigSchema = z.object({
     debugRawPromptTtlHours: z.number().int().positive().default(24),
   }),
   retrieval: z.object({
-    maxCards: z.number().int().positive().default(8),
+    maxCards: z.number().int().positive().default(4),
     minScore: z.number().nonnegative().default(40),
     additionalContextMaxChars: z.number().int().positive().default(6000),
     hookTimeoutMs: z.number().int().positive().default(4000),

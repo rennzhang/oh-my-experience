@@ -17,16 +17,15 @@ jobs:
           cache: npm
       - uses: oven-sh/setup-bun@v2
       - run: npm ci
-      - run: npx playwright install chromium
       - run: npm run check
       - run: npm test
       - name: Docs build
         run: npm run docs:build
       - name: Recall eval gate
-        run: node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 8 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json
+        run: node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 4 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json
       - name: Hook eval gate
         run: |
-          DATA_DIR="$(node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 8 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json | node -e "const fs = require('fs'); const json = JSON.parse(fs.readFileSync(0, 'utf8')); console.log(json.fixtureDataDir);")"
+          DATA_DIR="$(node bin/ome.js eval recall --suite tests/fixtures/eval/core.json --limit 4 --threshold 40 --min-pass-rate 1 --min-recall 1 --min-precision 1 --max-over-recall 0 --json | node -e "const fs = require('fs'); const json = JSON.parse(fs.readFileSync(0, 'utf8')); console.log(json.fixtureDataDir);")"
           printf '%s' '{"prompt":"Fix a frontend UI bug and validate the result in a real browser.","session_id":"ci-codex","turn_id":"1","cwd":"'"$PWD"'"}' \
             | node bin/ome.js hook run --data-dir "$DATA_DIR" --json \
             | tee /tmp/ome-codex-hook.json \

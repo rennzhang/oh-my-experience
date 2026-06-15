@@ -114,6 +114,19 @@ const SIGNAL_RULES: SignalRule[] = [
     ],
   },
   {
+    id: "ui_example_discussion",
+    polarity: "negative",
+    weight: -30,
+    reason: "UI or browser wording is discussed as documentation or an example, not used as a real UI task",
+    patterns: [
+      /(?:文档|README|readme|docs?|案例|示例|例子|examples?|展示|说明).{0,80}\b(?:UI|UX|frontend|front-end|browser|viewport)\b/i,
+      /\b(?:UI|UX|frontend|front-end|browser|viewport)\b.{0,80}(?:文档|README|readme|docs?|案例|示例|例子|examples?|展示|说明)/i,
+      /(?:文档|README|readme|docs?|案例|示例|例子|展示|说明).{0,80}(?:前端|界面|页面|浏览器|视口)/,
+      /(?:前端|界面|页面|浏览器|视口).{0,80}(?:文档|README|readme|docs?|案例|示例|例子|展示|说明)/,
+      /(?:不运行|不用运行|不执行|只解释|只是解释|只说明).{0,40}(?:UI|浏览器|页面|前端|browser)/i,
+    ],
+  },
+  {
     id: "ome_review_surface",
     polarity: "positive",
     weight: 10,
@@ -345,6 +358,7 @@ function suppressConflictingSignals(signals: RuleSignal[]): RuleSignal[] {
   const suppressed = new Set<string>();
   if (ids.has("goal_example_discussion")) suppressed.add("goal_execute");
   if (ids.has("ui_surface_noise")) suppressed.add("ui_surface");
+  if (ids.has("ui_example_discussion")) suppressed.add("ui_surface");
   if (ids.has("git_source_noise")) {
     suppressed.add("git_operation");
     suppressed.add("worktree_diff_operation");

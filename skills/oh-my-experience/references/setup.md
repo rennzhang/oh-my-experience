@@ -5,16 +5,25 @@ Use this reference for install, init, config, and hook setup.
 ## Default Flow
 
 ```bash
-npx oh-my-experience init
-npx oh-my-experience doctor
+npm install
+npm run build
+node bin/ome.js init
+node bin/ome.js match "fix UI and validate in browser" --explain
 ```
 
-For a global install:
+After the current `0.1.0` release is published to npm:
+
+```bash
+npx oh-my-experience@latest init
+npx oh-my-experience@latest match "fix UI and validate in browser" --explain
+```
+
+For a global install after publication:
 
 ```bash
 npm install -g oh-my-experience
 ome init
-ome doctor
+ome match "fix UI and validate in browser" --explain
 ```
 
 For this checkout:
@@ -23,8 +32,12 @@ For this checkout:
 npm install
 npm run build
 node bin/ome.js init
-node bin/ome.js doctor
+node bin/ome.js match "fix UI and validate in browser" --explain
 ```
+
+Run `ome doctor` when setup looks wrong, before release validation, or when the
+user explicitly asks for a health check. Do not make `doctor` the first success
+moment; the user should see a real recall explanation first.
 
 ## Init Behavior
 

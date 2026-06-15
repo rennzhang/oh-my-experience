@@ -54,7 +54,7 @@ ome reflect start --scope project --focus "发版验证"
 ome reflect candidates RUN_ID --scope project --from-file candidates.json
 ome reflect decide RUN_ID CANDIDATE_ID --scope project --action approve
 ome reflect apply RUN_ID --scope project
-ome experience promote DRAFT_ID --scope project
+ome experience enable DRAFT_ID --scope project
 ```
 
 除非是在做已审阅过的手工迁移，否则不要直接往 `experiences/active/` 写文件。CLI 会把
