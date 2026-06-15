@@ -2104,8 +2104,8 @@ function printHelp() {
   docs/zh/reference/cli.md
 ` : `${t("cli.title", locale)}
 
-Local-first experience layer for AI coding agents: review cards first, recall
-them at prompt time.
+Local-first experience layer for AI coding agents: approve experience drafts,
+then recall them at prompt time.
 
 Common path:
   ome init                         start the setup wizard

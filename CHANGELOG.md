@@ -6,6 +6,13 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.1.3 - 2026-06-15
+
+### Fixed
+
+- Updated the CLI help tagline to match the draft approval terminology used in
+  the release docs and onboarding flow.
+
 ## 0.1.2 - 2026-06-15
 
 ### Changed
