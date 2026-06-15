@@ -11,7 +11,7 @@ between a generic rule file and a conditional experience card.
 
 ## Example: `/goal` Starts Full-Closure Delivery
 
-Assume your active library contains a approved card for goal execution. In this
+Assume your active library contains an approved card for goal execution. In this
 example the card is named `Enter full-closure delivery mode when a goal
 starts`. Its usage criteria say to use it when `/goal`, `create a goal`, or
 `start now` begins a real execution task, and to ignore it for documentation
@@ -24,45 +24,25 @@ Based on the checkout redesign plan, create a goal and start now. Finish the
 whole feature end to end and verify it yourself.
 ```
 
-OME decomposes the prompt into a task envelope. It detects goal execution
-wording, explicit execution intent, and real validation wording. That is enough
-to list the goal card as a high-risk, must-use candidate. Candidate does not
-mean automatically used; the agent still checks the card's workflow meaning
-against the current task before reading and applying the full rule.
-
-## What Gets Mounted Into The Agent Prompt
-
-The hook mounts a compact context block. The frame is English so Codex and
-Claude receive one stable instruction shape. The card content stays in the
-language stored on the card.
+Before the agent starts editing, OME recognizes that this is real goal
+execution, not a docs example or OKR discussion. It surfaces one approved
+experience card:
 
 ```text
-OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
-Final report: if you actually used any card, add one final line `**OME experience cards used in this response: N** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
-1. [high risk][must] Enter full-closure delivery mode when a goal starts (agent-goal-execution)
-   Summary: When a user starts real execution with /goal, create a goal, or start now, a common failure is only creating goal copy or implementing a small slice; the agent should enter full-closure delivery and ignore docs examples, feature explanations, or business-goal discussion.
-   Scope: global
-   Use if: /goal starts execution; create a goal and start; use goal for a long task
-   Ignore if: /goal appears in docs or examples; explaining goal without executing
-   Matched by: task looks like a real goal-execution start
-   Rule: ome experience show agent-goal-execution --section rule
-   Final link if used: [Enter full-closure delivery mode when a goal starts](<~/.oh-my-experience/experiences/active/agent-goal-execution.md>)
+OME recalled:
+Enter full-closure delivery mode when a goal starts
 ```
 
-The linked path is rendered from the user's own library. A global library uses
-the user's `dataDir`; a project library uses
-`<project-root>/.oh-my-experience/`.
+The agent still has to judge whether the card fits the current task. If it
+does, it reads the full card and changes how it works.
 
-## What The Agent Reads Next
+## What Changes
 
-The injected context intentionally stays short. If the lesson applies, the agent
-then fetches the rule body:
+Without OME, this kind of prompt often leads to a shallow response: create a
+goal title, implement the first visible slice, run a partial check, and report
+done too early.
 
-```bash
-ome experience show agent-goal-execution --section rule
-```
-
-The rule says:
+With OME, the agent sees the actual rule before it acts:
 
 ```text
 When the user says `/goal`, `create a goal`, `use goal`, `start now`,
@@ -100,22 +80,22 @@ not as ordinary goal copy. Default execution rules:
    risks or limits, and open confirmations.
 ```
 
-The result is not "always add more rules." The agent sees this as a candidate
-only when the current prompt looks like goal execution. If the user is only
-discussing business goals, OKRs, or asking what `/goal` means, the card is
-ignored and does not appear in the final usage line.
+That means the agent should clarify scope when needed, work through the whole
+plan, validate through real user paths, self-review high-risk work, and avoid
+claiming completion when evidence is missing.
 
-## Try It Yourself
+## What The User Sees
 
-Use `ome match` to inspect the same path without sending a real agent prompt:
+The final response can disclose the experience card only if the agent actually
+used it:
 
-```bash
-ome match "Based on the checkout redesign plan, create a goal and start now. Finish the whole feature end to end and verify it yourself." --explain
+```text
+Completed the checkout prototype end to end, verified the primary flow, and
+listed the remaining risks.
+
+**OME experience cards used in this response: 1** Enter full-closure delivery mode when a goal starts
 ```
 
-Use `--json` when you want to inspect the task envelope, reasons, and rendered
-`additionalContext` programmatically:
-
-```bash
-ome match "Based on the checkout redesign plan, create a goal and start now. Finish the whole feature end to end and verify it yourself." --explain --json
-```
+If the user is only discussing business goals, OKRs, or asking what `/goal`
+means, OME should not surface this card and the final response should not show a
+usage line.

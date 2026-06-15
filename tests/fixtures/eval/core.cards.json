@@ -456,11 +456,11 @@
       "id": "cli-docs-i18n",
       "title": "CLI 与文档语言策略不进入持久配置",
       "category": "产品与 UI",
-      "summary": "语言不写入持久配置。CLI 人类输出默认英文，只在显式 OME_LANGUAGE=zh-CN 时使用中文；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。",
+      "summary": "语言不写入持久配置。CLI 人类输出固定英文，不提供中文 CLI 切换；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。",
       "criteria": {
         "use_when": [
-          "CLI 默认英文",
-          "OME_LANGUAGE",
+          "CLI 固定英文",
+          "中文 CLI 切换",
           "双语文档",
           "路径式 locale",
           "固定英文 hook frame"
@@ -476,8 +476,8 @@
         "risk": "low",
         "confidence": "medium",
         "triggers": [
-          "CLI 默认英文",
-          "OME_LANGUAGE",
+          "CLI 固定英文",
+          "中文 CLI 切换",
           "双语文档",
           "路径式 locale",
           "固定英文 hook frame"
@@ -491,7 +491,7 @@
       "scope": {
         "level": "global"
       },
-      "rule": "语言不写入持久配置。CLI 人类输出默认英文，只在显式 OME_LANGUAGE=zh-CN 时使用中文；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。",
+      "rule": "语言不写入持久配置。CLI 人类输出固定英文，不提供中文 CLI 切换；公开文档使用路径式双语 locale；JSON 字段保持稳定英文。经验卡语言由复盘产物自然决定，hook 注入框架固定英文。",
       "engine_hints": {}
     },
     {

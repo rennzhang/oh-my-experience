@@ -5,11 +5,11 @@ status: active
 
 # Codex Guide
 
-Codex is the first supported provider.
+Codex is the first supported provider and currently the best-tested path.
 
 ## Hook installation
 
-`ome init` configures the Codex hook by default. To configure separately:
+Choose `codex` in the interactive setup, or configure it explicitly:
 
 ```bash
 ome init --provider codex --dry-run   # Preview what will be written
@@ -76,6 +76,7 @@ the top of the agent's prompt.
 
 ## Skill
 
-`ome init` automatically installs the OME skill into the Codex skills directory.
-Once installed, the agent gains recall, reflect, curate, and troubleshoot
-capabilities through the skill system.
+`ome init --provider codex` installs the OME skill into the Codex skills
+directory. When multiple agents are selected, OME installs the matching skill
+for each selected agent. Once installed, the agent gains recall, reflect,
+curate, and troubleshoot capabilities through the skill system.

@@ -123,7 +123,7 @@
     {
       "id": "cli-docs-language",
       "difficulty": "medium",
-      "prompt": "语言策略不进入持久配置：CLI 默认英文，只允许 OME_LANGUAGE 显式切中文；公开文档使用 /zh/ 路径式双语；不要暴露经验语言、卡片默认语言或 hook additionalContext 语言；hook frame 固定英文。",
+      "prompt": "语言策略不进入持久配置：CLI 人类输出固定英文，不提供中文 CLI 切换；公开文档使用 /zh/ 路径式双语；不要暴露经验语言、卡片默认语言或 hook additionalContext 语言；hook frame 固定英文。",
       "expectedCards": [
         "cli-docs-i18n"
       ],

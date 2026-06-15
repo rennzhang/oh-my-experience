@@ -27,7 +27,6 @@ or agent runners, it skips prompts and uses flags/defaults. Use
 ```bash
 ome init
 ome doctor
-ome match "fix UI and validate in browser" --explain
 ome uninstall
 ```
 
@@ -43,9 +42,11 @@ ome init --no-hook
 ome init --reset-config
 ```
 
-`ome init` is safe to run more than once. It installs the OME library, Codex
-skill, and selected prompt-time hooks. `--reset-config` restores runtime config
-without deleting experiences, source indexes, or retrospective runs.
+`ome init` is safe to run more than once. It installs the OME library and, for
+each selected agent, the prompt-time hook plus bundled OME skill. `--no-hook`
+initializes or updates the library only; it does not install hooks or skills.
+`--reset-config` restores runtime config without deleting experiences, source
+indexes, or retrospective runs.
 
 ## Recall
 
@@ -55,6 +56,10 @@ ome match "<task>" --json
 ome match "<task>" --explain
 ome match "<task>" --cwd /path/to/project --explain
 ```
+
+`ome match` is for hooks, agents, evaluation, and troubleshooting. Normal
+first-run proof should be a real agent task where the installed hook recalls
+cards automatically; users should not need to run `match` by hand.
 
 Only active cards are recalled. Drafts created by a retrospective do not affect
 prompt-time recall until they are promoted.
@@ -206,8 +211,8 @@ should happen through `ome init`.
 
 ```bash
 ome config get
-ome config preview dataDir ~/Obsidian/Oh-My-Experience
-ome config set dataDir ~/Obsidian/Oh-My-Experience
+ome config preview dataDir ~/Documents/Oh-My-Experience
+ome config set dataDir ~/Documents/Oh-My-Experience
 ```
 
 ## Uninstall
@@ -220,13 +225,13 @@ ome uninstall --keep-skill
 ome uninstall --delete-library --yes
 ```
 
-`ome uninstall` removes selected prompt-time hooks and the Codex OME skill, but
+`ome uninstall` removes selected prompt-time hooks and matching OME skills, but
 keeps the experience library by default. Deleting the library is irreversible
 and requires `--delete-library --yes` or `--delete-library --force`.
 
 ## Language Behavior
 
-Human CLI output is English by default, including on non-English systems. Set
-`OME_LANGUAGE=zh-CN` only when you explicitly want Chinese CLI text.
+Human CLI output is English only, including on non-English systems. Localized
+documentation can still live under locale paths such as `/zh/`.
 
 JSON output field names stay stable English.

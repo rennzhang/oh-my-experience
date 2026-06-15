@@ -11,9 +11,10 @@ status: active
 
 ## 案例：`/goal` 触发完整闭环交付模式
 
-假设你的 active 经验库里有一张已经审核过的目标执行卡：
-`创建目标时进入完整闭环交付模式`。它的使用标准是：当 `/goal`、`创建目标` 或
-`开干` 启动真实执行任务时使用；如果只是文档示例、功能解释或业务目标讨论，就忽略。
+假设你的 active 经验库里有一张已经审核过的目标执行卡。首次初始化后，OME 会内置一张
+英文 starter 卡：`Enter full-closure delivery mode when a goal starts`。它的使用标准是：
+当 `/goal`、`创建目标` 或 `开干` 启动真实执行任务时使用；如果只是文档示例、功能解释
+或业务目标讨论，就忽略。
 
 当用户发出：
 
@@ -25,36 +26,23 @@ OME 会先把这段 prompt 拆成 task envelope。它会识别出 goal 执行意
 真实验证要求，然后把这张卡列为 high-risk、must-use 的待判断经验。命中不等于已经使用；
 Agent 还要根据这张卡的工作流含义判断它是否真的适用于当前任务，再读取并应用完整规则。
 
-## 实际压入 Agent Prompt 的内容
+## Agent 看到的关键提醒
 
-Hook 压入的是一个紧凑的 additional context。外层框架固定使用英文，保证 Codex 和
-Claude 收到稳定结构；经验卡自己的正文保持原语言。
+在 Agent 开始改文件前，OME 会把相关经验作为紧凑提醒交给它。用户不需要关心底层命令
+怎么跑，只需要知道 Agent 此时看到了哪条经验：
 
 ```text
-OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
-Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
-1. [high risk][must] 创建目标时进入完整闭环交付模式 (创建目标时进入完整闭环交付模式-40383753)
-   Summary: 当用户用 /goal、创建目标或开干启动真实长任务时，常见误判是只建目标或做局部切片；应进入完整闭环交付，并排除文档示例、概念解释和业务目标讨论。
-   Scope: global
-   Use if: /goal 开始执行; 创建目标开干; 使用 goal 跑长任务
-   Ignore if: 文档或案例里展示 /goal; 解释 goal 功能但不执行
-   Matched by: task looks like a real goal-execution start
-   Rule: ome experience show 创建目标时进入完整闭环交付模式-40383753 --section rule
-   Final link if used: [创建目标时进入完整闭环交付模式](<~/.oh-my-experience/experiences/active/创建目标时进入完整闭环交付模式-40383753.md>)
+OME 召回：
+Enter full-closure delivery mode when a goal starts
 ```
 
-链接里的路径来自用户自己的经验库。全局库会指向用户配置的 `dataDir`；项目库会指向
-`<project-root>/.oh-my-experience/`。
+Agent 仍然要判断这条经验是否真的适用于当前任务。如果适用，它再读取完整规则，并用这条
+经验约束自己的执行方式。
 
-## Agent 接下来读取的完整规则
+## 这会改变什么
 
-为了控制 prompt 体积，hook 先注入候选上下文。Agent 判断这张卡适用后，再读取完整规则：
-
-```bash
-ome experience show 创建目标时进入完整闭环交付模式-40383753 --section rule
-```
-
-这条规则的正文是：
+没有 OME 时，这类任务很容易变成：只写一个目标标题、先做第一个可见切片、跑一点局部检查，
+然后过早报告完成。有了 OME，Agent 会在行动前看到这条真实规则：
 
 ```text
 当用户说 `/goal`、`创建目标`、`使用 goal`、`开干`、`开始执行目标`、`跑长任务`，或要求把一批需求压进目标推进时，必须把这视为执行启动协议，而不是普通目标文案。默认执行规则如下：
@@ -69,21 +57,18 @@ ome experience show 创建目标时进入完整闭环交付模式-40383753 --sec
 8. 最终交付要面向用户说明体验变化、已验证证据、风险限制和待确认项。
 ```
 
-最后的效果是：Agent 不是每轮都背着这段长规则，而是在用户真的说 `/goal`、`创建目标`、
-`开干` 这类执行启动话术时，才把它作为待判断经验处理。如果确实采用，最终回复可以写
-`**本次使用 1条 OME 经验卡：** ...`；如果用户只是讨论业务目标、OKR，或者只是问
-`/goal` 是什么，这张卡会被忽略，也不会出现在最终使用披露里。
+结果是：Agent 不会每轮都背着这段长规则，而是在用户真的说 `/goal`、`创建目标`、`开干`
+这类执行启动话术时，才把它作为待判断经验处理。
 
-## 自己验证一次
+## 用户最终看到什么
 
-不需要真的给 Agent 发任务，也可以用 `ome match` 模拟同一条链路：
+如果 Agent 确实采用了这张经验，最终回复可以带一行使用披露：
 
-```bash
-ome match "创建目标，开干，把这个功能完整做完并自己验证" --explain
+```text
+已完整完成结账页原型，验证了主流程，并列出剩余风险。
+
+**本次使用 1条 OME 经验卡：** Enter full-closure delivery mode when a goal starts
 ```
 
-如果想看 task envelope、命中原因和最终渲染的 `additionalContext`，加上 `--json`：
-
-```bash
-ome match "创建目标，开干，把这个功能完整做完并自己验证" --explain --json
-```
+如果用户只是讨论业务目标、OKR，或者只是问 `/goal` 是什么，这张卡会被忽略，也不会出现
+在最终使用披露里。

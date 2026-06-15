@@ -94,7 +94,7 @@ The current scoring model is local and deterministic:
 - dampen stale or low-confidence cards;
 - collapse near-duplicate cards within the same scope so the hook
   context does not repeat the same lesson;
-- also collapse a starter card into a approved card when they share the same
+- also collapse a starter card into an approved card when they share the same
   explicit rule signal; two approved cards are not collapsed merely because
   they share a broad signal;
 - prefer a project card when a near-duplicate exists in both global and project

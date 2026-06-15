@@ -5,8 +5,9 @@ status: active
 
 # Quickstart
 
-This guide gets you to the first useful OME moment: initialize the library and
-see which experience card would be recalled for a real coding task.
+This guide gets you to the first useful OME moment: initialize the library,
+then send a real task to your agent and see whether OME recall appears
+automatically.
 
 ## 1. Initialize
 
@@ -15,8 +16,10 @@ npx oh-my-experience@latest init
 ```
 
 This runs the latest published OME CLI through npm, creates your local
-experience library, installs the OME Codex skill, and can install prompt-time
-hooks for supported agents. It is safe to rerun.
+experience library, and lets you choose which supported agents to connect. For
+each selected agent, OME installs the prompt-time hook and bundled skill. Codex
+is the best-tested path today; Claude uses the same hook runtime. It is safe to
+rerun.
 
 To install the command globally instead:
 
@@ -25,21 +28,21 @@ npm install -g oh-my-experience
 ome init
 ```
 
-## 2. See a recall explanation
+## 2. Send a real task to your agent
 
 Copy this to your agent:
 
 ```text
-Show me one OME recall example:
+Based on this checkout redesign plan: create a single-file checkout page prototype.
+Create a goal and start now. Finish the whole change end to end and verify it yourself.
 
-npx oh-my-experience@latest match "fix login page UI and validate in browser" --explain
-
-Explain which card matched, why it matched, and what compact context would be injected.
+Before changing files, mention whether OME recalled any relevant experience.
+If it did, explain the card in one short sentence and then continue normally.
 ```
 
-The built-in starter cards make this work before you have written your own
-cards. The match output is intentionally a candidate list: the agent must still
-judge whether the card fits the current task before using the full rule.
+The installed hook handles recall at prompt time. You should not need to run a
+manual search command just to prove setup works. The built-in starter cards make
+the first automatic recall possible before you have written your own cards.
 
 ## 3. Check health when needed
 
@@ -51,7 +54,7 @@ npx oh-my-experience@latest hook status --provider codex
 npx oh-my-experience@latest hook status --provider claude
 ```
 
-`doctor` checks the library, config, package identity, hooks, and card schema.
+`doctor` checks the library, config, package identity, hooks, skills, and card schema.
 It is useful for troubleshooting, but the first product proof should be recall,
 not a green status screen.
 
@@ -60,14 +63,13 @@ not a green status screen.
 - Create your first approved card: [First Experience Card](first-card.md)
 - See the end-to-end `/goal` example: [Examples](examples.md)
 - Use a repository-local library: [Global And Project Libraries](project-libraries.md)
-- Configure Codex or Claude hooks directly: [Codex](codex.md), [Claude](claude.md)
+- Configure Codex or Claude directly: [Codex](codex.md), [Claude](claude.md)
 
 ## Quick reference
 
 | I want to... | Command |
 |-------------|---------|
 | Initialize OME | `npx oh-my-experience@latest init` |
-| Test recall | `npx oh-my-experience@latest match "task description" --explain` |
 | Check health | `npx oh-my-experience@latest doctor` |
 | Inspect hooks | `npx oh-my-experience@latest hook status --provider codex` |
 | Create a project library | `npx oh-my-experience@latest project init` |

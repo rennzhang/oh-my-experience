@@ -10,7 +10,7 @@
 - 运行测试、eval 或验证命令时优先隔离 dataDir，不污染真实经验库。
 - 涉及删除经验库、覆盖 hooks、覆盖 skill、卸载数据时必须先得到用户确认。
 - 包内开发时可用 `node bin/ome.js` 替代全局 `ome`。
-- 默认第一成功路径是 `ome init -> ome match "<真实任务>" --explain`。不要把深度复盘、扫描历史、项目库和 eval 一次性塞给新用户。
+- 默认第一成功路径是 `ome init -> 用户把真实任务发给 Agent -> Agent 自动召回并解释是否命中 OME`。不要要求用户手动跑 `ome match` 作为首装验收；`match` 是给 hook、Agent、eval 和排障用的调试入口。
 
 ## 初始化与配置
 
@@ -29,6 +29,7 @@ ome init --reset-config
 - `ome init` 可重复运行。
 - 交互式终端中会打开设置流程。
 - CI、管道、Agent runner 中会跳过交互，使用 flags/defaults。
+- `--no-hook` 只初始化或更新经验库，不安装 Agent hook 或 OME skill。
 - `--reset-config` 只恢复运行配置，不删除 experiences、source indexes、reflect runs。
 - Claude hook 生效走 `ome init --provider claude` 或 `ome init --provider all`，不要要求用户记忆单独的 hook install 命令。
 
@@ -36,8 +37,8 @@ ome init --reset-config
 
 ```bash
 ome config get
-ome config preview dataDir ~/Obsidian/Oh-My-Experience
-ome config set dataDir ~/Obsidian/Oh-My-Experience
+ome config preview dataDir ~/Documents/Oh-My-Experience
+ome config set dataDir ~/Documents/Oh-My-Experience
 ```
 
 规则：
@@ -204,7 +205,7 @@ ome experience migrate-legacy --scope project --backup
 `ome experience migrate-legacy --scope project --dry-run` 预览，再按用户确认执行。
 迁移默认原地改写，不自动备份；只有用户明确要求临时备份时才加 `--backup`。
 
-## 匹配与召回
+## 匹配与召回调试
 
 ```bash
 ome match "<task>"
@@ -212,6 +213,8 @@ ome match "<task>" --json
 ome match "<task>" --explain
 ome match "<task>" --cwd <project-root> --explain
 ```
+
+`ome match` 是 Agent、hook、eval 和排障入口，不是普通用户首装后的下一步。面向用户时，优先让用户发送真实任务，由已安装 hook 自动召回；只有需要解释、验证或调试时才展示 `match`。
 
 复盘前后都可使用：
 
@@ -246,7 +249,7 @@ ome hook run
 
 规则：
 
-- 安装和卸载 hook 走 `ome init` / `ome uninstall`。
+- 安装和卸载 hook / skill 走 `ome init` / `ome uninstall`。
 - `ome hook run` 是 Codex/Claude 已安装 hook 的 runtime 入口，不能删除。
 - Hook 运行时会从 prompt payload 推导项目上下文，并应用卡片 `scope`。
 - 如果项目库存在，Hook 会读取项目 active 卡；hook events 仍写入全局 `dataDir`。

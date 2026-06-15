@@ -6,15 +6,17 @@ Use this reference for install, init, config, and hook setup.
 
 ```bash
 npx oh-my-experience@latest init
-npx oh-my-experience@latest match "fix UI and validate in browser" --explain
 ```
+
+After setup, send a real task to the agent. The installed hook should recall
+active experiences automatically; the user should not need to run `ome match`
+as the first success path.
 
 For a global install:
 
 ```bash
 npm install -g oh-my-experience
 ome init
-ome match "fix UI and validate in browser" --explain
 ```
 
 For this checkout:
@@ -23,12 +25,12 @@ For this checkout:
 npm install
 npm run build
 node bin/ome.js init
-node bin/ome.js match "fix UI and validate in browser" --explain
 ```
 
 Run `ome doctor` when setup looks wrong, before release validation, or when the
-user explicitly asks for a health check. Do not make `doctor` the first success
-moment; the user should see a real recall explanation first.
+user explicitly asks for a health check. Do not make `doctor` or manual
+`ome match` the first success moment; the user should see the agent use recall
+on a real task.
 
 ## Init Behavior
 
@@ -36,9 +38,12 @@ moment; the user should see a real recall explanation first.
 - `ome init -y` is the non-interactive scripted setup path.
 - `ome init` can be rerun. Existing config becomes defaults; confirmed settings are updated.
 - `ome init --reset-config` restores runtime config defaults without deleting cards, sessions, retrospective runs, or other experience assets.
-- Keep setup simple: data directory, default Codex recall, confirmation.
-- Interactive `ome init` may add one optional Spool CLI stage after core setup succeeds. Introduce Spool as a local AI session index, compare the paths clearly (without Spool: current conversation plus explicit Codex local scans; with Spool: index-first lookup across cross-agent local history, on-demand evidence, lower token use, and cleaner context than dumping raw sessions with think traces and tool logs), recommend the CLI for multi-agent users, show `https://github.com/spool-lab/spool`, and make clear OME installs only the CLI package (`npm install -g @spool-lab/cli`), not the Spool desktop client.
-- Never install Spool silently. `ome init -y`, JSON, dry-run, and other non-interactive setup paths must not prompt for or install Spool.
+- `ome init --no-hook` initializes or updates the library only. It does not install agent hooks or bundled skills.
+- Keep setup simple: data directory, supported agent choice, confirmation, then one completion view with the first task and optional suggestions.
+- Interactive `ome init` asks users which supported agents to connect (`codex`, `claude`, `all`, or `none`). Codex can remain the default because it is the best-tested path, but the product must not describe OME as Codex-only.
+- For each selected agent, install both the prompt-time hook and the bundled OME skill. `codex` writes `~/.codex/hooks.json` plus `~/.codex/skills/oh-my-experience`; `claude` writes `~/.claude/settings.json` plus `~/.claude/skills/oh-my-experience`.
+- Spool belongs in the same setup flow, not as a post-completion step. If Spool CLI is detected, ask whether to enable it as a source before confirmation. If Spool CLI is not detected, show a short install-later note in the completion view and do not prompt to install it.
+- Never install Spool during first setup. `ome init -y`, JSON, dry-run, and other non-interactive setup paths must not prompt for or install Spool.
 - Do not expose removed language or project-level install options.
 
 ## Config
@@ -47,13 +52,13 @@ Inspect before changing:
 
 ```bash
 ome config get
-ome config preview dataDir ~/Obsidian/Oh-My-Experience
+ome config preview dataDir ~/Documents/Oh-My-Experience
 ```
 
 Apply only after the user confirms the path:
 
 ```bash
-ome config set dataDir ~/Obsidian/Oh-My-Experience
+ome config set dataDir ~/Documents/Oh-My-Experience
 ```
 
 ## Hook Policy

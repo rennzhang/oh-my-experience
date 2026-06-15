@@ -24,8 +24,8 @@ ome init
 ```
 
 Global installation adds the `ome` command to your shell. `ome init` starts the
-setup wizard, chooses a library path, installs the default provider hook, and
-writes starter cards so you can verify recall immediately.
+setup wizard, chooses a library path, installs the default provider hook and
+skill, and writes starter cards so you can verify recall immediately.
 
 For local development from source:
 
@@ -68,11 +68,11 @@ npx oh-my-experience@latest init -y --data-dir ~/.oh-my-experience
 
 ## Configure data directory
 
-You can point it anywhere, including an Obsidian vault:
+You can move it later to any dedicated local directory:
 
 ```bash
-ome config preview dataDir ~/Obsidian/Oh-My-Experience   # Preview changes
-ome config set dataDir ~/Obsidian/Oh-My-Experience       # Execute migration
+ome config preview dataDir ~/Documents/Oh-My-Experience  # Preview changes
+ome config set dataDir ~/Documents/Oh-My-Experience      # Execute migration
 ome doctor                                                # Confirm success
 ```
 
@@ -81,22 +81,24 @@ project libraries. Project libraries are always discovered at
 `<project-root>/.oh-my-experience/`; initialize one with `ome project init` when
 the repository should carry its own cards.
 
-## Install hooks
+## Install Agent Entry Points
 
 ```bash
-ome hook status --provider codex     # Check current state
-ome init --provider claude            # Add Claude hook
-ome init --provider all               # Install both
+ome hook status --provider codex     # Check current hook state
+ome init --provider claude            # Add Claude hook and skill
+ome init --provider all               # Install both agents
 ```
 
-`ome init` configures the Codex hook and installs the bundled OME skill by
-default. The wizard shows hook file paths before writing.
+Interactive `ome init` lets you choose `codex`, `claude`, `all`, or `none`.
+Codex is the best-tested path today, but OME is a hook-based recall layer, not
+a Codex-only tool. For each selected agent, OME installs the prompt-time hook
+and bundled skill. The wizard shows paths before writing.
 
 ## Uninstall
 
 ```bash
-ome uninstall                         # Remove hooks, keep library
-ome uninstall --provider all          # Remove all provider hooks
+ome uninstall                         # Remove hooks and skills, keep library
+ome uninstall --provider all          # Remove all provider hooks and skills
 ome uninstall --delete-library --yes  # Delete all local data
 ```
 
@@ -108,12 +110,13 @@ all local cards, reflect runs, and logs.
 
 OME can optionally integrate with the Spool CLI, a local AI session index
 that unifies Claude, Codex, Gemini, and other agent histories. Core
-functionality works without it. Interactive `ome init` asks whether to install
-the Spool CLI after core setup:
+functionality works without it. Interactive `ome init` asks whether to enable
+Spool only when the CLI is already detected; otherwise it shows this install
+command for later:
 
 ```bash
 npm install -g @spool-lab/cli
 ```
 
-OME does not install the Spool desktop client. Scripted init (`-y`, dry-run)
+OME does not install Spool during first setup. Scripted init (`-y`, dry-run)
 never prompts for Spool. See [Source Scan](source-scan.md).

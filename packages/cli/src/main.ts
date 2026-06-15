@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import {
@@ -28,7 +27,6 @@ import {
   loadConfig,
   matchCardEntries,
   migrateLegacyCards,
-  normalizeLocale,
   explainMatchFromCards,
   projectLibraryPath,
   previewConfigValue,
@@ -43,7 +41,6 @@ import {
   runDoctor,
   saveConfig,
   setConfigValue,
-  t,
   writeCandidates,
   addDecision,
   applyRetrospective,
@@ -79,7 +76,7 @@ const KNOWN_COMMANDS = [
   "uninstall",
   "version",
 ];
-const SUGGESTED_COMMANDS = KNOWN_COMMANDS.filter((command) => command !== "reflect");
+const SUGGESTED_COMMANDS = KNOWN_COMMANDS.filter((command) => !["match", "reflect"].includes(command));
 
 export async function runCli(argv: string[]) {
   const args = parseArgs(argv);
@@ -179,8 +176,10 @@ function withLocalDiagnostics(record: any, args: ParsedArgs) {
     }
   }
   for (const warning of projectLibrary?.warnings || []) warnings.push(warning);
-  const codexSkill = inspectCodexSkillHealth(args);
-  if (codexSkill.warning) warnings.push(codexSkill.warning);
+  const agentSkills = inspectAgentSkillsHealth(args, String(record.checked?.dataDir || ""));
+  for (const skill of agentSkills) {
+    if (skill.warning) warnings.push(skill.warning);
+  }
   return {
     ...record,
     ok: errors.length === 0,
@@ -189,7 +188,7 @@ function withLocalDiagnostics(record: any, args: ParsedArgs) {
     checked: {
       ...(record.checked || {}),
       projectLibrary,
-      codexSkill,
+      agentSkills,
     },
   };
 }
@@ -218,9 +217,43 @@ function inspectCurrentProjectLibraryHealth(args: ParsedArgs) {
   return health;
 }
 
-function inspectCodexSkillHealth(args: ParsedArgs) {
-  const plan = planInitSkill(args, true);
+function inspectAgentSkillsHealth(args: ParsedArgs, dataDir: string) {
+  return skillProvidersForHealth(args, dataDir).map((provider) => inspectAgentSkillHealth(planSkill({
+    provider,
+    codexHome: codexHome(args),
+    claudeHome: claudeHome(args),
+    dryRun: true,
+  })));
+}
+
+function skillProvidersForHealth(args: ParsedArgs, dataDir: string): string[] {
+  if (args.flags.provider || args.flags.providers) return selectedProviders(args);
+  if (!dataDir) return ["codex"];
+  try {
+    const config = loadConfig(dataDir);
+    const enabled = Object.entries(asRecord(config.hooks?.providers))
+      .filter(([, value]) => asRecord(value).enabled)
+      .map(([provider]) => provider)
+      .filter((provider) => provider === "codex" || provider === "claude");
+    return enabled.length ? enabled : ["codex"];
+  } catch {
+    return ["codex"];
+  }
+}
+
+function inspectAgentSkillHealth(plan: Record<string, any>) {
+  if (plan.skipped) {
+    return {
+      provider: plan.provider,
+      skipped: true,
+      reason: plan.reason,
+      current: null,
+      bundled: null,
+      inSync: true,
+    };
+  }
   const health: any = {
+    provider: plan.provider,
     target: plan.target,
     source: plan.source,
     installed: plan.installed,
@@ -238,7 +271,7 @@ function inspectCodexSkillHealth(args: ParsedArgs) {
   health.bundled = directoryFingerprint(plan.source, new Set());
   health.inSync = health.current === health.bundled;
   if (!health.inSync) {
-    health.warning = `installed Codex OME skill differs from bundled package: ${plan.target}. Run \`ome init --provider codex\` to refresh it.`;
+    health.warning = `installed ${providerName(plan.provider)} OME skill differs from bundled package: ${plan.target}. Run \`ome init --provider ${plan.provider}\` to refresh it.`;
   }
   return health;
 }
@@ -293,17 +326,29 @@ function runInitSetup(dataDir: string, args: ParsedArgs) {
     resetConfig: shouldResetInitConfig(args),
   });
   const hookPlan = planInitHooks(dataDir, args, Boolean(args.flags["dry-run"]));
-  const skillPlan = planInitSkill(args, Boolean(args.flags["dry-run"]));
+  const skillPlan = planInitSkills(args, Boolean(args.flags["dry-run"]));
   if (!args.flags["dry-run"]) {
+    const hooks = installInitHooks(dataDir, args);
+    const skills = installInitSkills(args);
     return {
       ...result,
-      hooks: installInitHooks(dataDir, args),
-      skill: installInitSkill(args),
+      hooks,
+      skills,
       starterCards: listStarterCards(dataDir).map((card) => ({ id: card.id, title: card.title, category: card.category })),
-      nextStep: "Run `ome match \"fix UI and validate in browser\" --explain` to inspect the first recall before starting a retrospective.",
+      nextStep: initNextStep(hooks),
     };
   }
-  return { ...result, hooks: hookPlan, skill: skillPlan };
+  return { ...result, hooks: hookPlan, skills: skillPlan };
+}
+
+function initNextStep(hooks: unknown) {
+  return hasInstalledRecallHook(hooks)
+    ? "Send a real task to your agent; the installed hook will recall relevant active experiences automatically."
+    : "Library is ready. Connect an agent later with `ome init --provider codex`, `ome init --provider claude`, or `ome init --provider all` to enable prompt-time recall.";
+}
+
+function hasInstalledRecallHook(hooks: unknown) {
+  return Array.isArray(hooks) && hooks.some((hook) => Boolean(asRecord(hook).installed));
 }
 
 function shouldRunInteractiveInit(args: ParsedArgs) {
@@ -358,7 +403,8 @@ async function interactiveInitCommand(defaultDataDirectory: string, args: Parsed
       defaultValue: existingConfig?.dataDir || defaultDataDirectory,
       placeholder: copy.pathPlaceholder,
     })));
-    const hookChoice = initHookChoice(args);
+    const hookChoice = await chooseHookChoice(copy, prompt, args);
+    const spoolChoice = await chooseSpoolChoice(copy, prompt);
     const nextArgs = cloneArgs(args);
     nextArgs.flags["data-dir"] = dataDir;
     if (hookChoice === "none") nextArgs.flags["no-hook"] = true;
@@ -367,7 +413,7 @@ async function interactiveInitCommand(defaultDataDirectory: string, args: Parsed
       nextArgs.flags.provider = hookChoice;
     }
 
-    printInitRecallStep(copy, { dataDir, hookChoice }, nextArgs);
+    printInitPlan(copy, { dataDir, hookChoice, spoolChoice }, nextArgs);
     const confirmed = await askYesNo(prompt, {
       title: copy.confirmPrompt,
       description: copy.confirmDescription,
@@ -380,8 +426,8 @@ async function interactiveInitCommand(defaultDataDirectory: string, args: Parsed
       return;
     }
     const result = runInitSetup(dataDir, nextArgs);
-    printInitDone(copy, dataDir, hookChoice, result);
-    await maybeSetupSpoolSource(copy, dataDir, prompt);
+    if (spoolChoice.mode === "enabled") enableSpoolSource(dataDir);
+    printInitDone(copy, dataDir, hookChoice, result, spoolChoice);
     await waitForAnyKey(copy, prompt.interactive);
   } finally {
     prompt.close();
@@ -399,9 +445,10 @@ function loadExistingConfig(dataDir: string) {
 
 function initHookChoice(args: ParsedArgs) {
   if (args.flags["no-hook"]) return "none";
-  const raw = String(args.flags.provider || args.flags.providers || "codex");
-  if (raw.includes("all")) return "all";
-  if (raw.includes("claude")) return "claude";
+  const providers = selectedProviders(args);
+  if (!providers.length) return "none";
+  if (providers.includes("codex") && providers.includes("claude")) return "all";
+  if (providers.includes("claude")) return "claude";
   return "codex";
 }
 
@@ -453,6 +500,28 @@ async function askText(prompt: PromptSession, question: { step: string; title: s
   return answer.trim() || question.defaultValue;
 }
 
+async function chooseHookChoice(copy: InitCopy, prompt: PromptSession, args: ParsedArgs) {
+  if (args.flags["no-hook"] || args.flags.provider || args.flags.providers) return initHookChoice(args);
+  printStep("2/2", copy.agentStepPrompt, copy.agentStepDescription);
+  console.log(`  ${dim(copy.agentChoiceHelp)}`);
+  while (true) {
+    const answer = (await prompt.question(`${dim("[codex]")} ${cyan("> ")}`)).trim();
+    const choice = normalizeHookChoice(answer || "codex");
+    if (choice) return choice;
+    console.log(dim(copy.invalidAgentChoice));
+    if (!prompt.interactive) return "codex";
+  }
+}
+
+function normalizeHookChoice(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "codex") return "codex";
+  if (["claude", "cloud"].includes(normalized)) return "claude";
+  if (["all", "both", "codex+claude", "codex,claude"].includes(normalized)) return "all";
+  if (["none", "skip", "no", "off"].includes(normalized)) return "none";
+  return "";
+}
+
 async function askYesNo(prompt: PromptSession, question: { title: string; description?: string; defaultValue: boolean; invalidMessage: string; requireExplicit?: boolean }) {
   const suffix = question.requireExplicit ? "y/n" : (question.defaultValue ? "Y/n" : "y/N");
   console.log(`\n${bold(question.title)}`);
@@ -460,6 +529,7 @@ async function askYesNo(prompt: PromptSession, question: { title: string; descri
   while (true) {
     const answer = (await prompt.question(`${dim(`[${suffix}]`)} ${cyan("> ")}`)).trim().toLowerCase();
     if (!answer) {
+      if (!question.requireExplicit) return question.defaultValue;
       console.log(dim(question.invalidMessage));
       if (!prompt.interactive) return false;
       continue;
@@ -505,123 +575,78 @@ function printBrandMark(copy: InitCopy, version: string) {
   console.log(dim(`${copy.pillarLocal} · ${copy.pillarReview} · ${copy.pillarRecall}`));
 }
 
-function printInitRecallStep(copy: InitCopy, plan: { dataDir: string; hookChoice: string }, args: ParsedArgs) {
+function printInitPlan(copy: InitCopy, plan: { dataDir: string; hookChoice: string; spoolChoice: SpoolSetupChoice }, args: ParsedArgs) {
   const hookPlan = planInitHooks(plan.dataDir, args, true);
   const hookTargets = Array.isArray(hookPlan)
     ? hookPlan.map((hook) => formatHookPlanTarget(asRecord(hook))).filter(Boolean)
     : [];
-  const hookTarget = splitHookTarget(hookTargets[0] || "");
-  const skillTarget = planInitSkill(args, true).target;
-  printStep("2/2", copy.recallStepPrompt, copy.recallStepDescription);
-  printParagraph(copy.recallHookParagraph
-    .replace("{hook}", strongInline(hookTarget?.event.replace(/^Codex\s+/, "") || "UserPromptSubmit"))
-    .replace("{hookFile}", strongInline(hookTarget?.file || codexHooksFile(args)))
-    .replace("{library}", strongInline(plan.dataDir)));
-  console.log("");
-  printParagraph(copy.recallSkillParagraph
-    .replace("{skill}", strongInline("oh-my-experience"))
-    .replace("{skillDir}", strongInline(skillTarget)));
+  const skillPlans = planInitSkills(args, true);
+  printPanel(copy.planTitle, [
+    keyValue(copy.doneDataDir, plan.dataDir),
+    keyValue(copy.doneHook, formatHookChoice(plan.hookChoice, copy)),
+    ...hookTargets,
+    ...skillPlans.map((skill) => formatSkillPlanTarget(asRecord(skill))).filter(Boolean),
+    keyValue(copy.spoolPlanLabel, plan.spoolChoice.summary),
+  ]);
 }
 
-function printInitDone(copy: InitCopy, dataDir: string, hookChoice: string, result: unknown) {
+function printInitDone(copy: InitCopy, dataDir: string, hookChoice: string, result: unknown, spoolChoice: SpoolSetupChoice) {
   const hooks = Array.isArray((result as any).hooks) ? (result as any).hooks : [];
   const codexHookInstalled = hooks.some((hook: any) => hook.provider === "codex" && hook.installed);
+  const recallEnabled = hasInstalledRecallHook(hooks);
+  const skills: unknown[] = Array.isArray((result as any).skills) ? (result as any).skills : [];
   printPanel(green(copy.doneTitle), [
     keyValue(copy.doneDataDir, dataDir),
     keyValue(copy.doneConfig, configPointerPath()),
     keyValue(copy.doneHook, formatHookChoice(hookChoice, copy)),
+    ...skills.map((skill) => formatSkillPlanTarget(asRecord(skill))).filter(Boolean),
+    keyValue(copy.spoolPlanLabel, spoolChoice.done),
     ...(codexHookInstalled ? [copy.doneCodexTrust] : []),
   ]);
   console.log(`\n${bold(copy.heroCta)}`);
-  console.log(`${bold(copy.nextSteps)} ${dim(copy.starterPromptIntro)}`);
-  console.log("");
-  console.log(bold(copy.copyPromptHint));
-  printPromptBlock(copy.starterPrompt, copy);
-  console.log(`\n${bold(copy.afterRecallTitle)} ${dim(copy.afterRecallIntro)}`);
+  if (recallEnabled) {
+    console.log(`${bold(copy.nextSteps)} ${dim(copy.starterPromptIntro)}`);
+    console.log("");
+    console.log(bold(copy.copyPromptHint));
+    printPromptBlock(copy.starterPrompt, copy);
+  } else {
+    console.log(`${bold(copy.nextSteps)} ${dim(copy.noHookNextStep)}`);
+  }
   console.log(`\n${bold(copy.recommendations)}`);
-  printRecommendation(1, copy.sourceScanRecommendation, copy.sourceScanDescription, copy.sourceScanGuide);
+  printRecommendation(1, copy.afterRecallTitle, copy.afterRecallIntro, copy.firstCardGuide);
+  printRecommendation(2, copy.sourceScanRecommendation, copy.sourceScanDescription, copy.sourceScanGuide);
 }
 
-async function maybeSetupSpoolSource(copy: InitCopy, dataDir: string, prompt: PromptSession) {
-  printStep("Optional", copy.spoolStepPrompt, copy.spoolStepDescription);
-  printPanel(copy.spoolWhyTitle, [
-    copy.spoolIntro,
-    copy.spoolWithout,
-    copy.spoolWith,
-    copy.spoolRecommendation,
-    keyValue(copy.spoolGithubLabel, SPOOL_GITHUB_URL),
-    keyValue(copy.spoolInstallLabel, `npm install -g ${SPOOL_CLI_PACKAGE}`),
-    copy.spoolBoundary,
-  ]);
+type SpoolSetupChoice = {
+  mode: "off" | "enabled";
+  summary: string;
+  done: string;
+};
 
+async function chooseSpoolChoice(copy: InitCopy, prompt: PromptSession): Promise<SpoolSetupChoice> {
   const before = checkSpool();
   if (before.available) {
     const enable = await askYesNo(prompt, {
       title: copy.spoolEnablePrompt,
-      description: copy.spoolDetectedDescription.replace("{version}", before.version || copy.unknownVersion),
-      defaultValue: true,
+      description: copy.spoolEnableDescription.replace("{version}", before.version || copy.unknownVersion),
+      defaultValue: false,
       invalidMessage: copy.invalidYesNo,
     });
-    if (enable) {
-      enableSpoolSource(dataDir);
-      console.log(`\n${green(copy.spoolEnabled)}`);
-    } else {
-      console.log(`\n${dim(copy.spoolSkipped)}`);
-    }
-    return;
+    return enable
+      ? { mode: "enabled", summary: copy.spoolEnabledSummary.replace("{version}", before.version || copy.unknownVersion), done: copy.spoolEnabled }
+      : { mode: "off", summary: copy.spoolDetectedSkipped.replace("{version}", before.version || copy.unknownVersion), done: copy.spoolSkipped };
   }
 
-  const install = await askYesNo(prompt, {
-    title: copy.spoolInstallPrompt,
-    description: copy.spoolInstallDescription,
-    defaultValue: false,
-    invalidMessage: copy.invalidYesNo,
-  });
-  if (!install) {
-    console.log(`\n${dim(copy.spoolSkipped)}`);
-    return;
-  }
-
-  console.log(`\n${dim(copy.spoolInstalling.replace("{package}", SPOOL_CLI_PACKAGE))}`);
-  const installed = installSpoolCli();
-  if (!installed.ok) {
-    printPanel(copy.spoolInstallFailed, [
-      copy.spoolInstallFailedBody,
-      keyValue(copy.spoolGithubLabel, SPOOL_GITHUB_URL),
-      keyValue(copy.spoolInstallLabel, `npm install -g ${SPOOL_CLI_PACKAGE}`),
-      ...(installed.error ? [installed.error] : []),
-    ]);
-    return;
-  }
-
-  const after = checkSpool();
-  if (!after.available) {
-    printPanel(copy.spoolInstallFailed, [
-      copy.spoolInstallMissingAfterInstall,
-      keyValue(copy.spoolInstallLabel, `npm install -g ${SPOOL_CLI_PACKAGE}`),
-    ]);
-    return;
-  }
-
-  enableSpoolSource(dataDir);
-  console.log(`\n${green(copy.spoolInstallSuccess.replace("{version}", after.version || copy.unknownVersion))}`);
+  return {
+    mode: "off",
+    summary: copy.spoolMissingSummary,
+    done: `${copy.spoolMissingSummary} ${copy.spoolInstallLabel} npm install -g ${SPOOL_CLI_PACKAGE}. ${copy.spoolBoundary}`,
+  };
 }
 
 function enableSpoolSource(dataDir: string) {
   const config = loadConfig(dataDir);
   saveConfig(dataDir, { ...config, sources: { ...config.sources, spool: { mode: "enabled" } } });
-}
-
-function installSpoolCli() {
-  const result = spawnSync("npm", ["install", "-g", SPOOL_CLI_PACKAGE], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const error = [result.stderr, result.stdout].filter(Boolean).join("\n").trim().split(/\r?\n/).slice(-4).join("\n");
-  return {
-    ok: result.status === 0,
-    error,
-  };
 }
 
 async function waitForAnyKey(copy: InitCopy, enabled: boolean) {
@@ -660,20 +685,16 @@ function formatHookChoice(value: string, copy: InitCopy) {
 function formatHookPlanTarget(record: Record<string, any>) {
   if (record.skipped) return "";
   const target = String(record.target || "");
-  return `${providerName(record.provider)} UserPromptSubmit -> ${target}`;
+  return keyValue(`${providerName(record.provider)} hook:`, target);
+}
+
+function formatSkillPlanTarget(record: Record<string, any>) {
+  if (record.skipped) return "";
+  const target = String(record.target || "");
+  return keyValue(`${providerName(record.provider)} skill:`, target);
 }
 
 type InitCopy = ReturnType<typeof initCopy>;
-
-function splitHookTarget(value: string) {
-  const marker = " -> ";
-  const index = value.indexOf(marker);
-  if (index < 0) return null;
-  return {
-    event: value.slice(0, index),
-    file: value.slice(index + marker.length),
-  };
-}
 
 function printParagraph(value: string) {
   for (const line of wrapText(value, contentWidth() - 2)) console.log(`  ${line}`);
@@ -772,91 +793,13 @@ function stripAnsi(value: string) {
 }
 
 function initCopy() {
-  const zh = cliLanguage() === "zh-CN";
-  return zh ? {
-    productName: "Oh My Experience",
-    setupTitle: "Oh My Experience 设置向导",
-    setupSubtitle: "面向 AI 编码 Agent 的本地经验召回层",
-    heroClaim: "别再把同一条教训讲第二遍。",
-    heroCta: "先用内置示例经验体验召回。",
-    heroBody: "选择经验库位置；OME 默认安装 Codex 召回 hook。",
-    pillarLocal: "Local-first",
-    pillarReview: "Draft approval-first",
-    pillarRecall: "Prompt-time recall",
-    controls: "路径可回车使用推荐值 · 确认需输入 y/n · Ctrl+C 退出",
-    modeNew: "首次设置",
-    modeExisting: "重新配置已有经验库",
-    existingTitle: "已检测到现有配置",
-    existingHint: "继续后只更新你确认的设置；不会自动改写经验或激活新经验。",
-    dataDirPrompt: "经验库保存在哪里？",
-    dataDirDescription: "保存经验、复盘、索引和事件流。也可以放进 Obsidian，例如 ~/.vault/oh-my-experience。",
-    pathPlaceholder: "默认路径:",
-    confirmPrompt: "继续？",
-    confirmDescription: "OME 将保存这个经验库路径，安装上面显示的 Codex hook 和 skill，并写入内置示例经验。",
-    cancelled: "已取消，没有写入任何内容。",
-    recallStepPrompt: "安装 Codex 经验召回",
-    recallStepDescription: "OME 会配置两个本地入口，让 Codex 能在任务开始时加载相关经验。",
-    recallHookParagraph: "OME 会把 {hook} hook 写入 {hookFile}，用于在你向 Codex 发送任务时按需召回 {library} 中的经验。",
-    recallSkillParagraph: "OME 还会把 {skill} skill 安装到 {skillDir}，让 Codex 知道如何扫描会话、生成经验草稿并维护经验库。",
-    doneTitle: "设置完成",
-    doneDataDir: "经验库就绪:",
-    doneConfig: "配置文件:",
-    doneHook: "召回已启用:",
-    doneCodexTrust: "Codex App 可能会要求你信任新的 UserPromptSubmit hook。",
-    donePrivacy: "提示词原文默认不会写入事件流。",
-    nextSteps: "下一步:",
-    recommendations: "设置后的可选增强:",
-    starterPromptIntro: "内置示例经验已启用。先把一个真实任务发给 Agent，体验 prompt-time recall。",
-    copyPromptHint: "复制下面整个 Markdown 代码块给 Codex、Claude 或其他 Agent:",
-    copyPromptStart: "```text",
-    copyPromptEnd: "```",
-    starterPrompt: [
-      "Create a single HTML file for a Kanban board page.",
-      "Only build the board page, not a landing page or a full app.",
-      "Use a Linear-inspired, work-focused style with clear columns, readable task cards,",
-      "obvious status, and low visual noise.",
-      "After the task summary, tell me whether OME surfaced any relevant lesson,",
-      "and whether it changed your implementation or validation choices.",
-    ].join("\n"),
-    afterRecallTitle: "第一次召回体验后:",
-    afterRecallIntro: "如果这次召回符合预期，再进入第一张经验卡或更完整的复盘流程。",
-    sourceScanRecommendation: "用 Spool 连接更多 Agent 历史",
-    sourceScanDescription: "扫描 Claude CLI、Gemini CLI、opencode 等会话索引；不安装也不影响 Codex 默认召回。",
-    sourceScanGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/source-scan.md",
-    spoolStepPrompt: "可选：连接 Spool CLI",
-    spoolStepDescription: "OME 的核心设置已经完成。Spool 只是扩大可扫描的历史会话范围，不是 Codex 召回的前置条件。",
-    spoolWhyTitle: "为什么建议安装",
-    spoolIntro: "Spool 是本机 AI 会话索引层，把 Claude、Codex、Gemini 等多 Agent 历史统一成可搜索素材池。",
-    spoolWithout: "不安装：OME 仍可从当前对话和显式扫描的 Codex 会话取材，核心链路完整。",
-    spoolWith: "安装后：先索引命中、再按需取证据；比直接吞原始 session 更省 token、上下文更干净。",
-    spoolRecommendation: "推荐安装：多 Agent 用户覆盖更全，同时避免大量思考过程、工具日志挤占上下文。",
-    spoolGithubLabel: "GitHub:",
-    spoolInstallLabel: "CLI 安装:",
-    spoolBoundary: "这里只装 CLI，不装桌面 App。扫描材料仍需审核，不会自动成为 active 经验。",
-    spoolEnablePrompt: "检测到 Spool CLI，要启用 Spool 来源吗？",
-    spoolDetectedDescription: "本机 Spool 版本: {version}。启用后，OME 可以在你要求时扫描 Spool 索引到本地经验素材池。",
-    spoolInstallPrompt: "要现在安装 Spool CLI 吗？",
-    spoolInstallDescription: "会执行 npm 全局安装；你也可以拒绝，之后按上面的 GitHub 和安装命令手动安装。",
-    spoolInstalling: "正在安装 {package} ...",
-    spoolInstallSuccess: "Spool CLI 已安装并启用，检测到版本 {version}。",
-    spoolInstallFailed: "Spool CLI 安装失败",
-    spoolInstallFailedBody: "OME 主设置已完成；只是 Spool 可选增强没有启用。可以之后按官方地址手动安装。",
-    spoolInstallMissingAfterInstall: "npm 安装命令完成，但当前 PATH 仍检测不到 spool 命令。请打开新终端后运行 ome source status 检查。",
-    spoolEnabled: "Spool 来源已启用。",
-    spoolSkipped: "已跳过 Spool；OME 核心召回照常可用。",
-    unknownVersion: "未知",
-    exitHint: "按任意键退出",
-    enabled: "已启用",
-    disabled: "未启用",
-    invalidYesNo: "请输入 y 或 n。",
-    interactiveNeedsTerminal: "ome init --interactive 需要真实终端，或通过 stdin 提供完整回答。脚本化设置请使用 ome init -y。",
-  } : {
+  return {
     productName: "Oh My Experience",
     setupTitle: "Oh My Experience Setup",
     setupSubtitle: "local-first experience recall for AI coding agents",
     heroClaim: "Stop teaching your agent the same lesson twice.",
-    heroCta: "Start with built-in starter lessons today.",
-    heroBody: "Choose a library path; OME installs Codex recall by default.",
+    heroCta: "Recall is ready for your next agent task.",
+    heroBody: "Choose a library path; OME installs the recall hooks and skills you select.",
     pillarLocal: "Local-first",
     pillarReview: "Draft approval-first",
     pillarRecall: "Prompt-time recall",
@@ -866,61 +809,52 @@ function initCopy() {
     existingTitle: "Existing config:",
     existingHint: "Only confirmed settings are updated; init does not rewrite experiences or activate new ones.",
     dataDirPrompt: "Where should the experience library live?",
-    dataDirDescription: "Stores experiences, retrospectives, indexes, and events. Obsidian works too, for example ~/.vault/oh-my-experience.",
+    dataDirDescription: "Stores experiences, retrospectives, indexes, and events in a local OME directory. You can move it later with config preview/set.",
     pathPlaceholder: "Default path:",
+    agentStepPrompt: "Which agents should OME connect?",
+    agentStepDescription: "OME recalls experience through prompt-time hooks. Codex is the best-tested path today; Claude uses the same hook runtime. Choose codex, claude, all, or none.",
+    agentChoiceHelp: "Choices: codex, claude, all, none. Press Enter for codex.",
+    invalidAgentChoice: "Enter codex, claude, all, or none.",
     confirmPrompt: "Continue?",
-    confirmDescription: "OME will save this library path, install the Codex hook and skill shown above, and add built-in starter lessons.",
+    confirmDescription: "OME will save this library path, install the selected recall hooks and skills, and add built-in starter lessons.",
     cancelled: "Cancelled. Nothing was written.",
-    recallStepPrompt: "Install Codex experience recall",
-    recallStepDescription: "OME will configure two local entry points so Codex can load relevant experience at task time.",
-    recallHookParagraph: "OME will add the {hook} hook to {hookFile}. It recalls experiences from {library} when you send a task to Codex.",
-    recallSkillParagraph: "OME will also install the {skill} skill to {skillDir}. The skill tells Codex how to scan sessions, create experience drafts, and maintain the experience library.",
+    planTitle: "Setup summary",
     doneTitle: "Setup complete",
     doneDataDir: "Library ready:",
     doneConfig: "Config file:",
     doneHook: "Recall enabled:",
+    spoolPlanLabel: "Spool source:",
     doneCodexTrust: "Codex App may ask you to trust the new UserPromptSubmit hook.",
     donePrivacy: "Raw prompt text is not written to events by default.",
-    nextSteps: "Next step:",
-    recommendations: "After setup (optional):",
-    starterPromptIntro: "Starter lessons are active. First, send a real task to your agent to feel prompt-time recall.",
-    copyPromptHint: "Copy the entire Markdown code block below into Codex, Claude, or another agent:",
+    nextSteps: "Next task:",
+    recommendations: "Suggestions:",
+    starterPromptIntro: "Starter lessons are active. Send this to your selected agent so the hook can recall relevant experience automatically.",
+    noHookNextStep: "Starter lessons are active, but no agent is connected yet. Run `ome init --provider codex`, `ome init --provider claude`, or `ome init --provider all` when you want prompt-time recall.",
+    copyPromptHint: "Copy this task into your selected agent:",
     copyPromptStart: "```text",
     copyPromptEnd: "```",
     starterPrompt: [
-      "Create a single HTML file for a Kanban board page.",
-      "Only build the board page, not a landing page or a full app.",
-      "Use a Linear-inspired, work-focused style with clear columns, readable task cards,",
-      "obvious status, and low visual noise.",
-      "After the task summary, tell me whether OME surfaced any relevant lesson,",
-      "and whether it changed your implementation or validation choices.",
+      "Based on this checkout redesign plan: create a single-file checkout page prototype.",
+      "Create a goal and start now. Finish the whole change end to end and verify it yourself.",
+      "Before changing files, mention whether OME recalled any relevant experience.",
+      "If it did, explain the card in one short sentence and then continue normally.",
     ].join("\n"),
-    afterRecallTitle: "After the first recall:",
-    afterRecallIntro: "If the recall feels right, move on to the first-card guide or a fuller retrospective.",
+    afterRecallTitle: "Turn real corrections into cards",
+    afterRecallIntro: "If the first recall feels right, ask your agent to run a first-card flow or a fuller retrospective. New lessons stay in draft approval until you confirm them.",
+    firstCardGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/first-card.md",
     sourceScanRecommendation: "Connect more agent histories with Spool",
-    sourceScanDescription: "Scan Claude CLI, Gemini CLI, opencode, and other supported history indexes. Codex recall works without it.",
+    sourceScanDescription: "Use Spool when you want OME to search more local agent history. OME recall works without it.",
     sourceScanGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/source-scan.md",
-    spoolStepPrompt: "Optional: connect Spool CLI",
-    spoolStepDescription: "OME core setup is complete. Spool only expands the session history available for scans; Codex recall does not depend on it.",
-    spoolWhyTitle: "Why install it",
-    spoolIntro: "Spool is a local AI session index that unifies Claude, Codex, Gemini, and other agent histories into one searchable pool.",
-    spoolWithout: "Without it: OME still draws from the current conversation and explicitly scanned Codex sessions; the core path is intact.",
-    spoolWith: "With it: index-first lookup, then evidence on demand; avoids dumping raw sessions into context and saves tokens.",
-    spoolRecommendation: "Recommended for multi-agent users: broader coverage without flooding your context with think traces and tool logs.",
+    spoolMissingSummary: "Spool is not installed. OME is ready without it; install later only if you want wider local history search.",
     spoolGithubLabel: "GitHub:",
     spoolInstallLabel: "CLI install:",
-    spoolBoundary: "CLI only; no desktop app. Scanned material still requires review; lessons never auto-activate.",
+    spoolBoundary: "OME will not install Spool during first setup. Scanned material still requires draft approval before it can become active.",
     spoolEnablePrompt: "Spool CLI detected. Enable Spool sources?",
-    spoolDetectedDescription: "Detected Spool version: {version}. If enabled, OME can scan the Spool index into the local source pool when you ask.",
-    spoolInstallPrompt: "Install Spool CLI now?",
-    spoolInstallDescription: "This runs a global npm install. You can decline and install it later from the GitHub URL and command above.",
-    spoolInstalling: "Installing {package} ...",
-    spoolInstallSuccess: "Spool CLI installed and enabled. Detected version {version}.",
-    spoolInstallFailed: "Spool CLI install failed",
-    spoolInstallFailedBody: "OME core setup is complete; only the optional Spool enhancement was not enabled. You can install it manually later.",
-    spoolInstallMissingAfterInstall: "npm completed, but the spool command is still not visible on PATH. Open a new terminal and run ome source status.",
+    spoolEnableDescription: "Detected Spool {version}. This only updates OME source config. It does not scan history or activate any experience cards.",
+    spoolEnabledSummary: "enabled via Spool {version}",
+    spoolDetectedSkipped: "available ({version}), not enabled",
     spoolEnabled: "Spool sources enabled.",
-    spoolSkipped: "Skipped Spool; OME core recall still works.",
+    spoolSkipped: "available, not enabled",
     unknownVersion: "unknown",
     exitHint: "Press any key to exit",
     enabled: "Enabled",
@@ -979,10 +913,10 @@ function installInitHooks(dataDir: string, args: ParsedArgs) {
 
 function selectedProviders(args: ParsedArgs): string[] {
   const raw = String(args.flags.provider || args.flags.providers || "codex");
-  const values = raw.split(",").map((item) => item.trim()).filter(Boolean);
-  if (!values.length || values.includes("none")) return [];
-  if (values.includes("all")) return ["codex", "claude"];
-  return Array.from(new Set(values.map((item) => item === "claude" ? "claude" : "codex")));
+  const values = raw.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+  if (!values.length || values.some((item) => ["none", "skip", "no", "off"].includes(item))) return [];
+  if (values.some((item) => ["all", "both"].includes(item))) return ["codex", "claude"];
+  return Array.from(new Set(values.map((item) => ["claude", "cloud"].includes(item) ? "claude" : "codex")));
 }
 
 function hookInstallOptions(dataDir: string, args: ParsedArgs) {
@@ -995,27 +929,38 @@ function hookInstallOptions(dataDir: string, args: ParsedArgs) {
   };
 }
 
-function planInitSkill(args: ParsedArgs, dryRun: boolean) {
-  return planSkill({ codexHome: codexHome(args), dryRun });
-}
-
 const OME_SKILL_NAME = "oh-my-experience";
 const OME_SKILL_MARKER = ".ome-skill.json";
 
 type SkillOptions = {
+  provider?: string;
   codexHome?: string;
+  claudeHome?: string;
   dryRun?: boolean;
   force?: boolean;
 };
 
+function planInitSkills(args: ParsedArgs, dryRun: boolean) {
+  if (args.flags["no-hook"]) return [];
+  return selectedProviders(args).map((provider) => planSkill({
+    provider,
+    codexHome: codexHome(args),
+    claudeHome: claudeHome(args),
+    dryRun,
+  }));
+}
+
 function planSkill(options: SkillOptions = {}) {
-  const root = options.codexHome || codexHome({ flags: {}, positionals: [] });
+  const provider = options.provider === "claude" ? "claude" : "codex";
+  const root = provider === "claude"
+    ? (options.claudeHome || path.join(os.homedir(), ".claude"))
+    : (options.codexHome || codexHome({ flags: {}, positionals: [] }));
   const target = path.join(root, "skills", OME_SKILL_NAME);
   const source = path.join(packageRoot(), "skills", OME_SKILL_NAME);
   const existing = inspectSkillTarget(target);
   return {
     ok: true,
-    provider: "codex",
+    provider,
     name: OME_SKILL_NAME,
     root,
     source,
@@ -1028,21 +973,28 @@ function planSkill(options: SkillOptions = {}) {
   };
 }
 
-function installInitSkill(args: ParsedArgs) {
-  return installSkill({ codexHome: codexHome(args), dryRun: false, force: Boolean(args.flags.force) });
+function installInitSkills(args: ParsedArgs) {
+  if (args.flags["no-hook"]) return [];
+  return selectedProviders(args).map((provider) => installSkill({
+    provider,
+    codexHome: codexHome(args),
+    claudeHome: claudeHome(args),
+    dryRun: false,
+    force: Boolean(args.flags.force),
+  }));
 }
 
 function installSkill(options: SkillOptions = {}) {
   const plan = planSkill(options);
   if (!fs.existsSync(plan.source)) throw new Error(`bundled OME skill not found: ${plan.source}`);
   if (plan.conflict && !options.force) {
-    throw new Error(`Codex skill target already exists and is not owned by OME: ${plan.target}. Use --force only if you want to replace it.`);
+    throw new Error(`${providerName(plan.provider)} skill target already exists and is not owned by OME: ${plan.target}. Use --force only if you want to replace it.`);
   }
   if (options.dryRun) return plan;
   fs.rmSync(plan.target, { recursive: true, force: true });
   fs.mkdirSync(path.dirname(plan.target), { recursive: true });
   fs.cpSync(plan.source, plan.target, { recursive: true });
-  writeSkillMarker(plan.target);
+  writeSkillMarker(plan.target, plan.provider);
   return { ...plan, installed: true, owned: true, conflict: false };
 }
 
@@ -1050,7 +1002,7 @@ function uninstallSkill(options: SkillOptions = {}) {
   const plan = planSkill(options);
   if (!plan.installed) return { ...plan, uninstalled: false, reason: "not installed" };
   if (plan.conflict && !options.force) {
-    throw new Error(`Codex skill target exists but is not owned by OME: ${plan.target}. Use --force only if you want to remove it.`);
+    throw new Error(`${providerName(plan.provider)} skill target exists but is not owned by OME: ${plan.target}. Use --force only if you want to remove it.`);
   }
   if (options.dryRun) return { ...plan, dryRun: true };
   fs.rmSync(plan.target, { recursive: true, force: true });
@@ -1073,10 +1025,11 @@ function inspectSkillTarget(target: string) {
   return { installed: true, owned: legacyOwned, legacyOwned };
 }
 
-function writeSkillMarker(target: string) {
+function writeSkillMarker(target: string, provider: string) {
   const info = packageInfo();
   fs.writeFileSync(path.join(target, OME_SKILL_MARKER), JSON.stringify({
     name: OME_SKILL_NAME,
+    provider,
     package: info.name,
     version: info.version,
     installedAt: new Date().toISOString(),
@@ -1087,8 +1040,8 @@ function codexHome(args: ParsedArgs) {
   return args.flags["codex-home"] ? path.resolve(args.flags["codex-home"]) : process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
 }
 
-function codexHooksFile(args: ParsedArgs) {
-  return path.join(codexHome(args), "hooks.json");
+function claudeHome(args: ParsedArgs) {
+  return args.flags["claude-home"] ? path.resolve(args.flags["claude-home"]) : path.join(os.homedir(), ".claude");
 }
 
 function configPointerPath() {
@@ -1519,15 +1472,17 @@ function uninstallCommand(dataDir: string, args: ParsedArgs) {
       if (result.uninstalled) recordHookConfig(dataDir, provider, false);
       return result;
     });
-  const skill = args.flags["keep-skill"] || !providers.includes("codex")
-    ? { skipped: true, reason: args.flags["keep-skill"] ? "--keep-skill" : "codex provider not selected" }
-    : uninstallSkill({
-      codexHome: args.flags["codex-home"] ? path.resolve(args.flags["codex-home"]) : process.env.CODEX_HOME,
+  const skills = args.flags["keep-skill"]
+    ? providers.map((provider) => ({ provider, skipped: true, reason: "--keep-skill" }))
+    : providers.map((provider) => uninstallSkill({
+      provider,
+      codexHome: codexHome(args),
+      claudeHome: claudeHome(args),
       dryRun: Boolean(args.flags["dry-run"]),
       force: Boolean(args.flags.force),
-    });
+    }));
   const library = uninstallLibrary(dataDir, args);
-  return print({ ok: true, hooks, skill, library, dryRun: Boolean(args.flags["dry-run"]) }, args);
+  return print({ ok: true, hooks, skills, library, dryRun: Boolean(args.flags["dry-run"]) }, args);
 }
 
 function uninstallLibrary(dataDir: string, args: ParsedArgs) {
@@ -1610,124 +1565,127 @@ function renderHumanOutput(value: unknown, args: ParsedArgs): string {
   const command = args.positionals[0] || "";
   const subcommand = args.positionals[1] || "";
   const record = asRecord(value);
-  const zh = cliLanguage() === "zh-CN";
-  if (command === "init") return renderInitResult(record, zh);
-  if (command === "doctor") return renderDoctorResult(record, zh);
-  if (command === "hook") return renderHookResult(record, zh);
-  if (command === "config") return renderConfigResult(record, subcommand, zh);
-  if (command === "source") return renderSourceResult(record, subcommand, zh);
-  if (command === "reflect") return renderReflectResult(record, zh);
-  if (command === "experience") return renderExperienceResult(record, subcommand, zh);
-  if (command === "match") return renderMatchResult(record, Boolean(args.flags.explain), zh);
-  if (command === "project") return renderProjectResult(record, subcommand, zh);
-  if (command === "eval") return renderEvalResult(record, subcommand, zh);
-  if (command === "stats") return renderStatsResult(record, zh);
-  if (command === "uninstall") return renderUninstallResult(record, zh);
-  return renderGenericResult(record, zh);
+  if (command === "init") return renderInitResult(record);
+  if (command === "doctor") return renderDoctorResult(record);
+  if (command === "hook") return renderHookResult(record);
+  if (command === "config") return renderConfigResult(record, subcommand);
+  if (command === "source") return renderSourceResult(record, subcommand);
+  if (command === "reflect") return renderReflectResult(record);
+  if (command === "experience") return renderExperienceResult(record, subcommand);
+  if (command === "match") return renderMatchResult(record, Boolean(args.flags.explain));
+  if (command === "project") return renderProjectResult(record, subcommand);
+  if (command === "eval") return renderEvalResult(record);
+  if (command === "stats") return renderStatsResult(record);
+  if (command === "uninstall") return renderUninstallResult(record);
+  return renderGenericResult(record);
 }
 
-function renderInitResult(record: Record<string, any>, zh: boolean): string {
+function renderInitResult(record: Record<string, any>): string {
   const dryRun = Boolean(record.dryRun);
   const plan = asRecord(record.plan);
   const dataDir = String(plan.dataDir || record.dataDir || "");
   const hooks = Array.isArray(record.hooks) ? record.hooks : [];
   const lines = [
-    dryRun ? (zh ? "设置预览" : "Setup preview") : (zh ? "设置完成" : "Setup complete"),
-    `${zh ? "经验库" : "Library"}: ${dataDir}`,
-    `${zh ? "配置文件" : "Config file"}: ${configPointerPath()}`,
+    dryRun ? "Setup preview" : "Setup complete",
+    `Library: ${dataDir}`,
+    `Config file: ${configPointerPath()}`,
   ];
   if (record.sources) lines.push(`Spool: ${asRecord(asRecord(record.sources).spool).mode || "off"}`);
-  if (hooks.length) lines.push(`${zh ? "Agent 召回" : "Agent recall"}: ${hooks.map((hook) => formatHookStatus(asRecord(hook), zh)).join(", ")}`);
-  else if (asRecord(record.hooks).skipped) lines.push(`${zh ? "Agent 召回" : "Agent recall"}: ${zh ? "未启用" : "disabled"}`);
-  const skill = asRecord(record.skill);
-  if (skill.target) lines.push(`${zh ? "Codex Skill" : "Codex skill"}: ${skill.target}`);
+  if (hooks.length) lines.push(`Agent recall: ${hooks.map((hook) => formatHookStatus(asRecord(hook))).join(", ")}`);
+  else if (asRecord(record.hooks).skipped) lines.push("Agent recall: disabled");
+  const skills = Array.isArray(record.skills) ? record.skills : [];
+  if (skills.length) lines.push(`Agent skills: ${skills.map((skill) => formatSkillStatus(asRecord(skill))).join(", ")}`);
   const starterCards = Array.isArray(record.starterCards) ? record.starterCards : [];
-  if (starterCards.length) lines.push(`${zh ? "内置示例经验" : "Starter lessons"}: ${starterCards.length}`);
+  if (starterCards.length) lines.push(`Starter lessons: ${starterCards.length}`);
   if (!dryRun) {
     lines.push("");
-    lines.push(zh ? "下一步:" : "Next step:");
-    lines.push(`  ${zh ? "先把一个真实任务发给 Agent，体验内置示例经验的提示词阶段召回。" : "Send a real task to your agent first and feel prompt-time recall with the starter lessons."}`);
-    lines.push(`  ${zh ? "第一次召回体验后，再进入第一张经验卡或完整复盘流程；复盘出来的经验会进入经验草稿审批，不会自动启用。" : "After the first recall, move to the first-card or full retrospective flow; extracted experiences go to draft approval and are not enabled automatically."}`);
+    lines.push("Next step:");
+    if (hasInstalledRecallHook(hooks)) {
+      lines.push("  Send a real task to your agent; the installed hook will recall relevant active experiences automatically.");
+      lines.push("  After the first recall, move to the first-card or full retrospective flow; extracted experiences go to draft approval and are not enabled automatically.");
+    } else {
+      lines.push("  Library is ready, but prompt-time recall is not connected to an agent yet.");
+      lines.push("  Run `ome init --provider codex`, `ome init --provider claude`, or `ome init --provider all` when you want automatic recall.");
+    }
     if (hooks.some((hook) => asRecord(hook).provider === "codex" && asRecord(hook).installed)) {
-      lines.push(`  ${zh ? "Codex App 可能会要求你信任新的 UserPromptSubmit hook。" : "Codex App may ask you to trust the new UserPromptSubmit hook."}`);
+      lines.push("  Codex App may ask you to trust the new UserPromptSubmit hook.");
     }
     lines.push("");
-    lines.push(zh ? "建议:" : "Recommendations:");
-    lines.push(`  ${zh ? "用 Spool 连接更多 Agent 历史" : "Connect more agent histories with Spool"}`);
-    lines.push(`  ${zh ? "可扫描 Claude CLI、Gemini CLI、opencode 等会话索引；不安装也不影响 Codex 默认召回。" : "Scan Claude CLI, Gemini CLI, opencode, and other supported history indexes. Codex recall works without it."}`);
-    lines.push(`  ${zh ? "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/source-scan.md" : "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/source-scan.md"}`);
+    lines.push("Recommendations:");
+    lines.push("  Connect more agent histories with Spool");
+    lines.push("  Scan Claude CLI, Gemini CLI, opencode, and other supported history indexes. OME recall works without it.");
+    lines.push("  https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/source-scan.md");
   }
-  lines.push(jsonHint(zh));
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function renderDoctorResult(record: Record<string, any>, zh: boolean): string {
+function renderDoctorResult(record: Record<string, any>): string {
   const doctor = asRecord(record.doctor || record);
   const lines = [
-    `${zh ? "健康检查" : "Health check"}: ${doctor.ok ? (zh ? "正常" : "OK") : (zh ? "需要处理" : "Needs attention")}`,
+    `Health check: ${doctor.ok ? "OK" : "Needs attention"}`,
   ];
-  if (doctor.checked) lines.push(`${zh ? "已检查" : "Checked"}: ${Object.keys(asRecord(doctor.checked)).join(", ")}`);
-  appendList(lines, zh ? "阻塞项" : "Errors", doctor.errors);
-  appendList(lines, zh ? "注意项" : "Warnings", doctor.warnings);
-  appendList(lines, zh ? "建议动作" : "Actions", doctor.actions);
-  if (record.repairedIndex) lines.push(`${zh ? "索引已重建" : "Index rebuilt"}: ${asRecord(record.repairedIndex).experiences?.length || 0} ${zh ? "张卡片" : "cards"}`);
-  lines.push(jsonHint(zh));
+  if (doctor.checked) lines.push(`Checked: ${Object.keys(asRecord(doctor.checked)).join(", ")}`);
+  appendList(lines, "Errors", doctor.errors);
+  appendList(lines, "Warnings", doctor.warnings);
+  appendList(lines, "Actions", doctor.actions);
+  if (record.repairedIndex) lines.push(`Index rebuilt: ${asRecord(record.repairedIndex).experiences?.length || 0} cards`);
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function renderHookResult(record: Record<string, any>, zh: boolean): string {
-  const lines = [`${zh ? "Hook 状态" : "Hook status"}: ${formatHookStatus(record, zh)}`];
-  if (record.target) lines.push(`${zh ? "配置文件" : "Config file"}: ${record.target}`);
-  if (record.hook?.command) lines.push(`${zh ? "命令" : "Command"}: ${record.hook.command}`);
-  if (record.reason) lines.push(`${zh ? "原因" : "Reason"}: ${record.reason}`);
-  lines.push(jsonHint(zh));
+function renderHookResult(record: Record<string, any>): string {
+  const lines = [`Hook status: ${formatHookStatus(record)}`];
+  if (record.target) lines.push(`Config file: ${record.target}`);
+  if (record.hook?.command) lines.push(`Command: ${record.hook.command}`);
+  if (record.reason) lines.push(`Reason: ${record.reason}`);
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function renderUninstallResult(record: Record<string, any>, zh: boolean): string {
+function renderUninstallResult(record: Record<string, any>): string {
   const hooks = Array.isArray(record.hooks) ? record.hooks : [];
-  const skill = asRecord(record.skill);
+  const skills = Array.isArray(record.skills) ? record.skills : [];
   const library = asRecord(record.library);
   const lines = [
-    record.dryRun ? (zh ? "卸载预览" : "Uninstall preview") : (zh ? "卸载完成" : "Uninstall complete"),
+    record.dryRun ? "Uninstall preview" : "Uninstall complete",
   ];
-  if (hooks.length) lines.push(`${zh ? "Hook" : "Hooks"}: ${hooks.map((hook) => formatHookStatus(asRecord(hook), zh)).join(", ")}`);
-  if (!skill.skipped) lines.push(`${zh ? "Codex Skill" : "Codex skill"}: ${formatSkillStatus(skill, zh)}`);
-  else lines.push(`${zh ? "Codex Skill" : "Codex skill"}: ${zh ? "保留" : "kept"}`);
-  if (library.deleted) lines.push(`${zh ? "经验库已删除" : "Library deleted"}: ${library.path}`);
-  else lines.push(`${zh ? "经验库已保留" : "Library kept"}: ${library.path || ""}`);
-  lines.push(jsonHint(zh));
+  if (hooks.length) lines.push(`Hooks: ${hooks.map((hook) => formatHookStatus(asRecord(hook))).join(", ")}`);
+  if (skills.length) lines.push(`Agent skills: ${skills.map((skill) => formatSkillStatus(asRecord(skill))).join(", ")}`);
+  if (library.deleted) lines.push(`Library deleted: ${library.path}`);
+  else lines.push(`Library kept: ${library.path || ""}`);
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function renderConfigResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
+function renderConfigResult(record: Record<string, any>, subcommand: string): string {
   if (subcommand === "get" || record.version) {
     const retrieval = asRecord(record.retrieval);
     return [
-      zh ? "当前配置" : "Current config",
-      `${zh ? "经验库" : "Library"}: ${record.dataDir || ""}`,
-      `${zh ? "召回" : "Recall"}: maxCards=${retrieval.maxCards || "-"}, minScore=${retrieval.minScore || "-"}`,
-      jsonHint(zh),
+      "Current config",
+      `Library: ${record.dataDir || ""}`,
+      `Recall: maxCards=${retrieval.maxCards || "-"}, minScore=${retrieval.minScore || "-"}`,
+      jsonHint(),
     ].join("\n");
   }
   const lines = [
-    record.ok === false ? (zh ? "配置未更新" : "Config not updated") : (zh ? "配置已处理" : "Config updated"),
-    `${zh ? "字段" : "Key"}: ${record.key || ""}`,
+    record.ok === false ? "Config not updated" : "Config updated",
+    `Key: ${record.key || ""}`,
   ];
-  if (record.previous !== undefined) lines.push(`${zh ? "之前" : "Previous"}: ${formatScalar(record.previous)}`);
-  if (record.next !== undefined) lines.push(`${zh ? "现在" : "Next"}: ${formatScalar(record.next)}`);
-  appendList(lines, zh ? "注意项" : "Warnings", record.warnings);
-  lines.push(jsonHint(zh));
+  if (record.previous !== undefined) lines.push(`Previous: ${formatScalar(record.previous)}`);
+  if (record.next !== undefined) lines.push(`Next: ${formatScalar(record.next)}`);
+  appendList(lines, "Warnings", record.warnings);
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function renderSourceResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
+function renderSourceResult(record: Record<string, any>, subcommand: string): string {
   if (!subcommand || subcommand === "status") {
     const spool = asRecord(record.spool);
     const sourceIndex = asRecord(record.sourceIndex);
     return [
       "Source status",
-      `Spool: ${spool.available ? (zh ? "可用" : "available") : (zh ? "未检测到" : "not detected")}`,
+      `Spool: ${spool.available ? "available" : "not detected"}`,
       spool.version ? `Version: ${spool.version}` : "",
       `Mode: ${asRecord(asRecord(record.sources).spool).mode || "off"}`,
       `Sessions: ${sourceIndex.sessions || 0}`,
@@ -1736,7 +1694,7 @@ function renderSourceResult(record: Record<string, any>, subcommand: string, zh:
       `Message arrays: ${sourceIndex.messageArrays || 0}`,
       `Embedded message text: ${sourceIndex.embeddedMessageRecords || 0}`,
       `Summary records: ${sourceIndex.summaryRecords || 0}`,
-      jsonHint(zh),
+      jsonHint(),
     ].filter(Boolean).join("\n");
   }
   if (subcommand === "scan") {
@@ -1744,38 +1702,38 @@ function renderSourceResult(record: Record<string, any>, subcommand: string, zh:
     const skipped = Array.isArray(record.skipped) ? record.skipped.length : 0;
     const failed = Array.isArray(record.failed) ? record.failed.length : 0;
     return [
-      zh ? "来源扫描完成" : "Source scan complete",
+      "Source scan complete",
       `Source: ${record.source || ""}`,
       `Storage: ${record.storage || "pointer"}`,
-      `${zh ? "已索引" : "Indexed"}: ${indexed}`,
-      `${zh ? "跳过" : "Skipped"}: ${skipped}`,
-      `${zh ? "失败" : "Failed"}: ${failed}`,
-      jsonHint(zh),
+      `Indexed: ${indexed}`,
+      `Skipped: ${skipped}`,
+      `Failed: ${failed}`,
+      jsonHint(),
     ].join("\n");
   }
   if (subcommand === "clean") {
     const compact = asRecord(record.compact);
     const prune = asRecord(record.prune);
     return [
-      zh ? "来源索引清理" : "Source cleanup",
+      "Source cleanup",
       `Dry run: ${Boolean(record.dryRun)}`,
       `Sessions: ${compact.sessions || 0}`,
       `Saved bytes: ${compact.savedBytes || 0}`,
       `Materialized pruned: ${prune.pruned || 0}`,
-      record.next ? `${zh ? "下一步" : "Next"}: ${record.next}` : "",
-      jsonHint(zh),
+      record.next ? `Next: ${record.next}` : "",
+      jsonHint(),
     ].filter(Boolean).join("\n");
   }
   if (subcommand === "connect") {
     const sources = asRecord(record.sources);
     const spool = asRecord(sources.spool);
     return [
-      zh ? "来源配置已更新" : "Source config updated",
+      "Source config updated",
       `Spool mode: ${spool.mode || "off"}`,
-      jsonHint(zh),
+      jsonHint(),
     ].join("\n");
   }
-  return renderGenericResult(record, zh);
+  return renderGenericResult(record);
 }
 
 function formatCounts(counts: Record<string, any>) {
@@ -1784,43 +1742,42 @@ function formatCounts(counts: Record<string, any>) {
   return entries.map(([key, value]) => `${key}=${value}`).join(", ");
 }
 
-function renderReflectResult(record: Record<string, any>, zh: boolean): string {
+function renderReflectResult(record: Record<string, any>): string {
   if (Array.isArray(record.retrospectives) || Array.isArray(record.candidates) || Array.isArray(record.drafts)) {
-    return renderRetrospectiveResult(record, zh);
+    return renderRetrospectiveResult(record);
   }
   return [
-    zh ? "本次经验复盘" : "Experience review",
-    `${zh ? "复盘编号" : "Reflect id"}: ${record.runId || record.id || ""}`,
-    reviewFileLine(record, zh),
-    record.nextStep ? `${zh ? "下一步" : "Next"}: ${record.nextStep}` : "",
-    jsonHint(zh),
+    "Experience review",
+    `Reflect id: ${record.runId || record.id || ""}`,
+    reviewFileLine(record),
+    record.nextStep ? `Next: ${record.nextStep}` : "",
+    jsonHint(),
   ].filter(Boolean).join("\n");
 }
 
-function renderRetrospectiveResult(record: Record<string, any>, zh: boolean): string {
+function renderRetrospectiveResult(record: Record<string, any>): string {
   const candidates = Array.isArray(record.candidates) ? record.candidates.length : 0;
   const drafts = Array.isArray(record.drafts) ? record.drafts.length : 0;
   const retrospectives = Array.isArray(record.retrospectives) ? record.retrospectives.length : 0;
-  const lines = [zh ? "经验复盘结果" : "Experience review result"];
-  if (record.runId) lines.push(`${zh ? "复盘编号" : "Reflect id"}: ${record.runId}`);
-  if (retrospectives) lines.push(`${zh ? "经验复盘" : "Experience reviews"}: ${retrospectives}`);
-  if (candidates) lines.push(`${zh ? "经验草稿" : "Experience drafts"}: ${candidates}`);
-  if (drafts) lines.push(`${zh ? "待入库草稿" : "Drafts ready to add"}: ${drafts}`);
-  if (record.candidate?.id) lines.push(`${zh ? "经验编号" : "Experience id"}: ${record.candidate.id}`);
-  const reviewLine = reviewFileLine(record, zh);
+  const lines = ["Experience review result"];
+  if (record.runId) lines.push(`Reflect id: ${record.runId}`);
+  if (retrospectives) lines.push(`Experience reviews: ${retrospectives}`);
+  if (candidates) lines.push(`Experience drafts: ${candidates}`);
+  if (drafts) lines.push(`Drafts ready to add: ${drafts}`);
+  if (record.candidate?.id) lines.push(`Experience id: ${record.candidate.id}`);
+  const reviewLine = reviewFileLine(record);
   if (reviewLine) lines.push(reviewLine);
-  if (record.dryRun) lines.push(zh ? "这是 dry-run，没有准备入库草稿。" : "Dry run only; no drafts were prepared for the library.");
-  else if (drafts) lines.push(zh ? "这些草稿还不会参与召回；确认入库后再启用。" : "These drafts are not recalled yet. Enable them only after confirmation.");
-  else if (candidates) lines.push(retrospectiveNextStep(record, zh));
-  lines.push(jsonHint(zh));
+  if (record.dryRun) lines.push("Dry run only; no drafts were prepared for the library.");
+  else if (drafts) lines.push("These drafts are not recalled yet. Enable them only after confirmation.");
+  else if (candidates) lines.push(retrospectiveNextStep(record));
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function reviewFileLine(record: Record<string, any>, zh: boolean): string {
+function reviewFileLine(record: Record<string, any>): string {
   if (!record.reviewFile) return "";
   const relative = reviewRelativePath(record);
-  const label = zh ? "经验草稿审批" : "Draft approval";
-  return `${label}: [${zh ? "查看" : "Review"}](<${markdownLinkTarget(relative)}>)`;
+  return `Draft approval: [Review](<${markdownLinkTarget(relative)}>)`;
 }
 
 function reviewRelativePath(record: Record<string, any>): string {
@@ -1838,52 +1795,46 @@ function markdownLinkTarget(value: string): string {
   return value.replaceAll(">", "%3E");
 }
 
-function retrospectiveNextStep(record: Record<string, any>, zh: boolean): string {
+function retrospectiveNextStep(record: Record<string, any>): string {
   const state = String(record.state || "");
   if (state === "applied_to_drafts") {
-    return zh
-      ? "已准备好待入库草稿；它们还不会参与召回。确认入库后再启用。"
-      : "The approved drafts are ready to add. They are not recalled yet; enable them only after confirmation.";
+    return "The approved drafts are ready to add. They are not recalled yet; enable them only after confirmation.";
   }
   if (state === "decisions_recorded") {
-    return zh
-      ? "已有审批意见；确认后让 Agent 把通过的经验准备入库。"
-      : "Approval notes are recorded; after confirmation, have the agent prepare accepted drafts for the library.";
+    return "Approval notes are recorded; after confirmation, have the agent prepare accepted drafts for the library.";
   }
-  return zh
-    ? "查看经验草稿审批；请确认：通过 / 不通过 / 修改 / 合并 / 补充边界。确认后再入库。"
-    : "Review the experience drafts; reply approve, reject, revise, merge, or add boundaries. Add to the library only after confirmation.";
+  return "Review the experience drafts; reply approve, reject, revise, merge, or add boundaries. Add to the library only after confirmation.";
 }
 
-function renderExperienceResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
+function renderExperienceResult(record: Record<string, any>, subcommand: string): string {
   const cards = Array.isArray(record.experiences) ? record.experiences : [];
   const invalidCards = Array.isArray(record.invalidCards) ? record.invalidCards : [];
-  const lines = [subcommand === "list" || cards.length ? `${zh ? "经验" : "Experiences"}: ${cards.length}` : (zh ? "经验已更新" : "Experience updated")];
+  const lines = [subcommand === "list" || cards.length ? `Experiences: ${cards.length}` : "Experience updated"];
   for (const card of cards.slice(0, 10)) lines.push(`  - ${asRecord(card).id}: ${asRecord(card).title || ""}`);
   if (cards.length > 10) lines.push(`  ... ${cards.length - 10} more`);
   if (invalidCards.length) {
-    lines.push(`${zh ? "无效卡片" : "Invalid cards"}: ${invalidCards.length}`);
+    lines.push(`Invalid cards: ${invalidCards.length}`);
     for (const issue of invalidCards.slice(0, 5)) {
       const item = asRecord(issue);
       lines.push(`  - ${item.status || ""}: ${item.path || ""} (${item.message || ""})`);
     }
     if (invalidCards.length > 5) lines.push(`  ... ${invalidCards.length - 5} more invalid`);
   }
-  lines.push(jsonHint(zh));
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function renderMatchResult(record: Record<string, any>, explain: boolean, zh: boolean): string {
+function renderMatchResult(record: Record<string, any>, explain: boolean): string {
   const matches = Array.isArray(record.matches) ? record.matches : [];
   const libraries = Array.isArray(record.libraries) ? record.libraries : [];
   const lines = [
-    `${zh ? "召回结果" : "Recall result"}: ${matches.length} ${zh ? "张卡片" : "cards"}`,
-    `${zh ? "查询" : "Query"}: ${record.query || ""}`,
+    `Recall result: ${matches.length} cards`,
+    `Query: ${record.query || ""}`,
   ];
   if (explain && libraries.length) {
-    lines.push(`${zh ? "经验库" : "Libraries"}: ${libraries.map((library) => {
+    lines.push(`Libraries: ${libraries.map((library) => {
       const item = asRecord(library);
-      return `${item.scope}${item.exists === false ? (zh ? "(不存在)" : "(missing)") : item.readable === false ? (zh ? "(不可读)" : "(unreadable)") : ""}`;
+      return `${item.scope}${item.exists === false ? "(missing)" : item.readable === false ? "(unreadable)" : ""}`;
     }).join(", ")}`);
   }
   for (const match of matches.slice(0, 8)) {
@@ -1892,33 +1843,33 @@ function renderMatchResult(record: Record<string, any>, explain: boolean, zh: bo
     const title = item.title || card.title || item.id || card.id;
     const id = item.id || card.id || "";
     const scope = card.libraryScope ? ` ${card.libraryScope}` : "";
-    lines.push(`  ${item.rank || "-"}。${title} (${zh ? "分数" : "score"} ${Math.round(Number(item.score || 0))}${scope}) ${id ? `[${id}]` : ""}`);
+    lines.push(`  ${item.rank || "-"}. ${title} (score ${Math.round(Number(item.score || 0))}${scope}) ${id ? `[${id}]` : ""}`);
     if (explain && Array.isArray(item.reasons) && item.reasons.length) lines.push(`     ${item.reasons.slice(0, 2).map(formatMatchReason).join("; ")}`);
   }
   const envelope = asRecord(record.envelope);
   if (explain && Array.isArray(envelope.intentModes) && envelope.intentModes.length) lines.push(`intent: ${envelope.intentModes.join(", ")}`);
   if (explain && Array.isArray(envelope.ruleSignals) && envelope.ruleSignals.length) lines.push(`signals: ${envelope.ruleSignals.map((signal) => asRecord(signal).id || signal).join(", ")}`);
-  if (record.additionalContext) lines.push(`${zh ? "注入上下文" : "Additional context"}: ${String(record.additionalContext).length} chars`);
-  lines.push(jsonHint(zh));
+  if (record.additionalContext) lines.push(`Additional context: ${String(record.additionalContext).length} chars`);
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function renderProjectResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
+function renderProjectResult(record: Record<string, any>, subcommand: string): string {
   if (subcommand === "init") {
     return [
-      zh ? "项目经验库已初始化" : "Project library initialized",
-      `${zh ? "项目" : "Project"}: ${record.projectRoot || ""}`,
-      `${zh ? "项目经验库" : "Project library"}: ${record.projectLibrary || ""}`,
-      jsonHint(zh),
+      "Project library initialized",
+      `Project: ${record.projectRoot || ""}`,
+      `Project library: ${record.projectLibrary || ""}`,
+      jsonHint(),
     ].join("\n");
   }
   return [
-    zh ? "项目经验库状态" : "Project library status",
-    `${zh ? "项目经验库" : "Project library"}: ${record.projectLibrary || ""}`,
-    `${zh ? "存在" : "Exists"}: ${record.exists ? (zh ? "是" : "yes") : (zh ? "否" : "no")}`,
-    `${zh ? "可读" : "Readable"}: ${record.readable ? (zh ? "是" : "yes") : (zh ? "否" : "no")}`,
-    ...(Array.isArray(record.warnings) && record.warnings.length ? [`${zh ? "警告" : "Warnings"}: ${record.warnings.join("; ")}`] : []),
-    jsonHint(zh),
+    "Project library status",
+    `Project library: ${record.projectLibrary || ""}`,
+    `Exists: ${record.exists ? "yes" : "no"}`,
+    `Readable: ${record.readable ? "yes" : "no"}`,
+    ...(Array.isArray(record.warnings) && record.warnings.length ? [`Warnings: ${record.warnings.join("; ")}`] : []),
+    jsonHint(),
   ].join("\n");
 }
 
@@ -1928,57 +1879,58 @@ function formatMatchReason(value: unknown): string {
   return `${item.field || "reason"}:${item.term || ""}${item.weight !== undefined ? ` ${item.weight}` : ""}`.trim();
 }
 
-function renderEvalResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
+function renderEvalResult(record: Record<string, any>): string {
   const metrics = asRecord(record.metrics);
   const lines = [
-    `${zh ? "评估结果" : "Evaluation"}: ${record.ok === false ? (zh ? "未通过" : "failed") : (zh ? "通过" : "passed")}`,
+    `Evaluation: ${record.ok === false ? "failed" : "passed"}`,
   ];
   if (Object.keys(metrics).length) {
     lines.push(`passRate=${formatMetric(metrics.passRate)}, recall@k=${formatMetric(metrics.recallAtK)}, precision@k=${formatMetric(metrics.precisionAtK)}, overRecall=${formatMetric(metrics.overRecallRate)}`);
   }
-  if (record.thresholds && asRecord(record.thresholds).failed?.length) appendList(lines, zh ? "未达标" : "Failed thresholds", asRecord(record.thresholds).failed);
-  lines.push(jsonHint(zh));
+  if (record.thresholds && asRecord(record.thresholds).failed?.length) appendList(lines, "Failed thresholds", asRecord(record.thresholds).failed);
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function renderStatsResult(record: Record<string, any>, zh: boolean): string {
+function renderStatsResult(record: Record<string, any>): string {
   return [
-    zh ? "运行统计" : "Stats",
-    `${zh ? "卡片数" : "Cards"}: ${Object.keys(asRecord(record.cardRecallCount)).length}`,
-    `${zh ? "最近事件" : "Recent events"}: ${Array.isArray(record.recentEvents) ? record.recentEvents.length : 0}`,
-    jsonHint(zh),
+    "Stats",
+    `Cards: ${Object.keys(asRecord(record.cardRecallCount)).length}`,
+    `Recent events: ${Array.isArray(record.recentEvents) ? record.recentEvents.length : 0}`,
+    jsonHint(),
   ].join("\n");
 }
 
-function renderGenericResult(record: Record<string, any>, zh: boolean): string {
-  const lines = [record.ok === false ? (zh ? "未完成" : "Failed") : (zh ? "完成" : "Done")];
+function renderGenericResult(record: Record<string, any>): string {
+  const lines = [record.ok === false ? "Failed" : "Done"];
   for (const [key, value] of Object.entries(record).slice(0, 8)) {
     if (key === "ok") continue;
     if (Array.isArray(value)) lines.push(`${key}: ${value.length}`);
     else if (isPrimitive(value)) lines.push(`${key}: ${formatScalar(value)}`);
   }
-  lines.push(jsonHint(zh));
+  lines.push(jsonHint());
   return lines.join("\n");
 }
 
-function formatHookStatus(record: Record<string, any>, zh: boolean): string {
+function formatHookStatus(record: Record<string, any>): string {
   const provider = providerName(record.provider || "hook");
-  if (record.skipped) return `${provider} ${zh ? "未启用" : "disabled"}`;
-  if (record.installed) return `${provider} ${zh ? "已启用" : "enabled"}`;
-  if (record.uninstalled) return `${provider} ${zh ? "已移除" : "removed"}`;
-  if (record.dryRun) return `${provider} ${zh ? "预览" : "preview"}`;
-  if (typeof record.installed === "boolean") return `${provider} ${record.installed ? (zh ? "已启用" : "enabled") : (zh ? "未启用" : "disabled")}`;
-  return `${provider} ${zh ? "已处理" : "updated"}`;
+  if (record.skipped) return `${provider} disabled`;
+  if (record.installed) return `${provider} enabled`;
+  if (record.uninstalled) return `${provider} removed`;
+  if (record.dryRun) return `${provider} preview`;
+  if (typeof record.installed === "boolean") return `${provider} ${record.installed ? "enabled" : "disabled"}`;
+  return `${provider} updated`;
 }
 
-function formatSkillStatus(record: Record<string, any>, zh: boolean): string {
-  if (record.skipped) return zh ? "已跳过" : "skipped";
-  if (record.conflict) return zh ? "冲突" : "conflict";
-  if (record.uninstalled) return zh ? "已移除" : "removed";
-  if (record.dryRun) return zh ? "预览" : "preview";
-  if (record.installed) return zh ? "已安装" : "installed";
-  if (typeof record.installed === "boolean") return record.installed ? (zh ? "已安装" : "installed") : (zh ? "未安装" : "not installed");
-  return zh ? "已处理" : "updated";
+function formatSkillStatus(record: Record<string, any>): string {
+  const provider = providerName(record.provider || "skill");
+  if (record.skipped) return `${provider} kept`;
+  if (record.conflict) return `${provider} conflict`;
+  if (record.uninstalled) return `${provider} removed`;
+  if (record.dryRun) return `${provider} preview`;
+  if (record.installed) return `${provider} installed`;
+  if (typeof record.installed === "boolean") return `${provider} ${record.installed ? "installed" : "not installed"}`;
+  return `${provider} updated`;
 }
 
 function providerName(value: unknown): string {
@@ -2006,8 +1958,8 @@ function formatMetric(value: unknown): string {
   return Number.isFinite(numeric) ? numeric.toFixed(2) : "-";
 }
 
-function jsonHint(zh: boolean): string {
-  return zh ? "完整机器可读输出请加 --json。" : "Use --json for full machine-readable output.";
+function jsonHint(): string {
+  return "Use --json for full machine-readable output.";
 }
 
 function asRecord(value: unknown): Record<string, any> {
@@ -2063,46 +2015,8 @@ function parseArgs(argv: string[]): ParsedArgs {
   return { flags, positionals };
 }
 
-function cliLanguage() {
-  return normalizeLocale(String(process.env.OME_LANGUAGE || "en"));
-}
-
 function printHelp() {
-  const locale = cliLanguage();
-  const zh = locale === "zh-CN";
-  console.log(zh ? `${t("cli.title", locale)}
-
-面向 AI 编码 Agent 的本地经验层：先审核经验卡，再在提示词阶段召回。
-
-常用路径:
-  ome init                         打开设置向导
-  ome doctor                       检查经验库、hook 和包状态
-  ome uninstall                    移除 Codex hook 和 OME skill，默认保留经验库
-  ome match "修复 UI 并浏览器验收" --explain
-
-核心命令:
-  ome init [--interactive] [--yes|-y] [--data-dir <path>] [--provider codex|claude|all] [--no-hook] [--reset-config]
-  ome uninstall [--provider codex|claude|all] [--delete-library --yes]
-  ome version | ome -v
-  ome config get|preview|set
-  ome source status|scan codex|scan spool|clean|connect spool
-  ome reflect start [--focus <text>]
-  ome reflect list|show|add|candidates|decide|apply|resume
-  ome experience list|show|enable|archive|migrate-legacy
-  ome project init|status
-  ome eval recall --suite <file>
-  ome hook run|status
-  ome stats
-
-输出:
-  默认输出给人看；脚本、hook、测试请加 --json。
-  --reset-config 只覆盖运行配置，不删除经验、来源索引或草稿审批记录。
-  如果 init 没有出现向导，先运行 ome version 确认当前二进制，再用 ome init --interactive。
-
-文档:
-  docs/zh/guides/quickstart.md
-  docs/zh/reference/cli.md
-` : `${t("cli.title", locale)}
+  console.log(`Oh My Experience
 
 Local-first experience layer for AI coding agents: approve experience drafts,
 then recall them at prompt time.
@@ -2110,8 +2024,7 @@ then recall them at prompt time.
 Common path:
   ome init                         start the setup wizard
   ome doctor                       check library, hooks, and package status
-  ome uninstall                    remove Codex hook and OME skill, keep library by default
-  ome match "fix UI and validate in browser" --explain
+  ome uninstall                    remove selected recall hooks and skills, keep library by default
 
 Core commands:
   ome init [--interactive] [--yes|-y] [--data-dir <path>] [--provider codex|claude|all] [--no-hook] [--reset-config]

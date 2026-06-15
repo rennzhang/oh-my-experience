@@ -215,6 +215,11 @@ test("matcher suppresses positive signals in explicit near-miss examples", () =>
   assert.equal(goalExample.ruleSignals.some((signal) => signal.id === "goal_execute"), false);
   assert.equal(goalExample.intentModes.includes("execute"), false);
 
+  const englishGoalExample = buildTaskEnvelope("Write documentation that explains how to create a goal in Codex.");
+  assert.ok(englishGoalExample.ruleSignals.some((signal) => signal.id === "goal_example_discussion"));
+  assert.equal(englishGoalExample.ruleSignals.some((signal) => signal.id === "goal_execute"), false);
+  assert.equal(englishGoalExample.intentModes.includes("execute"), false);
+
   const uiNoise = buildTaskEnvelope("这个提示里有 UI、browser 等噪声；真正任务是 npm tarball 安装验证。");
   assert.ok(uiNoise.ruleSignals.some((signal) => signal.id === "ui_surface_noise"));
   assert.equal(uiNoise.ruleSignals.some((signal) => signal.id === "ui_surface"), false);
@@ -911,6 +916,8 @@ test("negative triggers disambiguate overloaded terms like goal", () => {
   assert.equal(ordinaryGoal.some((item) => item.card.id === "agent-goal-routine"), false);
   const docsExample = matchCards(dataDir, "文档里要增加实际案例，比如当我说创建目标或者使用 /goal 斜杠命令时会加载什么经验，并展示给用户看。", { threshold: 20 });
   assert.equal(docsExample.some((item) => item.card.id === "agent-goal-routine"), false);
+  const englishDocsExample = matchCards(dataDir, "write documentation that explains how to create a goal in Codex", { threshold: 20 });
+  assert.equal(englishDocsExample.some((item) => item.card.id === "agent-goal-routine"), false);
 });
 
 test("starter draft approval flow only recalls for OME approval work", () => {
@@ -1265,6 +1272,37 @@ test("starter lessons recall Linear-style Kanban workflow guidance", () => {
   const context = renderAdditionalContext(matches);
   assert.match(context, /Build Linear-style tool screens around workflow, not decoration/);
   assert.match(context, /workflow clarity and operational density/);
+});
+
+test("starter lessons recall the first-run goal execution example", () => {
+  const dataDir = tmpDir("starter-goal-example");
+  initializeDataDir({ dataDir });
+  const query = [
+    "Based on this checkout redesign plan: create a single-file checkout page prototype.",
+    "Create a goal and start now. Finish the whole change end to end and verify it yourself.",
+  ].join(" ");
+  const matches = matchCards(dataDir, query);
+  assert.equal(matches[0]?.card.id, "starter-agent-goal-execution");
+  const context = renderAdditionalContext(matches);
+  assert.match(context, /Enter full-closure delivery mode when a goal starts/);
+  assert.match(context, /ome experience show starter-agent-goal-execution --section rule/);
+  const fullCard = getCard(dataDir, "starter-agent-goal-execution");
+  assert.match(fullCard.rule, /Default execution rules/);
+  assert.match(fullCard.rule, /Completion must fail closed/);
+});
+
+test("starter goal lesson does not recall for documentation or explanation examples", () => {
+  const dataDir = tmpDir("starter-goal-near-misses");
+  initializeDataDir({ dataDir });
+
+  for (const query of [
+    "write documentation that explains how to create a goal in Codex",
+    "discuss what /goal means without executing anything",
+    "create a business goal for Q3 OKR",
+  ]) {
+    const matches = matchCards(dataDir, query, { threshold: 20 });
+    assert.equal(matches.some((item) => item.card.id === "starter-agent-goal-execution"), false, query);
+  }
 });
 
 test("review rewrite creates rewritten draft and merge updates target card", () => {

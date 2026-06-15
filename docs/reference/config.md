@@ -71,8 +71,8 @@ Changing `dataDir` should go through `ome config preview` before applying the
 new value. This prevents an accidental command from moving the writable library
 location without a visible diff.
 
-Language is intentionally not stored in config. Human CLI output is English by
-default, and `OME_LANGUAGE=zh-CN` is an explicit override.
+Language is intentionally not stored in config. Human CLI output is English
+only; documentation localization lives in docs routes such as `/zh/`.
 
 ## Global Versus Project Storage
 

@@ -340,7 +340,7 @@ test("match skips invalid project library and keeps global recall usable", () =>
   assert.match(projectLibrary.warnings.join("\n"), /failed to read project experience library/);
 });
 
-test("doctor warns when installed Codex skill differs from bundled skill", () => {
+test("doctor warns when installed agent skill differs from bundled skill", () => {
   const dataDir = tmpDir("doctor-skill-drift");
   const codexHome = tmpDir("doctor-skill-drift-codex-home");
   json(run(["init", "--data-dir", dataDir, "--codex-home", codexHome, "--json"]));
@@ -349,7 +349,8 @@ test("doctor warns when installed Codex skill differs from bundled skill", () =>
 
   const doctor = json(run(["doctor", "--data-dir", dataDir, "--codex-home", codexHome, "--json"]));
   assert.equal(doctor.ok, true);
-  assert.equal(doctor.checked.codexSkill.inSync, false);
+  const skill = doctor.checked.agentSkills.find((item) => item.provider === "codex");
+  assert.equal(skill.inSync, false);
   assert.match(doctor.warnings.join("\n"), /installed Codex OME skill differs from bundled package/);
 });
 
@@ -448,7 +449,7 @@ test("CLI errors stay actionable and machine-readable", () => {
   const human = run(["mach"]);
   assert.notEqual(human.status, 0);
   assert.match(human.stderr, /unknown command: mach/);
-  assert.match(human.stderr, /Did you mean: ome match/);
+  assert.doesNotMatch(human.stderr, /ome match/);
   assert.match(human.stderr, /ome help/);
 
   const hidden = run(["retrospectiv"]);
@@ -500,6 +501,23 @@ test("init short yes flag skips prompts for scripted setup", () => {
   assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience", ".ome-skill.json")), true);
 });
 
+test("init no-hook does not claim automatic recall is connected", () => {
+  const dataDir = path.join(tmpDir("no-hook-next-step"), "library");
+  const jsonResult = json(run(["init", "--data-dir", dataDir, "--no-hook", "--json"]));
+  assert.equal(jsonResult.hooks.skipped, true);
+  assert.equal(jsonResult.skills.length, 0);
+  assert.match(jsonResult.nextStep, /Library is ready/);
+  assert.doesNotMatch(jsonResult.nextStep, /installed hook will recall/);
+
+  const human = run(["init", "--data-dir", path.join(tmpDir("no-hook-human"), "library"), "--no-hook"], {
+    env: { NO_COLOR: "1" },
+  });
+  assert.equal(human.status, 0, `${human.stderr}\n${human.stdout}`);
+  assert.match(human.stdout, /Agent recall: disabled/);
+  assert.match(human.stdout, /prompt-time recall is not connected to an agent yet/);
+  assert.doesNotMatch(human.stdout, /installed hook will recall/);
+});
+
 test("init reset-config overwrites setup files but keeps experience assets", () => {
   const dataDir = tmpDir("cli-reset-config");
   json(run(["init", "--data-dir", dataDir, "--no-hook", "--json"]));
@@ -540,7 +558,7 @@ test("interactive init exposes first-run choices without migration prompts", () 
       PATH: emptyPath,
       NO_COLOR: "1",
     },
-    input: "\ny\nn\n",
+    input: "\n\ny\n",
   });
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
   assert.match(result.stdout, /____  __  ___ ______/);
@@ -548,47 +566,44 @@ test("interactive init exposes first-run choices without migration prompts", () 
   assert.match(result.stdout, /Stop teaching your agent the same lesson twice/);
   assert.match(result.stdout, /Local-first · Draft approval-first · Prompt-time recall/);
   assert.match(result.stdout, /Enter accepts path defaults · confirmation requires y\/n · Ctrl\+C cancels/);
-  assert.match(result.stdout, /Start with built-in starter lessons today/);
-  assert.match(result.stdout, /First, send a real task to your agent to feel prompt-time recall/);
-  assert.match(result.stdout, /Copy the entire Markdown code block below into Codex, Claude, or another agent/);
+  assert.match(result.stdout, /Which agents should OME connect/);
+  assert.match(result.stdout, /Codex is the best-tested path today/);
+  assert.match(result.stdout, /Choices: codex, claude, all, none/);
+  assert.match(result.stdout, /Setup summary/);
+  assert.match(result.stdout, /Recall is ready for your next agent task/);
+  assert.match(result.stdout, /Send this to your selected agent so the hook can recall relevant experience automatically/);
+  assert.match(result.stdout, /Copy this task into your selected agent/);
   assert.match(result.stdout, /```text/);
-  assert.match(result.stdout, /Create a single HTML file for a Kanban board page/);
-  assert.match(result.stdout, /not a landing page or a full app/);
-  assert.match(result.stdout, /Linear-inspired, work-focused style/);
-  assert.match(result.stdout, /After the task summary, tell me whether OME surfaced any relevant lesson/);
+  assert.match(result.stdout, /checkout redesign plan/);
+  assert.match(result.stdout, /Create a goal and start now/);
+  assert.match(result.stdout, /Finish the whole change end to end and verify it yourself/);
+  assert.match(result.stdout, /Before changing files, mention whether OME recalled any relevant experience/);
   assert.match(result.stdout, /```/);
-  assert.match(result.stdout, /After the first recall:/);
-  assert.match(result.stdout, /move on to the first-card guide or a fuller retrospective/);
-  assert.match(result.stdout, /After setup \(optional\):/);
+  assert.match(result.stdout, /Suggestions:/);
+  assert.match(result.stdout, /Turn real corrections into cards/);
+  assert.match(result.stdout, /first-card\.md/);
   assert.match(result.stdout, /Connect more agent histories with Spool/);
-  assert.match(result.stdout, /Claude CLI, Gemini CLI, opencode/);
+  assert.match(result.stdout, /OME recall works without it/);
   assert.match(result.stdout, /github\.com\/rennzhang\/oh-my-experience\/blob\/main\/docs\/guides\/source-scan\.md/);
-  assert.match(result.stdout, /Optional: connect Spool CLI/);
-  assert.match(result.stdout, /Why install it/);
-  assert.match(result.stdout, /Spool is a local AI session index/);
-  assert.match(result.stdout, /Without it: OME still draws from the current conversation/);
-  assert.match(result.stdout, /With it: index-first lookup, then evidence on demand/);
-  assert.match(result.stdout, /saves[\s\S]{0,40}tokens/);
-  assert.match(result.stdout, /think traces[\s\S]{0,40}tool[\s\S]{0,40}logs/);
-  assert.match(result.stdout, /github\.com\/spool-lab\/spool/);
+  assert.match(result.stdout, /Spool is not installed/);
+  assert.match(result.stdout, /OME is ready without it/);
   assert.match(result.stdout, /npm install -g @spool-lab\/cli/);
-  assert.match(result.stdout, /CLI only; no desktop app/);
-  assert.match(result.stdout, /Install Spool CLI now/);
-  assert.match(result.stdout, /Skipped Spool; OME core recall still works/);
+  assert.match(result.stdout, /OME will not install Spool during first setup/);
+  assert.doesNotMatch(result.stdout, /Step Optional/);
+  assert.doesNotMatch(result.stdout, /Install Spool CLI now/);
+  assert.doesNotMatch(result.stdout, /Skipped Spool; OME core recall still works/);
   assert.doesNotMatch(result.stdout, /Create a scheduled retrospective task/);
   assert.doesNotMatch(result.stdout, /scheduled-retrospectives\.md/);
   assert.match(result.stdout, /Step 1\/2/);
   assert.match(result.stdout, /Step 2\/2/);
-  assert.match(result.stdout, /Install Codex experience recall/);
-  assert.match(result.stdout, /two local entry points/);
   assert.match(result.stdout, /Where should the experience library live/);
+  assert.match(result.stdout, /local OME directory/);
   assert.match(result.stdout, /UserPromptSubmit hook/);
   assert.match(result.stdout, /hooks\.json/);
-  assert.match(result.stdout, /oh-my-experience skill/);
-  assert.match(result.stdout, /skills\/oh-my-experience/);
+  assert.match(result.stdout, /Codex skill/);
   assert.match(result.stdout, /Codex App may ask you to trust the new UserPromptSubmit hook/);
   assert.match(result.stdout, /Continue\?/);
-  assert.match(result.stdout, /OME will save this library path, install the Codex hook and skill shown above, and add built-in starter lessons/);
+  assert.match(result.stdout, /install the selected recall hooks/);
   assert.match(result.stdout, /Library ready:\s+/);
   assert.match(result.stdout, /Config file:\s+/);
   assert.match(result.stdout, /Recall enabled:\s+Codex/);
@@ -641,11 +656,12 @@ exit 1
       PATH: binDir,
       NO_COLOR: "1",
     },
-    input: "\ny\ny\n",
+    input: "\n\ny\ny\n",
   });
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
   assert.match(result.stdout, /Spool CLI detected. Enable Spool sources/);
-  assert.match(result.stdout, /Detected Spool version: spool-test 9\.9\.9/);
+  assert.match(result.stdout, /Detected Spool spool-test 9\.9\.9/);
+  assert.match(result.stdout, /This only updates OME source config/);
   assert.match(result.stdout, /Spool sources enabled/);
 
   const config = JSON.parse(fs.readFileSync(path.join(dataDir, "config.json"), "utf8"));
@@ -713,7 +729,7 @@ test("interactive init reuses existing config as defaults", () => {
       PATH: tmpDir("existing-empty-path"),
       NO_COLOR: "1",
     },
-    input: "\ny\n",
+    input: "\n\ny\n",
   });
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
   assert.match(result.stdout, /reconfigure existing library/);
@@ -756,15 +772,11 @@ test("default CLI output is human-readable and JSON is opt-in", () => {
   assert.equal(machine.ok, true);
 });
 
-test("human CLI stays English by default and only uses Chinese with explicit OME_LANGUAGE", () => {
+test("human CLI stays English in non-English locales", () => {
   const english = run(["help"], { env: { LANG: "zh_CN.UTF-8", NO_COLOR: "1" } });
   assert.equal(english.status, 0, `${english.stderr}\n${english.stdout}`);
   assert.match(english.stdout, /Common path:/);
   assert.equal(english.stdout.includes("常用路径:"), false);
-
-  const chinese = run(["help"], { env: { OME_LANGUAGE: "zh-CN", LANG: "en_US.UTF-8", NO_COLOR: "1" } });
-  assert.equal(chinese.status, 0, `${chinese.stderr}\n${chinese.stdout}`);
-  assert.match(chinese.stdout, /常用路径:/);
 });
 
 test("CLI recall eval defaults to isolated fixture data", () => {
@@ -850,7 +862,7 @@ test("init installs and uninstall removes global hook without project setup", ()
   assert.equal(dryRun.dryRun, true);
   assert.equal(dryRun.hooks[0].provider, "codex");
   assert.equal(dryRun.hooks[0].installTarget, "global");
-  assert.equal(dryRun.skill.dryRun, true);
+  assert.equal(dryRun.skills[0].dryRun, true);
   const installed = json(run(["init", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
   assert.equal(installed.hooks[0].installed, true);
   assert.equal(installed.hooks[0].installTarget, "global");
@@ -898,12 +910,14 @@ test("skill lifecycle protects user-owned targets", () => {
   const dataDir = tmpDir("skill-data");
   const skillDir = path.join(localCodexHome, "skills", "oh-my-experience");
   const installed = json(run(["init", "--data-dir", dataDir, "--codex-home", localCodexHome, "--no-hook", "--json"]));
-  assert.equal(installed.skill.installed, true);
-  assert.equal(installed.skill.owned, true);
+  assert.equal(installed.skills.length, 0);
+  const installedWithHook = json(run(["init", "--data-dir", dataDir, "--codex-home", localCodexHome, "--json"]));
+  assert.equal(installedWithHook.skills[0].installed, true);
+  assert.equal(installedWithHook.skills[0].owned, true);
   assert.equal(fs.existsSync(path.join(skillDir, "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(skillDir, ".ome-skill.json")), true);
   const removed = json(run(["uninstall", "--data-dir", dataDir, "--codex-home", localCodexHome, "--keep-hooks", "--json"]));
-  assert.equal(removed.skill.uninstalled, true);
+  assert.equal(removed.skills[0].uninstalled, true);
   assert.equal(fs.existsSync(skillDir), false);
 
   const conflictHome = tmpDir("skill-conflict-home");
@@ -912,11 +926,15 @@ test("skill lifecycle protects user-owned targets", () => {
   fs.mkdirSync(conflictDir, { recursive: true });
   fs.writeFileSync(path.join(conflictDir, "SKILL.md"), "---\nname: custom-skill\n---\n", "utf8");
   const conflict = run(["init", "--data-dir", conflictDataDir, "--codex-home", conflictHome, "--no-hook", "--json"]);
-  assert.notEqual(conflict.status, 0);
-  assert.match(JSON.parse(conflict.stdout).error.message, /not owned by OME/);
+  assert.equal(conflict.status, 0);
+  const conflictWithHook = run(["init", "--data-dir", conflictDataDir, "--codex-home", conflictHome, "--json"]);
+  assert.notEqual(conflictWithHook.status, 0);
+  assert.match(JSON.parse(conflictWithHook.stdout).error.message, /not owned by OME/);
   assert.equal(fs.readFileSync(path.join(conflictDir, "SKILL.md"), "utf8").includes("custom-skill"), true);
   const forced = json(run(["init", "--data-dir", conflictDataDir, "--codex-home", conflictHome, "--no-hook", "--force", "--json"]));
-  assert.equal(forced.skill.installed, true);
+  assert.equal(forced.skills.length, 0);
+  const forcedWithHook = json(run(["init", "--data-dir", conflictDataDir, "--codex-home", conflictHome, "--force", "--json"]));
+  assert.equal(forcedWithHook.skills[0].installed, true);
   assert.equal(fs.existsSync(path.join(conflictDir, ".ome-skill.json")), true);
 });
 
@@ -929,7 +947,7 @@ test("uninstall removes local entry points and keeps library unless explicitly d
   assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience", "SKILL.md")), true);
 
   const result = json(run(["uninstall", "--data-dir", dataDir, "--codex-home", localCodexHome, "--json"]));
-  assert.equal(result.skill.uninstalled, true);
+  assert.equal(result.skills[0].uninstalled, true);
   assert.equal(result.library.kept, true);
   assert.equal(fs.existsSync(path.join(dataDir, "config.json")), true);
   assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience")), false);
@@ -965,6 +983,11 @@ test("init installs claude hook through the same runtime command", () => {
   assert.equal(installed.hooks[0].provider, "claude");
   assert.equal(installed.hooks[0].installed, true);
   assert.equal(installed.hooks[0].installTarget, "global");
+  assert.equal(installed.skills[0].provider, "claude");
+  assert.equal(installed.skills[0].installed, true);
+  assert.equal(fs.existsSync(path.join(claudeHome, "skills", "oh-my-experience", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(claudeHome, "skills", "oh-my-experience", ".ome-skill.json")), true);
+  assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience")), false);
   const settings = JSON.parse(fs.readFileSync(path.join(claudeHome, "settings.json"), "utf8"));
   const commands = settings.hooks.UserPromptSubmit.flatMap((entry) => entry.hooks).map((hook) => hook.command);
   assert.equal(commands.filter((command) => command.includes("ome hook run")).length, 1);
@@ -972,6 +995,31 @@ test("init installs claude hook through the same runtime command", () => {
   assert.match(commands.find((command) => command.includes("ome hook run")), /--json/);
   const doctor = json(run(["doctor", "--data-dir", dataDir, "--claude-home", claudeHome, "--json"]));
   assert.equal(doctor.ok, true, doctor.errors.join("\n"));
+  assert.equal(doctor.checked.agentSkills[0].provider, "claude");
+  assert.equal(doctor.checked.agentSkills[0].inSync, true);
+});
+
+test("init provider all installs hooks and skills for Codex and Claude", () => {
+  const dataDir = tmpDir("all-provider-skills");
+  const codexHome = tmpDir("all-provider-codex-home");
+  const claudeHome = tmpDir("all-provider-claude-home");
+
+  const installed = json(run(["init", "--provider", "all", "--data-dir", dataDir, "--codex-home", codexHome, "--claude-home", claudeHome, "--json"]));
+  assert.deepEqual(installed.hooks.map((hook) => hook.provider), ["codex", "claude"]);
+  assert.deepEqual(installed.skills.map((skill) => skill.provider), ["codex", "claude"]);
+  assert.equal(fs.existsSync(path.join(codexHome, "skills", "oh-my-experience", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(claudeHome, "skills", "oh-my-experience", "SKILL.md")), true);
+
+  const doctor = json(run(["doctor", "--data-dir", dataDir, "--codex-home", codexHome, "--claude-home", claudeHome, "--json"]));
+  assert.equal(doctor.ok, true, doctor.errors.join("\n"));
+  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.provider), ["codex", "claude"]);
+  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.inSync), [true, true]);
+
+  const removed = json(run(["uninstall", "--provider", "all", "--data-dir", dataDir, "--codex-home", codexHome, "--claude-home", claudeHome, "--json"]));
+  assert.deepEqual(removed.skills.map((skill) => skill.provider), ["codex", "claude"]);
+  assert.deepEqual(removed.skills.map((skill) => skill.uninstalled), [true, true]);
+  assert.equal(fs.existsSync(path.join(codexHome, "skills", "oh-my-experience")), false);
+  assert.equal(fs.existsSync(path.join(claudeHome, "skills", "oh-my-experience")), false);
 });
 
 test("hook no-hit succeeds without additionalContext", () => {

@@ -69,7 +69,7 @@ ome config set <key> <value>
 修改 `dataDir` 应该先走 `ome config preview`，再应用新值。这可以避免一次误操作就在没有
 可见 diff 的情况下移动可写库位置。
 
-语言不写入配置。CLI 人类输出默认英文，`OME_LANGUAGE=zh-CN` 是显式覆盖。
+语言不写入配置。CLI 人类输出固定英文；中文文档通过 `/zh/` 这类文档路径提供。
 
 ## 全局存储与项目存储
 

@@ -32,11 +32,11 @@ const INTENT_RULES: IntentRule[] = [
   },
   {
     mode: "explain",
-    patterns: [/我想知道|为什么|原理|解释一下|说明一下|怎么理解|what is|why\b|explain/i],
+    patterns: [/我想知道|为什么|原理|解释一下|说明一下|怎么理解|what is|what\b.*\bmeans?\b|why\b|explain/i],
   },
   {
     mode: "discuss",
-    patterns: [/怎么看|评判一下|好处坏处|是否可以|要不要|我想了解|讨论|方案|策略|判断一下/],
+    patterns: [/\bdiscuss\b|怎么看|评判一下|好处坏处|是否可以|要不要|我想了解|讨论|方案|策略|判断一下/],
   },
   {
     mode: "review",
@@ -61,9 +61,11 @@ const SIGNAL_RULES: SignalRule[] = [
     id: "goal_execute",
     polarity: "positive",
     weight: 18,
-    reason: "explicit Codex goal execution wording",
+    reason: "explicit agent goal execution wording",
     patterns: [
       /\/goal\b/i,
+      /\b(?:create|start|use)\s+(?:a\s+)?goal\b/i,
+      /\bgoal\s+(?:and\s+)?(?:start|execute|run|finish|verify)\b/i,
       /创建.{0,6}目标.{0,24}(?:开始|开干|执行|处理|优化|做完|全部完成|验证)|创建目标|使用\s*goal|开始执行目标|创建目标开干|跑长任务|全部完成|逐一验收/,
     ],
   },
@@ -73,9 +75,11 @@ const SIGNAL_RULES: SignalRule[] = [
     weight: -34,
     reason: "goal wording is discussed as documentation or an example, not used as an execution trigger",
     patterns: [
-      /(?:文档|README|readme|docs?|案例|示例|例子|examples?|展示|说明).{0,80}(?:\/goal\b|创建目标|使用\s*goal)/i,
-      /(?:\/goal\b|创建目标|使用\s*goal).{0,80}(?:文档|README|readme|docs?|案例|示例|例子|examples?|展示|说明|给用户看)/i,
+      /(?:文档|README|readme|docs?|documentation|guide|tutorial|案例|示例|例子|examples?|展示|说明).{0,80}(?:\/goal\b|创建目标|使用\s*goal|\bcreate\s+(?:a\s+)?goal\b|\buse\s+goal\b)/i,
+      /(?:\/goal\b|创建目标|使用\s*goal|\bcreate\s+(?:a\s+)?goal\b|\buse\s+goal\b).{0,80}(?:文档|README|readme|docs?|documentation|guide|tutorial|案例|示例|例子|examples?|展示|说明|给用户看)/i,
       /(?:比如|例如|当我说).{0,40}(?:\/goal\b|创建目标|使用\s*goal)/i,
+      /\b(?:discuss|explain)\b.{0,80}(?:\/goal\b|\bcreate\s+(?:a\s+)?goal\b|\buse\s+goal\b)/i,
+      /(?:\/goal\b|\bcreate\s+(?:a\s+)?goal\b|\buse\s+goal\b).{0,80}\b(?:means?|explained|explaining|discussion|without\s+executing)\b/i,
     ],
   },
   {
@@ -329,7 +333,7 @@ const SIGNAL_RULES: SignalRule[] = [
     polarity: "negative",
     weight: -24,
     reason: "explanation or discussion only",
-    patterns: [/我想知道|为什么|原理|解释一下|只是.*(?:了解|讨论|解释)|不(?:要|用).*执行|先别.*(?:改|做)/],
+    patterns: [/我想知道|为什么|原理|解释一下|只是.*(?:了解|讨论|解释)|不(?:要|用).*执行|先别.*(?:改|做)|\b(?:explain|discuss)\b|without\s+executing|do\s+not\s+execute/i],
   },
 ];
 

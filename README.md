@@ -30,17 +30,21 @@ mistake.
 
 ```bash
 npx oh-my-experience@latest init
-npx oh-my-experience@latest match "fix UI and validate in browser" --explain
 ```
 
-Expected shape:
+Then send a real task to your agent:
 
 ```text
-Matched:
-- Validate UI changes in a real browser
-  Why: task has a real UI or browser-visible surface
-  Rule: ome experience show browser-validation --section rule
+Based on this checkout redesign plan: create a single-file checkout page prototype.
+Create a goal and start now. Finish the whole change end to end and verify it yourself.
+
+Before changing files, mention whether OME recalled any relevant experience.
+If it did, explain the card in one short sentence and then continue normally.
 ```
+
+The installed hook handles recall automatically. For troubleshooting, ask your
+agent to inspect recall; users should not need a separate search command for
+the first successful run.
 
 ## Why OME
 
@@ -87,9 +91,10 @@ whole feature end to end and verify it yourself.
 ```
 
 OME can recall the approved card `Enter full-closure delivery mode when a goal
-starts` before Codex starts. The agent then reads the card's core rule:
+starts` before Codex starts. The useful part is not the underlying command; it
+is that the agent sees the right execution judgment before acting.
 
-This is the actual core rule the agent reads, not a toy example.
+The recalled card tells the agent:
 
 ```text
 When the user says `/goal`, `create a goal`, `use goal`, `start now`,
@@ -128,7 +133,8 @@ not as ordinary goal copy. Default execution rules:
 ```
 
 The key point is timing: this rule is not always loaded. It appears when the
-task actually looks like goal execution. See the full injected context in
+task actually looks like goal execution, and stays out of the prompt when the
+user is only discussing docs, OKRs, or what `/goal` means. See the walkthrough in
 [Examples](docs/guides/examples.md).
 
 ## How It Works

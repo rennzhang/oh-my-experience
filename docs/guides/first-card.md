@@ -56,11 +56,13 @@ Nothing is recalled in future tasks until you explicitly confirm adding it.
 
 ## 4. Verify Recall
 
-Use a realistic future prompt, not the exact wording from the card:
+Ask the agent to verify with a realistic future prompt, not the exact wording
+from the card:
 
-```bash
-ome match "a similar future task" --explain
+```text
+Verify recall for the approved card with a realistic future task.
+Tell me whether it matches too broadly or too narrowly.
 ```
 
-The result should be precise. If a card matches too broadly, refine the card
-before adding more cards.
+The result should be precise. If a card matches too broadly, ask the agent to
+refine it before adding more cards.

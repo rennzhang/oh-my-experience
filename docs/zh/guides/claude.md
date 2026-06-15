@@ -14,14 +14,15 @@ Claude 使用和 Codex 相同的 provider-neutral hook runtime。同一套经验
 | --- | --- |
 | `UserPromptSubmit` | `prompt.submit` |
 
-## Hook 安装
+## Hook 和 Skill 安装
 
 ```bash
 ome init --provider claude --dry-run   # 预览
 ome init --provider claude             # 安装
 ```
 
-安装器写入 `~/.claude/settings.json`。
+安装器会把 hook 写入 `~/.claude/settings.json`，并把内置 OME skill 安装到
+`~/.claude/skills/oh-my-experience`。
 
 **让 Agent 帮你：**
 
@@ -41,7 +42,8 @@ ome init --provider claude             # 安装
 ome init --provider all
 ```
 
-同一套经验库，同一个召回引擎，两边自动共享。不需要维护两份规则。
+同一套经验库，同一个召回引擎，两边自动共享。OME 会给选中的 Agent 同步安装 hook
+和 skill，不需要维护两份规则。
 
 ## 用 Claude Agent 做复盘
 

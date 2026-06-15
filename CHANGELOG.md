@@ -6,6 +6,32 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.1.4 - 2026-06-15
+
+### Added
+
+- Added a first-run goal-execution starter card so new libraries can demonstrate
+  prompt-time recall before users create their own cards.
+- Added Codex and Claude skill installation alongside prompt-time hooks.
+
+### Changed
+
+- Reworked README and docs around a real agent-task demo instead of asking users
+  to run recall debugging commands as the first proof.
+- Simplified human CLI output to fixed English while keeping localized public
+  docs under locale routes.
+- Made Spool an explicit optional setup source that OME does not install during
+  first setup.
+
+### Fixed
+
+- Reduced false positive recall for goal-related documentation, explanation,
+  OKR, and business-goal prompts.
+- Corrected `--no-hook` next-step output so it no longer claims automatic recall
+  is connected when no hook was installed.
+- Aligned example docs with the real built-in starter card ID and full card
+  rule.
+
 ## 0.1.3 - 2026-06-15
 
 ### Fixed

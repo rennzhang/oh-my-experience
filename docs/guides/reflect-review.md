@@ -107,10 +107,8 @@ recalled in future tasks until you explicitly confirm adding it.
 Verify immediately after enabling:
 
 ```text
-Use `ome match` to verify the new cards.
-Simulate a task similar to where the mistake happened and check whether the new cards hit.
-
-ome match "a realistic task description" --explain
+Verify recall for the new cards.
+Simulate a task similar to where the mistake happened and tell me whether the new cards hit too broadly, too narrowly, or correctly.
 ```
 
 ## Common Replies

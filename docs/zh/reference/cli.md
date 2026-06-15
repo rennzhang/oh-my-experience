@@ -20,7 +20,6 @@ status: active
 ```bash
 ome init
 ome doctor
-ome match "fix UI and validate in browser" --explain
 ome uninstall
 ```
 
@@ -36,7 +35,9 @@ ome init --no-hook
 ome init --reset-config
 ```
 
-`ome init` 可以重复运行。它会安装 OME 经验库、Codex skill 和选定的提示词阶段 hook。`--reset-config` 只恢复运行配置，不删除经验、来源索引或复盘 run。
+`ome init` 可以重复运行。它会安装 OME 经验库，并给每个选中的 Agent 安装提示词阶段
+hook 和对应 skill。`--no-hook` 只初始化或更新经验库，不安装 hook 或 skill。
+`--reset-config` 只恢复运行配置，不删除经验、来源索引或复盘 run。
 
 ## 召回
 
@@ -46,6 +47,9 @@ ome match "<task>" --json
 ome match "<task>" --explain
 ome match "<task>" --cwd /path/to/project --explain
 ```
+
+`ome match` 面向 hook、Agent、评估和排障。普通首装验收应该是一条真实 Agent 任务，
+由已安装 hook 自动召回经验；用户不需要手动运行 `match`。
 
 只有 active 卡会被召回。复盘生成的 draft 在 `ome experience enable` 之前不会影响提示词阶段召回。
 
@@ -172,8 +176,8 @@ which -a ome
 
 ```bash
 ome config get
-ome config preview dataDir ~/Obsidian/Oh-My-Experience
-ome config set dataDir ~/Obsidian/Oh-My-Experience
+ome config preview dataDir ~/Documents/Oh-My-Experience
+ome config set dataDir ~/Documents/Oh-My-Experience
 ```
 
 ## 卸载
@@ -186,10 +190,11 @@ ome uninstall --keep-skill
 ome uninstall --delete-library --yes
 ```
 
-`ome uninstall` 会移除选中的提示词阶段 hook 和 Codex OME skill，但默认保留经验库。删除经验库是不可逆操作，必须显式使用 `--delete-library --yes` 或 `--delete-library --force`。
+`ome uninstall` 会移除选中的提示词阶段 hook 和对应 OME skill，但默认保留经验库。删除经验库是不可逆操作，必须显式使用 `--delete-library --yes` 或 `--delete-library --force`。
 
 ## 语言行为
 
-CLI 人类输出默认英文，即使系统语言不是英文也一样。只有明确需要中文 CLI 文案时，才设置 `OME_LANGUAGE=zh-CN`。
+CLI 人类输出固定英文，即使系统语言不是英文也一样。中文公开文档继续通过 `/zh/`
+这类路径提供。
 
 JSON 输出字段名保持稳定英文。

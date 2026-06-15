@@ -5,11 +5,11 @@ status: active
 
 # Codex 指南
 
-Codex 是 OME 第一个支持的 Agent 平台。
+Codex 是 OME 第一个支持的 Agent 平台，也是当前验证最充分的路径。
 
 ## Hook 安装
 
-`ome init` 默认会安装 Codex hook。如果已经初始化过，单独配置：
+交互式设置里选择 `codex`，或者显式单独配置：
 
 ```bash
 ome init --provider codex --dry-run   # 预览会写什么
@@ -77,5 +77,6 @@ echo '{"prompt": "修复登录页 UI 并在浏览器验证"}' | ome hook run
 
 ## Skill
 
-`ome init` 会自动把 OME skill 安装到 Codex skills 目录。安装后 Agent 可以通过
-skill 系统获得 recall、reflect、curate 和 troubleshoot 能力。
+`ome init --provider codex` 会把 OME skill 安装到 Codex skills 目录。选择多个
+Agent 时，OME 会给每个选中的 Agent 安装对应 skill。安装后 Agent 可以通过 skill
+系统获得 recall、reflect、curate 和 troubleshoot 能力。

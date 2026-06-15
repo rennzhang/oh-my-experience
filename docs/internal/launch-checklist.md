@@ -43,8 +43,10 @@ npx oh-my-experience@latest init --help
 
 ```bash
 npx oh-my-experience@latest init
-npx oh-my-experience@latest match "fix UI and validate in browser" --explain
 ```
+
+Then send a real task to the agent and confirm the hook recalls relevant
+experience automatically.
 
 Keep source checkout instructions as the contributor fallback.
 
@@ -99,12 +101,11 @@ After pushing the release commit:
 Prepare one short terminal demo:
 
 ```text
-$ ome match "create a goal and finish this feature end to end" --explain
+$ codex "create a goal and finish this feature end to end"
 
-Matched:
+OME matched experience cards:
 - Enter full-closure delivery mode when a goal starts
-  Why: task looks like real goal execution
-  Rule: ome experience show agent-goal-execution --section rule
+  Why: task looks like real goal execution.
 ```
 
 Prepare one sentence:

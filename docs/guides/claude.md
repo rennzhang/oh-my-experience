@@ -14,14 +14,15 @@ retrieval engine.
 | --- | --- |
 | `UserPromptSubmit` | `prompt.submit` |
 
-## Hook installation
+## Hook And Skill Installation
 
 ```bash
 ome init --provider claude --dry-run   # Preview
 ome init --provider claude             # Install
 ```
 
-The installer writes to `~/.claude/settings.json`.
+The installer writes the hook to `~/.claude/settings.json` and installs the
+bundled OME skill to `~/.claude/skills/oh-my-experience`.
 
 **Have your agent do it:**
 
@@ -41,7 +42,8 @@ If you use both:
 ome init --provider all
 ```
 
-One library, one retrieval engine, shared automatically. No duplicate rules.
+One library, one retrieval engine, shared automatically. OME installs the hook
+and skill for both selected agents; no duplicate rules.
 
 ## Running a reflect scan with Claude
 

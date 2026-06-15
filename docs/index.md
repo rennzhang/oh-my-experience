@@ -22,11 +22,11 @@ features:
   - title: Nothing enters without draft approval
     details: Cards follow candidate → draft → active → archived. AI-generated drafts wait for your approval first. Only active cards are recalled.
   - title: One library, Codex and Claude
-    details: Same cards, same retrieval engine, shared across providers. Install each hook once.
+    details: Same cards, same retrieval engine, shared across providers. Install each agent hook and skill once.
   - title: Local-first, private by default
     details: Everything on your machine. No cloud, no accounts. The hook path calls no LLM, stores no raw prompts.
   - title: Explainable matching
-    details: Use ome match --explain to see which cards hit, why they scored, and what context would be injected.
+    details: Agents and debugging scripts can inspect which cards hit, why they scored, and what context would be injected.
   - title: Survives context compression
     details: AGENTS.md injects once then gets compressed away. OME's hook re-injects on every UserPromptSubmit.
 ---
@@ -39,14 +39,9 @@ features:
 
 ## A Real Recall Shape
 
-```text
-$ ome match "create a goal and finish this feature end to end" --explain
-
-Matched:
-- Enter full-closure delivery mode when a goal starts
-  Why: task looks like real goal execution
-  Rule: ome experience show agent-goal-execution --section rule
-```
+When the user sends a real execution prompt, the installed hook gives the agent
+a compact candidate list with the matched card, why it matched, and the command
+for reading the full rule.
 
 OME does not load every lesson all the time. It mounts the relevant candidate
 when the prompt looks like the workflow that needs it.

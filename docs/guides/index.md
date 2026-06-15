@@ -12,7 +12,7 @@ corrections into approved cards.
 
 - [Introduction](introduction.md): what OME is, why AGENTS.md isn't enough, and how it works.
 - [Quickstart](quickstart.md): install, initialize, and verify one recall explanation.
-- [First experience card](first-card.md): turn one real correction into a approved card.
+- [First experience card](first-card.md): turn one real correction into an approved card.
 - [Examples](examples.md): see a real `/goal` prompt, the matched card, and the exact injected context.
 
 ## Agent setup

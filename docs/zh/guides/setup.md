@@ -23,7 +23,7 @@ ome init
 ```
 
 全局安装会把 `ome` 命令加入 shell。`ome init` 会启动初始化向导，选择经验库路径、
-安装默认 provider 的 hook，并写入内置示例卡，方便你马上验证召回。
+安装默认 provider 的 hook 和 skill，并写入内置示例卡，方便你马上验证召回。
 
 本地源码开发：
 
@@ -64,11 +64,11 @@ npx oh-my-experience@latest init -y --data-dir ~/.oh-my-experience
 
 ## 配置数据目录
 
-可以改成任意本地路径，包括 Obsidian vault：
+之后可以迁移到任意专用本地目录：
 
 ```bash
-ome config preview dataDir ~/Obsidian/Oh-My-Experience   # 预览变更
-ome config set dataDir ~/Obsidian/Oh-My-Experience       # 执行迁移
+ome config preview dataDir ~/Documents/Oh-My-Experience  # 预览变更
+ome config set dataDir ~/Documents/Oh-My-Experience      # 执行迁移
 ome doctor                                                # 确认迁移成功
 ```
 
@@ -76,22 +76,23 @@ ome doctor                                                # 确认迁移成功
 `<project-root>/.oh-my-experience/` 发现；当仓库需要携带自己的卡片时，用
 `ome project init` 初始化。
 
-## 安装 Hook
+## 安装 Agent 入口
 
 ```bash
-ome hook status --provider codex     # 查看当前状态
-ome init --provider claude            # 追加 Claude hook
-ome init --provider all               # 两个都装
+ome hook status --provider codex     # 查看当前 hook 状态
+ome init --provider claude            # 追加 Claude hook 和 skill
+ome init --provider all               # 两个 Agent 都装
 ```
 
-`ome init` 默认配置 Codex hook 并安装 OME skill。向导会在写入前展示 hook 文件
-路径。
+交互式 `ome init` 会让你选择 `codex`、`claude`、`all` 或 `none`。Codex 是当前验证
+最充分的路径，但 OME 是基于 hook 的召回层，不是 Codex 专用工具。向导会在写入前展示
+写入路径。对每个选中的 Agent，OME 都会安装 prompt-time hook 和内置 skill。
 
 ## 卸载
 
 ```bash
-ome uninstall                         # 移除 hook，保留经验库
-ome uninstall --provider all          # 移除所有 provider hook
+ome uninstall                         # 移除 hook 和 skill，保留经验库
+ome uninstall --provider all          # 移除所有 provider hook 和 skill
 ome uninstall --delete-library --yes  # 删除所有本地数据
 ```
 
@@ -101,11 +102,12 @@ reflect run 和日志时才用 `--delete-library`。
 ## Spool（可选）
 
 OME 可以接入 Spool CLI，把 Claude、Codex、Gemini 等多 Agent 历史统一索引。
-不装不影响核心功能。交互式 `ome init` 会在最后询问是否安装 Spool CLI：
+不装不影响核心功能。交互式 `ome init` 只有在检测到 Spool CLI 时才询问是否启用；
+如果没检测到，只展示这个以后安装的命令：
 
 ```bash
 npm install -g @spool-lab/cli
 ```
 
-OME 不安装 Spool 桌面客户端。脚本化 init（`-y`、dry-run）不会询问 Spool。
+OME 不会在首次设置中安装 Spool。脚本化 init（`-y`、dry-run）不会询问 Spool。
 详见 [来源扫描](source-scan.md)。
