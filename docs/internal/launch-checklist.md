@@ -15,12 +15,22 @@ This is an internal maintainer checklist. It is intentionally kept under
 
 ## npm release
 
-Do not switch public docs to npx-first until npm shows the intended version.
+Use npm Trusted Publishing through GitHub Actions. Do not switch public docs to
+npx-first until npm shows the intended version.
 
 1. Confirm `package.json` version and `CHANGELOG.md`.
 2. Run the full pre-launch gate.
-3. Publish the package.
-4. Verify:
+3. Commit the release.
+4. Tag and push:
+
+```bash
+git tag v$(node -p "require('./package.json').version")
+git push origin main
+git push origin v$(node -p "require('./package.json').version")
+```
+
+5. Confirm `.github/workflows/npm-publish.yml` publishes the package.
+6. Verify:
 
 ```bash
 npm view oh-my-experience version --json
@@ -28,7 +38,7 @@ npx oh-my-experience@latest --version
 npx oh-my-experience@latest init --help
 ```
 
-5. After npm shows the intended version, update README and Quickstart so the
+7. After npm shows the intended version, update README and Quickstart so the
    primary path is:
 
 ```bash
@@ -37,6 +47,8 @@ npx oh-my-experience@latest match "fix UI and validate in browser" --explain
 ```
 
 Keep source checkout instructions as the contributor fallback.
+
+One-time setup is documented in `docs/internal/npm-trusted-publishing.md`.
 
 ## GitHub repository settings
 
