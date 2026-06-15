@@ -35,16 +35,6 @@ npx oh-my-experience@latest init
 npx oh-my-experience@latest match "修复登录页 UI 并在浏览器里验证" --explain
 ```
 
-本地开发源码版本：
-
-```bash
-git clone https://github.com/rennzhang/oh-my-experience.git
-cd oh-my-experience
-npm install
-npm run build
-node bin/ome.js init
-```
-
 预期输出形态：
 
 ```text
@@ -54,14 +44,14 @@ Matched:
   Rule: ome experience show browser-validation --section rule
 ```
 
-发版验证覆盖 typecheck、测试、文档构建、打包 dry-run 和 dogfood 安装冒烟。
-
 ## 为什么需要 OME
 
 `AGENTS.md` / `CLAUDE.md` 适合放项目地图、全局规范和稳定约定。Skills 适合封装
 可重复执行的流程。Memory 适合保存事实、偏好和长期背景。
 
 OME 存的是另一类东西：执行判断。
+
+Rules 是常驻约束。OME 是按场景召回的执行判断记忆。
 
 OME 不替代 memory、`AGENTS.md`、`CLAUDE.md` 或 skills。它只在当前任务需要时，
 召回经过审核的执行经验。
@@ -73,7 +63,7 @@ OME 把它们移出常驻上下文，只在任务匹配时召回。
 ## 你会得到什么
 
 - 本地优先：prompt 阶段召回不走网络。
-- 审核优先：经验卡遵循 `candidate -> draft -> active -> archived`。
+- 先审批再召回：经验卡遵循 `candidate -> draft -> active -> archived`。
 - Codex 和 Claude hook 共用同一套本地 runtime。
 - 支持全局经验库，也支持项目根目录 `.oh-my-experience/`。
 - 可解释召回：能看到命中的卡、分数、原因和压入上下文。
@@ -95,8 +85,10 @@ OME 把它们移出常驻上下文，只在任务匹配时召回。
 基于结账页改版计划，创建目标开干吧，把这个功能完整做完并自己验证。
 ```
 
-OME 可以在 Codex 开始行动前召回已经审核过的经验卡
+OME 可以在 Codex 开始行动前召回已经确认入库的经验卡
 `创建目标时进入完整闭环交付模式`。Agent 随后会读取这张卡的核心规则：
+
+下面是真实会被 Agent 读取的核心规则，不是玩具示例。
 
 ```text
 当用户说 `/goal`、`创建目标`、`使用 goal`、`开干`、`开始执行目标`、`跑长任务`，或要求把一批需求压进目标推进时，必须把这视为执行启动协议，而不是普通目标文案。默认执行规则如下：
@@ -117,17 +109,27 @@ OME 可以在 Codex 开始行动前召回已经审核过的经验卡
 ## 它怎么工作
 
 ```text
-真实会话 -> 复盘扫描 -> 审核经验卡 -> prompt 阶段召回 -> 统计 -> 迭代
+真实会话 -> 复盘扫描 -> 经验草稿审批 -> 确认 active 卡 -> prompt 阶段召回 -> 统计 -> 迭代
 ```
 
 1. 扫描或检查真实编码 Agent 会话。
-2. 把重复纠正和返工点整理成候选经验卡。
-3. 先审核、合并、重写或拒绝，再决定是否启用。
-4. Hook 在任务匹配时召回 active 经验卡。
+2. 把重复纠正和返工点整理成经验草稿。
+3. 先审批、合并、重写或拒绝，再决定是否启用。
+4. 明确确认哪些经验成为 active，之后由 hook 在任务匹配时召回。
 
 只有 `active` 状态的经验卡会被召回。OME 不会把 AI 生成的笔记静默变成永久规则。
 
 ## 文档
+
+本地开发源码版本：
+
+```bash
+git clone https://github.com/rennzhang/oh-my-experience.git
+cd oh-my-experience
+npm install
+npm run build
+node bin/ome.js init
+```
 
 - [快速开始](docs/zh/guides/quickstart.md)
 - [第一张经验卡](docs/zh/guides/first-card.md)

@@ -33,16 +33,6 @@ npx oh-my-experience@latest init
 npx oh-my-experience@latest match "fix UI and validate in browser" --explain
 ```
 
-For local development from source:
-
-```bash
-git clone https://github.com/rennzhang/oh-my-experience.git
-cd oh-my-experience
-npm install
-npm run build
-node bin/ome.js init
-```
-
 Expected shape:
 
 ```text
@@ -52,9 +42,6 @@ Matched:
   Rule: ome experience show browser-validation --section rule
 ```
 
-Release validation currently covers typecheck, tests, docs build, package
-dry-run, and dogfood install smoke.
-
 ## Why OME
 
 `AGENTS.md` and `CLAUDE.md` are good for stable project maps and always-on
@@ -62,6 +49,8 @@ rules. Skills package repeatable workflows. Memory stores facts and long-term
 context.
 
 OME stores a different thing: execution judgment from real work.
+
+Rules are always-on. OME is conditional memory for execution judgment.
 
 OME is not a replacement for memory, `AGENTS.md`, `CLAUDE.md`, or skills. It
 recalls reviewed execution lessons only when the current task needs them.
@@ -74,7 +63,7 @@ need them.
 ## What You Get
 
 - Local-first recall: no network calls on the prompt-time path.
-- Reviewed cards: `candidate -> draft -> active -> archived`.
+- Draft approval before recall: `candidate -> draft -> active -> archived`.
 - Codex and Claude hooks using the same local runtime.
 - Global libraries plus optional project libraries at `.oh-my-experience/`.
 - Explainable matching with scores, reasons, and compact injected context.
@@ -97,8 +86,10 @@ Based on the checkout redesign plan, create a goal and start now. Finish the
 whole feature end to end and verify it yourself.
 ```
 
-OME can recall the reviewed card `Enter full-closure delivery mode when a goal
+OME can recall the approved card `Enter full-closure delivery mode when a goal
 starts` before Codex starts. The agent then reads the card's core rule:
+
+This is the actual core rule the agent reads, not a toy example.
 
 ```text
 When the user says `/goal`, `create a goal`, `use goal`, `start now`,
@@ -143,18 +134,28 @@ task actually looks like goal execution. See the full injected context in
 ## How It Works
 
 ```text
-real session -> retrospective -> reviewed card -> prompt-time recall -> stats -> refinement
+real session -> reflect scan -> draft approval -> confirmed active card -> prompt-time recall -> stats -> refinement
 ```
 
 1. Import or inspect real coding-agent sessions.
-2. Turn repeated corrections into candidate experience cards.
-3. Review, merge, rewrite, or reject candidates before activation.
-4. Let hooks recall active cards when a matching task appears.
+2. Turn repeated corrections into experience drafts.
+3. Approve, merge, rewrite, or reject drafts before activation.
+4. Confirm what becomes active, then let hooks recall active cards when a matching task appears.
 
 Only `active` cards are recalled. OME does not silently turn AI-generated notes
 into permanent rules.
 
 ## Documentation
+
+For local development from source:
+
+```bash
+git clone https://github.com/rennzhang/oh-my-experience.git
+cd oh-my-experience
+npm install
+npm run build
+node bin/ome.js init
+```
 
 - [Quickstart](docs/guides/quickstart.md)
 - [First Experience Card](docs/guides/first-card.md)
