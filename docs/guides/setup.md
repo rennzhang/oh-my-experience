@@ -116,4 +116,4 @@ npm install -g @spool-lab/cli
 ```
 
 OME does not install the Spool desktop client. Scripted init (`-y`, dry-run)
-never prompts for Spool. See [Import Sources](import-sources.md).
+never prompts for Spool. See [Source Scan](source-scan.md).

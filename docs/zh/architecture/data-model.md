@@ -74,7 +74,7 @@ Active 卡片聚焦召回和使用判断，不再把原始来源、日期、`ori
 
 ## 来源索引
 
-Session 导入不会把完整 transcript 复制进 OME。导入只向 `indexes/sources.json`
+Session 扫描不会把完整 transcript 复制进 OME。扫描只向 `indexes/sources.json`
 写入紧凑来源指针：
 
 - `id`

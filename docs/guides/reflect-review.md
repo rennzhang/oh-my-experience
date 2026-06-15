@@ -98,6 +98,21 @@ For each candidate, ask three questions:
 2. If the agent sees this card next time, will it avoid the same mistake?
 3. Are the triggers precise enough? Will this card misfire on unrelated tasks?
 
+### Refining the same scan
+
+If you give the agent more context after the candidates appear, such as a link,
+a pasted conversation, a correction, or "use this as reference", that should
+revise the current run by default. The agent should update the same run's
+candidate file and run:
+
+```bash
+ome reflect candidates RUN_ID --from-file UPDATED_FILE
+```
+
+It should not start a new reflect run or create a sibling card unless you
+explicitly ask for a separate lesson. The review link should stay anchored to
+the same `RUN_ID` until you approve, reject, merge, or rewrite the candidates.
+
 ### Step 3: Apply
 
 After deciding on each candidate, have the agent apply the results:
@@ -131,7 +146,7 @@ ome match "a realistic task description" --explain
 | approve | The lesson is reusable, triggers are precise | `ome reflect decide RUN_ID CANDIDATE_ID --action approve` |
 | reject | Too vague, one-off, or already covered | `ome reflect decide RUN_ID CANDIDATE_ID --action reject` |
 | merge | Highly similar to another candidate | `ome reflect decide RUN_ID CANDIDATE_ID --action merge --target OTHER_ID` |
-| rewrite | Right direction, wrong wording | Edit the candidate file and re-import |
+| rewrite | Right direction, wrong wording | Edit the candidate file and resubmit |
 
 ## Keeping the library healthy
 

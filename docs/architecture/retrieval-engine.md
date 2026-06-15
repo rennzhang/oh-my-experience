@@ -147,7 +147,7 @@ Examples:
   "show what happens when the user says /goal" is blocked by
   `goal_example_discussion`.
 - A Spool handoff card uses `historical_session_lookup` as a strong positive
-  hint. Saying that Spool is an optional import source is not enough.
+  hint. Saying that Spool is an optional scan source is not enough.
 - A browser validation card uses `ui_surface` as a strong positive hint and is
   suppressed when UI words are explicitly described as noise, documentation,
   examples, or explanation-only content.

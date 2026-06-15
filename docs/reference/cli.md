@@ -6,7 +6,7 @@ status: active
 # CLI Reference
 
 This page lists the public `ome` command surface. The CLI is intentionally
-small: setup, recall, retrospective review, library governance, source import,
+small: setup, recall, retrospective review, library governance, source scan,
 diagnostics, and uninstall.
 
 ## Output Contract
@@ -67,15 +67,25 @@ specific project context.
 ## Sources
 
 ```bash
-ome import codex --sessions <dir>
 ome source status
+ome source scan codex --sessions <dir>
+ome source scan spool --limit 20
+ome source scan spool --query "browser validation" --source codex
+ome source scan spool --query "browser validation" --max-session-bytes 4194304
+ome source clean
+ome source clean --yes
 ome source connect spool --mode ask
-ome source import spool --limit 20
-ome import spool --query "browser validation" --source codex
+ome source connect spool --mode enabled
 ```
 
-Spool is optional. If it is unavailable, Codex session import and local recall
-still work.
+Spool is optional. If it is unavailable, Codex session scanning and local recall
+still work. Source scans write pointer indexes; they do not copy full original
+transcripts. `ome source clean` is a dry run by default and `--yes` applies the
+cleanup of legacy summaries and materialized markers.
+
+Spool scans skip sessions whose `spool show --json` output is too large for the
+current safety limit. Use a narrower query first; if the session is expected to
+be large and still worth indexing, raise `--max-session-bytes` explicitly.
 
 ## Retrospectives
 
@@ -118,7 +128,9 @@ experience lifecycle folders. It does not change `dataDir`.
 
 `ome project status --json` reports the detected `projectContext`, project
 library path, whether the project library exists, whether it is readable, and
-any warnings.
+any warnings. When the library exists, it also reports `experiences` and
+`invalidCards`; invalid active or draft project cards make `ok: false` because
+project libraries participate in prompt-time recall.
 
 ## Experience Library
 
@@ -133,6 +145,8 @@ ome experience show <card-id> --section rule
 ome experience enable <card-id>
 ome experience enable <card-id> --scope project
 ome experience archive <card-id> --reason "superseded"
+ome experience migrate-legacy --scope project --dry-run
+ome experience migrate-legacy --scope project --backup
 ```
 
 The lifecycle stays explicit: `candidate -> draft -> active -> archived`.
@@ -144,6 +158,12 @@ files instead of stopping at the first parse error. The response includes
 `invalidCards` with `status`, `path`, and `message`. Runtime recall remains
 strict for active cards; invalid active cards must still be fixed before they
 can be recalled.
+
+Use `ome experience migrate-legacy --dry-run` to preview migration of old
+pre-`schema: ome-card` cards into the current schema. Add `--scope project`
+for project libraries. Run without `--dry-run` only after reviewing the
+migration list. Migration rewrites cards in place by default and does not
+create backups; add `--backup` only when you explicitly want a temporary copy.
 
 ## Evaluation
 

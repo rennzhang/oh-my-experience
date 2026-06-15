@@ -55,7 +55,7 @@ if the project library is missing or unreadable, global recall still works.
 Hook runtime must:
 
 - fail open on internal errors;
-- avoid LLM, network, and long-running import work;
+- avoid LLM, network, and long-running source scan work;
 - avoid writing active cards;
 - avoid storing raw prompt by default;
 - record structured events for stats and debugging;

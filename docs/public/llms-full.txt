@@ -16,7 +16,7 @@ site.
 
 ## Medium priority
 
-- /guides/import-sources - Codex session import and optional Spool source import.
+- /guides/source-scan - Codex source scanning and optional Spool search-backed scanning.
 - /guides/evaluation - deterministic recall evaluation and hook evaluation.
 - /reference/cli - complete CLI command surface.
 - /reference/config - configuration schema and data directory behavior.

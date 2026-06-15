@@ -1,6 +1,6 @@
 {
   "name": "oh-my-experience",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first prompt-time experience recall for AI coding agents.",
   "type": "module",
   "keywords": [

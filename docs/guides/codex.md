@@ -31,19 +31,19 @@ Help me install the Oh My Experience Codex hook.
 If Codex App asks me to trust the hook in the UI, stop and tell me what to confirm.
 ```
 
-## Import Codex sessions
+## Scan Codex sessions
 
 ```bash
-ome import codex --sessions ~/.codex/sessions
+ome source scan codex --sessions ~/.codex/sessions
 ```
 
 **Have your agent do it:**
 
 ```text
-Import my Codex sessions into OME.
+Scan my Codex sessions into the OME source index.
 
-Run `ome import codex --sessions ~/.codex/sessions`, then tell me how many
-sessions were imported, how many were skipped, and whether any failed to parse.
+Run `ome source scan codex --sessions ~/.codex/sessions`, then tell me how many
+sessions were indexed, how many were skipped, and whether any failed to parse.
 ```
 
 ## Running a reflect scan with Codex

@@ -48,7 +48,7 @@ status: active
 }
 ```
 
-`sessions.store` 控制导入来源 session 的保留姿态：
+`sessions.store` 控制已扫描来源 session 的保留姿态：
 
 - `pointer`：优先保留来源引用和轻量索引。
 - `recent`：为 source-aware workflow 预留的保留姿态。

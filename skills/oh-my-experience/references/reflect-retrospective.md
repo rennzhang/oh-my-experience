@@ -47,6 +47,7 @@ Agent 收到以下指令时执行本指南：
 - **证据不足标不完整**：剩余证据缺口存在时如实标注。
 - **OME CLI 是 OME 数据写入入口**：写入复盘候选、draft 或 active 卡时，不得绕过 CLI 直接改库文件。
 - **生命周期单向**：`candidate -> draft -> active -> archived`。
+- **补充材料默认修订当前 run**：候选生成后、用户审批前，如果用户继续提供链接、粘贴内容、口头纠正、反例或"可以参考吸收"之类反馈，默认是在优化当前扫描结果。不要新建独立 run 或新卡；应读取当前 run 的候选和用户补充，重写同一 run 的候选输入，再用 `ome reflect candidates <run-id> --from-file <file>` 覆盖候选，保持 review 入口不变。只有用户明确要求另开主题或另做一张卡时才创建新 run。
 
 ---
 
@@ -66,6 +67,8 @@ Agent 收到以下指令时执行本指南：
 
 **关键规则**：只有用户**明确**限制来源范围时才用 `bounded` 或 `user-provided`。说"关注 X 主题"是设 `focusLens`，不是缩小 `sourceCoverage`。
 
+**字段约束**：`sourceCoverage` 只能使用上表枚举值。不要写 `spool-backed`、`spool-backed-representative` 之类自造值；Spool 的实际使用方式写进 `searchedSources`、`unavailableSources`、`remainingEvidenceGaps`。
+
 ### focusLens（主题镜头）
 
 复盘关注点，用户指定。无则空字符串。
@@ -81,8 +84,53 @@ Agent 收到以下指令时执行本指南：
 1. Codex 会话（`.jsonl`）
 2. 执行日志
 3. 任务轨迹
-4. 已导入的 session record
+4. 已扫描的 session record
 5. 用户指定的其他来源
+
+### Agent 语义展开
+
+语义展开是 Agent 的职责，不是 Spool 或 OME CLI 的职责。无论使用 Spool、本地 `.jsonl`、source index，还是用户提供文件，Agent 都必须把 `focusLens` 拆成多组自然语言入口后分别搜索、合并、去重和验证。
+
+执行要求：
+
+- 先把主题拆成 3-8 组搜索入口：用户可能说过的原话、同义表达、反向表达、验收标准、拒收理由、相关路径/模块名。
+- 每组搜索入口尽量短；不要把多个语义强行塞进一个 query 里。`"最小化侵入 不要历史包袱"` 只能作为其中一个窄入口，不能代表整个主题。
+- 对每个来源后端使用同一套语义展开：有 Spool 时跑多条 `spool search`；无 Spool 时用多条本地全文搜索；用户给文件时也要多关键词、多表达检索。
+- 合并结果后按 session/message 去重，再按 `messageRole=user`、时间、cwd、上下文类型过滤。
+- 搜索反例和边界：用户是否在相近场景要求保留兼容、接受临时方案、只讨论概念而非执行。
+- 在 `searchedSources` 里记录实际搜索过的 query 族、来源后端和过滤口径；不要只写一个代表性 query。
+
+### Spool 分支策略
+
+先运行 `ome source status --json`，只按真实状态选路线。Spool 是来源加速器，不改变候选生命周期，也不替代原话验证。
+
+#### 无 Spool / Spool off
+
+适用：Spool 不可用、未安装、配置为 `off`，或用户不允许启用。
+
+- 继续走 Codex 本地会话、已扫描 source index 和用户提供来源；不要因为没有 Spool 就停止复盘。
+- `searchedSources` 里写明实际枚举的 sessions 目录、source index 和代表性原始记录。
+- 建立清洗后的用户消息索引：只保留可识别的用户输入，过滤 system / developer / AGENTS / assistant summary / worker prompt / IDE 注入上下文。
+- 按 Agent 语义展开跑多组本地搜索；不要用单个关键词或单条 `rg` 命中代表主题覆盖。
+- 对关键词计数保持克制：计数只说明索引信号，不能直接当候选证据。
+- 高价值证据必须回到原始 `.jsonl` 行或 session record，确认角色、上下文和用户是否在纠正、验收或拒收。
+- `unavailableSources` 写清 Spool 不可用或关闭；如果本地来源已完整枚举，`sourceCoverage` 仍可为 `all-accessible`。
+
+#### 有 Spool / Spool enabled
+
+适用：`ome source status` 显示 Spool 可用，且配置为 `ask` 或 `enabled`；如果用户要求"打开 Spool 配置"，优先使用 `ome source connect spool --mode enabled`。
+
+- 深扫前先记录 `spool status`；需要最新历史时运行 `spool sync`，并记录同步前后 session 数、来源分布和时间。
+- 默认 **search-first，不要 scan-first**。先按 Agent 语义展开运行多条 `spool search "<短 query>" --json --limit <n>` 定位候选会话，再合并去重并决定是否扫描索引。
+- 查询要拆成两类：
+  - 精确用户原话：短语、纠正、验收标准、拒收理由。Spool 通常更快、更干净。
+  - 宽泛工程概念：fallback、source of truth、职责边界、两套真相等。Spool 可能漏召回，需要本地全文扫或 OME source index 补覆盖。
+- Spool 的单 query 命中少只说明这一条词面检索窄，不代表主题覆盖完成；必须跑同义、近义、反向和边界 query。
+- 扫描只索引少量高价值命中：优先用窄 query + limit，或先 `spool show --json <uuid>` 验证后再 `ome source scan spool`。不要用宽泛主题直接扫入大量 Spool 历史。
+- 如果宽 query 命中超大会话、部分失败或输出过大，不把它当复盘失败；改用更窄 query、`spool search` 结果和代表性 source scan，并把失败写进 `unavailableSources` 或 `remainingEvidenceGaps`。
+- Spool 命中的 current-run assistant 文本、OME 开发会话总结、assistant 转述都按噪声处理，除非能回到独立用户原话。
+- 有 Spool 时，最佳证据形态是：Spool session UUID / source / startedAt / cwd / role / snippet + 选中记录扫描结果 + 必要的本地全文补扫。
+- 如果只用了代表性 Spool query 而没有覆盖所有可访问来源，`sourceCoverage` 用 `bounded`，并写清边界；如果 Spool index、本地来源和用户指定来源都按计划覆盖，才用 `all-accessible`。
 
 ---
 
@@ -101,13 +149,13 @@ focusLens: <用户指定，无则 "">
 
 按 `references/cli.md` 用 `ome reflect start` 创建 reflect run。Spool 不可用时，继续走 Codex 或本地来源路径。
 
-### 步骤 3：导入来源
+### 步骤 3：扫描来源
 
-按 `references/cli.md` 导入 Codex、Spool 或用户提供的来源。
+按 `references/cli.md` 扫描 Codex、Spool 或用户提供的来源。启用 Spool 时先 search 后窄 scan；不要把宽泛主题的 Spool scan 当作第一步。
 
 ### 步骤 4：枚举实际搜索的来源
 
-列出真正读取过的每个文件 / 导入的每条记录 → 写入 `searchedSources`。
+列出真正读取过的每个文件 / 扫描的每条记录 → 写入 `searchedSources`。
 
 ### 步骤 5：过滤噪声
 
@@ -127,10 +175,13 @@ focusLens: <用户指定，无则 "">
 ### 步骤 6：搜索证据和反例
 
 - 先用关键词、session id、路径、标题和用户原话片段建立索引
+- 先由 Agent 对 `focusLens` 做语义展开，形成多组短 query；每组 query 分别搜索并记录
 - 再扩展到所有可访问来源，避免只看最先命中的几条记录
 - 搜索匹配 `focusLens` 的用户消息
 - 同时搜索反例：用户对类似场景给出不同处理方式的情况
 - 专门搜索近似噪声：文档案例、解释讨论、工具名只是资料来源、业务概念和非执行场景
+- 有 Spool 时，先用精确短语拿 session 锚点，再用本地全文或 source index 补宽泛概念覆盖
+- 无 Spool 时，先构建清洗后的本地用户消息索引，再回读原始会话验证代表性证据
 
 ### 步骤 7：原始记录验证
 
@@ -150,6 +201,27 @@ focusLens: <用户指定，无则 "">
 ### 步骤 10：写清证据缺口
 
 列出因证据不足无法确定的结论。
+
+---
+
+## 候选后的继续迭代
+
+用户经常不会一次性给完反馈。候选已经生成但还没审批时，后续输入的默认含义是"把这条经验改得更准"，而不是"再创建一条经验"。
+
+处理规则：
+
+1. 先定位最近或用户点名的 `runId`，读取 `ome reflect show <run-id> --json` 和现有候选。
+2. 判断用户补充影响哪张候选：改 summary、触发条件、ignore 边界、rule、证据、冲突说明，还是应拒绝/合并。
+3. 用同一个 run 的 `candidates-input.json` 或新临时输入文件重写完整候选集合；保留未受影响的候选，修改受影响的候选。
+4. 在 audit 里追加这次补充来源和 `userCorrections`，说明没有重新全盘扫描的原因；`sourceCoverage` 可以是原覆盖范围，若只处理用户补充则写清它是 refinement，不要伪装成新全盘扫描。
+5. 运行 `ome reflect candidates <run-id> --from-file <file>` 更新当前 review 文件。
+6. 明确告诉用户 review 的仍是同一个 run；没有 approve、apply 或 enable。
+
+禁止动作：
+
+- 不因为用户给了一个新链接或一句新纠正就创建另一个 sibling run。
+- 不把用户补充原文整段长期保存为 rule；只吸收可执行判断。
+- 不把"参考吸收"理解成直接 enable active。
 
 ---
 
@@ -219,7 +291,7 @@ focusLens: <用户指定，无则 "">
 - `/goal`、`创建目标`：只有用户真的要启动 Agent 目标执行时才是 `goal_execute`；文档、README、案例、解释里的 `/goal` 是 `goal_example_discussion`。
 - `高内聚/低耦合/根因修复`：只有用户要求整理核心逻辑、重构召回引擎、清理 fallback 或提升实现质量时才是 `architecture_quality`；普通文案润色或只讨论概念不触发。
 - `git`：只有 commit、push、diff、stage、worktree 等真实操作才是 `git_operation`；GitHub 作为资料来源不是 Git 操作。
-- `Spool`：只有查历史会话、session UUID、turn/message 证据时才是 `historical_session_lookup`；说明 Spool 是可选导入来源不触发。
+- `Spool`：只有查历史会话、session UUID、turn/message 证据时才是 `historical_session_lookup`；说明 Spool 是可选扫描来源不触发。
 - `UI/browser`：真实页面、浏览器、视口、前端验收才是 `ui_surface`；用户明确说 UI 只是噪声时用 `ui_surface_noise`。
 
 ### 自检

@@ -230,9 +230,9 @@
       ]
     },
     {
-      "id": "spool-optional-import-not-handoff",
+      "id": "spool-optional-scan-not-handoff",
       "difficulty": "medium",
-      "prompt": "安装文档里说明 Spool 是可选导入来源，不是 Codex 召回的前置条件。",
+      "prompt": "安装文档里说明 Spool 是可选扫描来源，不是 Codex 召回的前置条件。",
       "expectedCards": [],
       "unexpectedCards": [
         "spool-session-context-anchoring"

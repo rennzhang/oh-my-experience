@@ -12,7 +12,7 @@ status: active
 ## 端到端路径
 
 ```text
-session/import/retrospective
+session/source-scan/retrospective
   -> candidate.scope
   -> reflect decision can override scope
   -> draft preserves scope

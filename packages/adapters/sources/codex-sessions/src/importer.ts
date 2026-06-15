@@ -1,21 +1,22 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { SessionRecordSchema, type SessionRecord } from "../../../../core/src/schema.js";
 import { writeSessionRecords } from "../../../../core/src/sessions.js";
-import { hashText, nowIso } from "../../../../core/src/storage.js";
+import { nowIso } from "../../../../core/src/storage.js";
 
 const USER_VISIBLE_ROLES = new Set(["user", "assistant", "tool"]);
 
 type JsonRecord = Record<string, any>;
 type ImportWarning = { file: string; line?: number; warning: string };
 
-export function importCodexSessions(dataDir: string, sessionsDir: string) {
+export function scanCodexSessions(dataDir: string, sessionsDir: string) {
   if (!sessionsDir || !fs.existsSync(sessionsDir)) {
     throw new Error(`Codex sessions directory not found: ${sessionsDir}`);
   }
   const files = collectJsonl(sessionsDir);
-  const imported: string[] = [];
+  const indexed: string[] = [];
   const records: SessionRecord[] = [];
   const failed: Array<{ file: string; error: string }> = [];
   const warnings: ImportWarning[] = [];
@@ -23,38 +24,42 @@ export function importCodexSessions(dataDir: string, sessionsDir: string) {
     try {
       const session = parseCodexSession(file, { warnings });
       records.push(session);
-      imported.push(session.id);
+      indexed.push(session.id);
     } catch (error) {
       failed.push({ file, error: error instanceof Error ? error.message : String(error) });
     }
   }
   if (records.length) writeSessionRecords(dataDir, records);
-  return { ok: failed.length === 0, provider: "codex", imported, skipped: [] as string[], failed, warnings };
+  return { ok: failed.length === 0, provider: "codex", indexed, skipped: [] as string[], failed, warnings };
 }
 
 export function parseCodexSession(filePath: string, { warnings = [] }: { warnings?: ImportWarning[] } = {}): SessionRecord {
-  const lines = fs.readFileSync(filePath, "utf8").split("\n").filter(Boolean);
   const messages: Array<{ role: string; text: string; createdAt: string | null }> = [];
+  const metadata = crypto.createHash("sha256");
   let cwd = null;
   let startedAt = null;
-  for (const [index, line] of lines.entries()) {
+  metadata.update(`${path.resolve(filePath)}:${fs.statSync(filePath).size}:`);
+  let lineNumber = 0;
+  for (const line of readLinesSync(filePath)) {
+    lineNumber += 1;
     let event: JsonRecord;
     try {
       event = JSON.parse(line);
     } catch (error: any) {
-      warnings.push({ file: filePath, line: index + 1, warning: `invalid JSONL line skipped: ${error.message}` });
+      warnings.push({ file: filePath, line: lineNumber, warning: `invalid JSONL line skipped: ${error.message}` });
       continue;
     }
     const text = extractText(event);
     if (text) {
       const role = extractRole(event);
       if (!USER_VISIBLE_ROLES.has(role)) {
-        warnings.push({ file: filePath, line: index + 1, warning: `skipped non-user-visible Codex message role: ${role}` });
+        warnings.push({ file: filePath, line: lineNumber, warning: `skipped non-user-visible Codex message role: ${role}` });
         continue;
       }
+      metadata.update(`${role}\0${text}\n`);
       messages.push({
         role,
-        text,
+        text: "",
         createdAt: event.timestamp || event.created_at || null,
       });
     }
@@ -63,14 +68,14 @@ export function parseCodexSession(filePath: string, { warnings = [] }: { warning
   }
   if (messages.length === 0) warnings.push({ file: filePath, warning: "no user-visible messages parsed" });
   const source = path.resolve(filePath);
-  const metadataHash = hashText(`${source}:${fs.statSync(filePath).size}:${messages.map((message) => message.text).join("\n")}`);
+  const metadataHash = metadata.digest("hex");
   return SessionRecordSchema.parse({
     id: crypto.createHash("sha1").update(metadataHash).digest("hex").slice(0, 16),
     provider: "codex",
     sourcePath: source,
     startedAt: startedAt || nowIso(),
     cwd,
-    summary: messages.slice(0, 3).map((message) => message.text).join(" ").slice(0, 280),
+    summary: "",
     messages,
     metadataHash,
   });
@@ -84,6 +89,29 @@ function collectJsonl(root: string): string[] {
     else if (entry.name.endsWith(".jsonl")) files.push(fullPath);
   }
   return files;
+}
+
+function* readLinesSync(filePath: string): Generator<string> {
+  const fd = fs.openSync(filePath, "r");
+  const decoder = new StringDecoder("utf8");
+  const buffer = Buffer.allocUnsafe(64 * 1024);
+  let remainder = "";
+  try {
+    while (true) {
+      const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, null);
+      if (bytesRead === 0) break;
+      const text = remainder + decoder.write(buffer.subarray(0, bytesRead));
+      const lines = text.split(/\r?\n/);
+      remainder = lines.pop() || "";
+      for (const line of lines) {
+        if (line.trim()) yield line;
+      }
+    }
+    const tail = remainder + decoder.end();
+    if (tail.trim()) yield tail;
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 function extractText(event: JsonRecord): string {

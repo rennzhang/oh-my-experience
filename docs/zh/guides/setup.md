@@ -108,4 +108,4 @@ npm install -g @spool-lab/cli
 ```
 
 OME 不安装 Spool 桌面客户端。脚本化 init（`-y`、dry-run）不会询问 Spool。
-详见 [导入源](import-sources.md)。
+详见 [来源扫描](source-scan.md)。

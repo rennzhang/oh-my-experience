@@ -48,7 +48,7 @@ Default path:
 }
 ```
 
-`sessions.store` controls the retention posture for imported source sessions:
+`sessions.store` controls the retention posture for scanned source sessions:
 
 - `pointer`: prefer source references and lightweight indexes.
 - `recent`: reserved retention posture for source-aware workflows.

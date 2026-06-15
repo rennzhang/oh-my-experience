@@ -1,6 +1,6 @@
 # OME CLI 操作参考
 
-本参考给 Agent 读取。`ome` CLI 仍然是 OME 数据写入的 source of truth，但公开命令面保持克制：初始化、召回、来源导入、复盘、经验治理、评估、诊断和卸载。
+本参考给 Agent 读取。`ome` CLI 仍然是 OME 数据写入的 source of truth，但公开命令面保持克制：初始化、召回、来源扫描、复盘、经验治理、评估、诊断和卸载。
 
 ## 使用原则
 
@@ -10,7 +10,7 @@
 - 运行测试、eval 或验证命令时优先隔离 dataDir，不污染真实经验库。
 - 涉及删除经验库、覆盖 hooks、覆盖 skill、卸载数据时必须先得到用户确认。
 - 包内开发时可用 `node bin/ome.js` 替代全局 `ome`。
-- 默认第一成功路径是 `ome init -> ome match "<真实任务>" --explain`。不要把深度复盘、导入历史、项目库和 eval 一次性塞给新用户。
+- 默认第一成功路径是 `ome init -> ome match "<真实任务>" --explain`。不要把深度复盘、扫描历史、项目库和 eval 一次性塞给新用户。
 
 ## 初始化与配置
 
@@ -56,23 +56,39 @@ ome project init
 
 - `ome project init` 只在当前项目根目录创建 `.oh-my-experience/`。
 - 项目库适合保存随仓库同行的经验卡；个人或隐私经验仍放全局库。
-- `ome project status --json` 会返回项目上下文、项目库路径、存在性、可读性和 warnings。
+- `ome project status --json` 会返回项目上下文、项目库路径、存在性、可读性、warnings、经验数量和 `invalidCards`；项目 active / draft 坏卡会让 `ok: false`。
 
-## 来源导入
+## 来源扫描
 
 ```bash
-ome import codex --sessions <dir>
 ome source status
+ome source scan codex --sessions <dir>
+ome source scan spool --limit 20
+ome source scan spool --query "browser validation" --source codex
+ome source scan spool --query "browser validation" --max-session-bytes 4194304
+ome source clean
+ome source clean --yes
 ome source connect spool --mode ask
-ome source import spool --limit 20
-ome import spool --query "browser validation" --source codex
+ome source connect spool --mode enabled
+spool status
+spool sync
+spool search "browser validation" --source codex --limit 10 --json
+spool show <uuid> --json
 ```
 
 规则：
 
 - Spool 是可选依赖；不可用时继续使用 Codex 或本地来源。
+- Spool mode 只能是 `off`、`ask` 或 `enabled`。用户要求打开配置时用 `enabled`；只想逐次选择时用 `ask`。
+- 复盘扫描默认先由 Agent 做语义展开，再逐条 `spool search` 定位，最后用 `ome source scan spool` 窄扫描；不要把单条 query 或宽泛主题直接扫入大量 Spool 记录。
+- 深扫需要当前历史时，先记录 `spool status`，再运行 `spool sync`，并把同步前后状态写进 `searchedSources`。
+- Spool search 是词面检索入口，不承担语义展开；Agent 必须自行拆同义、近义、反向和边界 query，并在 `searchedSources` 记录 query 族。
+- 宽泛概念或单条 query 命中少不代表主题不存在；用更多语义入口、本地 Codex 全文扫或已扫描 source index 补覆盖。
+- 宽 query 命中超大会话、输出过大或部分失败时，改用更窄 query / `spool show --json <uuid>` / 代表性扫描，并把降级写入 audit。
+- 确认某个大会话值得索引时，才显式提高 `--max-session-bytes`；不要把它当默认宽扫开关。
 - 用户给 session id 时，不要传给 `ome reflect start`；在来源审计阶段读取原记录。
-- 导入后必须记录实际搜索过的来源，写入 `searchedSources`。
+- `source scan` 只写 pointer source index，默认不保存原始摘要；扫描后必须记录实际搜索过的来源，写入 `searchedSources`。
+- `ome source clean` 默认 dry-run；确认后用 `ome source clean --yes` 清掉历史 summary 和物化残留。
 
 ## 复盘 Run
 
@@ -177,11 +193,16 @@ ome experience show <card-id>
 ome experience show <card-id> --section rule
 ome experience show <card-id> --scope project --section rule
 ome experience archive <card-id> --reason "superseded"
+ome experience migrate-legacy --scope project --dry-run
+ome experience migrate-legacy --scope project --backup
 ```
 
 分类由候选、审批和卡片内容自然产生；不要要求用户维护单独的 category 命令。Starter lessons 由 `init` 安装，后续治理走正常经验库 review 和 archive，不再暴露单独 starter 命令。
 `list --json` 默认返回完整卡片。只需要索引时使用 `--compact` 或
 `--index`，避免把完整规则正文拉进上下文。
+旧版卡缺少 `schema: ome-card` 时，不要手改 active；先运行
+`ome experience migrate-legacy --scope project --dry-run` 预览，再按用户确认执行。
+迁移默认原地改写，不自动备份；只有用户明确要求临时备份时才加 `--backup`。
 
 ## 匹配与召回
 

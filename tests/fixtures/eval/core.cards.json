@@ -297,8 +297,8 @@
           "不是 npm pack",
           "不是 clean temp project",
           "安装文档",
-          "可选导入来源",
-          "Spool 可选导入",
+          "可选扫描来源",
+          "Spool 可选扫描",
           "不是 Codex 召回前置条件"
         ]
       },
@@ -578,11 +578,11 @@
           "turn id"
         ],
         "ignore_when": [
-          "Spool 可选导入",
+          "Spool 可选扫描",
           "没有历史会话或跨会话证据需求",
           "普通 code review",
-          "Spool 是可选导入来源",
-          "Spool 只是可选导入来源",
+          "Spool 是可选扫描来源",
+          "Spool 只是可选扫描来源",
           "不是 Codex 召回前置条件"
         ]
       },

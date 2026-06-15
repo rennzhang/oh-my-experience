@@ -1,7 +1,7 @@
 ---
 name: oh-my-experience
 description: >-
-  Use this skill when Codex needs to work with Oh My Experience for AI coding-agent execution lessons: set up a local OME library, install or inspect Codex hooks, recall active experience cards before medium or complex work, import and scan coding sessions for retrospective candidates, create or inspect retrospective candidates, review and govern an existing experience library, run recall evaluation, or troubleshoot OME data directories, hooks, stats, Spool imports, and doctor failures.
+  Use this skill when Codex needs to work with Oh My Experience for AI coding-agent execution lessons: set up a local OME library, install or inspect Codex hooks, recall active experience cards before medium or complex work, scan coding sessions for retrospective candidates, create or inspect retrospective candidates, review and govern an existing experience library, run recall evaluation, or troubleshoot OME data directories, hooks, stats, Spool source scans, and doctor failures.
 ---
 
 # Oh My Experience
@@ -19,7 +19,7 @@ Read only the reference needed for the user request:
 | Need exact CLI commands, flags, JSON behavior, lifecycle commands, or safe command routing | [cli.md](references/cli.md) |
 | Install, initialize, configure, hook setup | [setup.md](references/setup.md) |
 | Recall prior lessons for the current task, inspect match quality | [recall.md](references/recall.md) |
-| Import sessions, run retrospective, inspect candidates, approve cards | [reflect-retrospective.md](references/reflect-retrospective.md) |
+| Scan sessions, run retrospective, inspect candidates, approve cards | [reflect-retrospective.md](references/reflect-retrospective.md) |
 | Review, refine, merge, archive, or de-conflict existing experience cards | [experience-library-review.md](references/experience-library-review.md) |
 | Doctor failures, hook status, stats, eval, dogfood validation | [troubleshoot-eval.md](references/troubleshoot-eval.md) |
 
@@ -50,7 +50,7 @@ setup -> recall -> retrospective -> draft -> active -> eval -> maintenance
 - Use `--scope project` only when the user wants cards written to the current project's `.oh-my-experience/` library.
 - Never install or overwrite real Codex hooks unless the user explicitly confirms.
 - Never store raw prompt text in events unless the user explicitly opts into that behavior.
-- Keep Spool optional. If Spool is unavailable, Codex session import and local recall still need to work.
+- Keep Spool optional. If Spool is unavailable, Codex session scanning and local recall still need to work.
 - Keep scheduling outside the built-in skill workflow. Periodic retrospectives are an advanced docs pattern and require explicit user approval for the chosen host.
 - Use JSON output for scripts or agent-to-agent consumption; use human output for user-facing terminal guidance.
 - Prefer isolated temp data dirs for tests and eval. Do not pollute the user's real OME library with fixtures.

@@ -62,6 +62,8 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
         exists: library.exists,
         readable: library.readable,
         warningCount: library.warnings.length,
+        warningHashes: library.warnings.map((warning) => hashText(warning)),
+        warningMessages: library.warnings.map((warning) => sanitizeLibraryWarning(warning, library.dataDir)).slice(0, 3),
       })),
       queryVariants: queryVariants.map((variant) => hashText(variant)),
       matchedCards: matches.map((match) => ({ id: match.card.id, score: match.score, reasons: match.reasons })),
@@ -104,6 +106,10 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
   }
 }
 
+function sanitizeLibraryWarning(warning: string, dataDir: string): string {
+  return warning.replaceAll(dataDir, "$OME_LIBRARY").slice(0, 300);
+}
+
 function safeReadLibraryStackCards(stack: ReturnType<typeof resolveLibraryStack>) {
   try {
     return readLibraryStackCards(stack);
@@ -121,7 +127,6 @@ function isOmeMaintenancePrompt(prompt: string): boolean {
   return [
     "ome init",
     "ome uninstall",
-    "ome import",
     "ome source",
     "ome doctor",
     "ome config",

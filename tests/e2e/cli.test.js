@@ -76,8 +76,8 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const dataDir = tmpDir("full");
   const init = json(run(["init", "--data-dir", dataDir, "--json"]));
   assert.equal("locale" in init, false);
-  const importResult = json(run(["import", "codex", "--sessions", path.join(root, "tests", "fixtures", "codex"), "--data-dir", dataDir, "--json"]));
-  assert.equal(importResult.imported.length, 3);
+  const scanResult = json(run(["source", "scan", "codex", "--sessions", path.join(root, "tests", "fixtures", "codex"), "--data-dir", dataDir, "--json"]));
+  assert.equal(scanResult.indexed.length, 3);
   const sessionIndex = JSON.parse(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8"));
   assert.equal(sessionIndex.storage, "sources");
   assert.equal("messages" in sessionIndex.sessions[0], false);
@@ -264,6 +264,91 @@ test("project library participates in CLI recall without writing project events"
   assert.match(show.stdout, /project-local validation path/);
   const eventsAfterMatch = fs.existsSync(eventPath) ? fs.readFileSync(eventPath, "utf8") : "";
   assert.equal(eventsAfterMatch, eventsBeforeMatch);
+});
+
+test("project status reports invalid project cards", () => {
+  const projectRoot = tmpDir("project-status-invalid-root");
+  fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "@example/project-status-invalid" }), "utf8");
+  json(run(["project", "init", "--json"], { cwd: projectRoot }));
+  const invalidPath = path.join(projectRoot, ".oh-my-experience", "experiences", "active", "legacy-card.md");
+  fs.writeFileSync(invalidPath, "---\nid: legacy-card\nstatus: active\n---\n# Legacy\n", "utf8");
+
+  const status = json(run(["project", "status", "--json"], { cwd: projectRoot }));
+  assert.equal(status.ok, false);
+  assert.equal(status.invalidCards.length, 1);
+  assert.equal(fs.realpathSync(status.invalidCards[0].path), fs.realpathSync(invalidPath));
+  assert.match(status.invalidCards[0].message, /unsupported experience card schema/);
+});
+
+test("experience migrate-legacy converts old project cards after dry-run preview", () => {
+  const projectRoot = tmpDir("project-migrate-legacy-root");
+  fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "@example/project-migrate-legacy" }), "utf8");
+  json(run(["project", "init", "--json"], { cwd: projectRoot }));
+  const legacyPath = path.join(projectRoot, ".oh-my-experience", "experiences", "active", "legacy-card.md");
+  fs.writeFileSync(legacyPath, [
+    "---",
+    "id: legacy-card",
+    "status: active",
+    "title: Legacy Card",
+    "category: Test",
+    "summary: Legacy cards need explicit migration.",
+    "rule: Migrate legacy cards through the CLI.",
+    "triggers:",
+    "  - legacy migration",
+    "topics:",
+    "  - migration",
+    "---",
+    "# Legacy Card",
+    "",
+  ].join("\n"), "utf8");
+
+  const preview = json(run(["experience", "migrate-legacy", "--scope", "project", "--dry-run", "--json"], { cwd: projectRoot }));
+  assert.equal(preview.dryRun, true);
+  assert.equal(preview.migrated.length, 1);
+  assert.equal(fs.readFileSync(legacyPath, "utf8").includes("schema: ome-card"), false);
+
+  const migrated = json(run(["experience", "migrate-legacy", "--scope", "project", "--json"], { cwd: projectRoot }));
+  assert.equal(migrated.dryRun, false);
+  assert.equal(migrated.backup, false);
+  assert.deepEqual(migrated.backups, []);
+  assert.equal(migrated.migrated.length, 1);
+  assert.equal(fs.readFileSync(legacyPath, "utf8").includes("schema: ome-card"), true);
+  const status = json(run(["project", "status", "--json"], { cwd: projectRoot }));
+  assert.equal(status.ok, true);
+  assert.equal(status.invalidCards.length, 0);
+});
+
+test("match skips invalid project library and keeps global recall usable", () => {
+  const dataDir = tmpDir("project-invalid-match");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const projectRoot = tmpDir("project-invalid-match-root");
+  fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "@example/project-invalid-match" }), "utf8");
+  json(run(["project", "init", "--json"], { cwd: projectRoot }));
+  fs.writeFileSync(
+    path.join(projectRoot, ".oh-my-experience", "experiences", "active", "legacy-card.md"),
+    "---\nid: legacy-card\nstatus: active\n---\n# Legacy\n",
+    "utf8",
+  );
+
+  const matched = json(run(["match", "fix UI and validate in browser", "--data-dir", dataDir, "--cwd", projectRoot, "--json"]));
+  assert.equal(matched.ok, true);
+  assert.match(matched.warnings.join("\n"), /failed to read project experience library/);
+  const projectLibrary = matched.libraries.find((library) => library.scope === "project");
+  assert.ok(projectLibrary);
+  assert.match(projectLibrary.warnings.join("\n"), /failed to read project experience library/);
+});
+
+test("doctor warns when installed Codex skill differs from bundled skill", () => {
+  const dataDir = tmpDir("doctor-skill-drift");
+  const codexHome = tmpDir("doctor-skill-drift-codex-home");
+  json(run(["init", "--data-dir", dataDir, "--codex-home", codexHome, "--json"]));
+  const skillDir = path.join(codexHome, "skills", "oh-my-experience");
+  fs.writeFileSync(path.join(skillDir, "SKILL.md"), "---\nname: oh-my-experience\n---\n# stale\n", "utf8");
+
+  const doctor = json(run(["doctor", "--data-dir", dataDir, "--codex-home", codexHome, "--json"]));
+  assert.equal(doctor.ok, true);
+  assert.equal(doctor.checked.codexSkill.inSync, false);
+  assert.match(doctor.warnings.join("\n"), /installed Codex OME skill differs from bundled package/);
 });
 
 test("reflect candidates rejects missing source audit unless explicitly overridden", () => {
@@ -473,9 +558,9 @@ test("interactive init exposes first-run choices without migration prompts", () 
   assert.match(result.stdout, /After the first recall:/);
   assert.match(result.stdout, /move on to the first-card guide or a fuller retrospective/);
   assert.match(result.stdout, /After setup \(optional\):/);
-  assert.match(result.stdout, /Import more agent histories with Spool/);
+  assert.match(result.stdout, /Connect more agent histories with Spool/);
   assert.match(result.stdout, /Claude CLI, Gemini CLI, opencode/);
-  assert.match(result.stdout, /github\.com\/rennzhang\/oh-my-experience\/blob\/main\/docs\/guides\/import-sources\.md/);
+  assert.match(result.stdout, /github\.com\/rennzhang\/oh-my-experience\/blob\/main\/docs\/guides\/source-scan\.md/);
   assert.match(result.stdout, /Optional: connect Spool CLI/);
   assert.match(result.stdout, /Why install it/);
   assert.match(result.stdout, /Spool is a local AI session index/);
@@ -557,9 +642,9 @@ exit 1
     input: "\ny\ny\n",
   });
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
-  assert.match(result.stdout, /Spool CLI detected. Enable Spool imports/);
+  assert.match(result.stdout, /Spool CLI detected. Enable Spool sources/);
   assert.match(result.stdout, /Detected Spool version: spool-test 9\.9\.9/);
-  assert.match(result.stdout, /Spool imports enabled/);
+  assert.match(result.stdout, /Spool sources enabled/);
 
   const config = JSON.parse(fs.readFileSync(path.join(dataDir, "config.json"), "utf8"));
   assert.equal(config.sources.spool.mode, "enabled");
@@ -697,19 +782,51 @@ test("CLI recall eval defaults to isolated fixture data", () => {
 test("codex importer parses real response_item content arrays", () => {
   const dataDir = tmpDir("codex-real");
   json(run(["init", "--data-dir", dataDir, "--json"]));
-  const result = json(run(["import", "codex", "--sessions", path.join(root, "tests", "fixtures", "codex"), "--data-dir", dataDir, "--json"]));
+  const result = json(run(["source", "scan", "codex", "--sessions", path.join(root, "tests", "fixtures", "codex"), "--data-dir", dataDir, "--json"]));
   assert.equal(result.failed.length, 0);
   const sessions = JSON.parse(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8")).sessions;
-  const parsed = sessions.find((session) => session.summary.includes("dataDir"));
-  assert.ok(parsed, "array content fixture should be indexed");
+  const parsed = sessions.find((session) => session.messageCount >= 2);
+  assert.ok(parsed, "array content fixture should be indexed without raw summary");
+  assert.equal(parsed.summary, "");
   assert.equal("messages" in parsed, false);
   assert.equal(parsed.sessionFile, "");
   assert.equal(parsed.materialized, false);
-  const filtered = sessions.find((session) => session.summary.includes("真实执行经验"));
-  assert.ok(filtered, "user-visible content should remain");
-  assert.equal(filtered.summary.includes("harness instruction"), false);
-  assert.ok(filtered.messageCount >= 2);
-  assert.equal(filtered.sessionFile, "");
+  assert.ok(parsed.messageCount >= 2);
+});
+
+test("source status and clean expose and clean source summaries", () => {
+  const dataDir = tmpDir("source-inspect-compact");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const sourceIndex = path.join(dataDir, "indexes", "sources.json");
+  fs.writeFileSync(sourceIndex, JSON.stringify({
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    storage: "sources",
+    sessions: [{
+      id: "source-1",
+      provider: "codex",
+      sourcePath: "/tmp/source.jsonl",
+      startedAt: null,
+      cwd: null,
+      summary: "raw summary",
+      metadataHash: "hash",
+      messageCount: 2,
+      materialized: false,
+      sessionFile: "",
+    }],
+  }, null, 2), "utf8");
+
+  const status = json(run(["source", "status", "--data-dir", dataDir, "--json"]));
+  assert.equal(status.sourceIndex.sessions, 1);
+  assert.equal(status.sourceIndex.summaryRecords, 1);
+  const dryRun = json(run(["source", "clean", "--data-dir", dataDir, "--json"]));
+  assert.equal(dryRun.dryRun, true);
+  assert.equal(dryRun.compact.dropSummaries, true);
+  assert.equal(JSON.parse(fs.readFileSync(sourceIndex, "utf8")).sessions[0].summary, "raw summary");
+  const applied = json(run(["source", "clean", "--yes", "--data-dir", dataDir, "--json"]));
+  assert.equal(applied.dryRun, false);
+  assert.equal(applied.compact.dropSummaries, true);
+  assert.equal(JSON.parse(fs.readFileSync(sourceIndex, "utf8")).sessions[0].summary, "");
 });
 
 test("init installs and uninstall removes global hook without project setup", () => {
@@ -928,6 +1045,31 @@ test("hook log does not persist raw prompt by default", () => {
   assert.equal(log.includes("private raw prompt abc"), false);
 });
 
+test("hook logs project library warnings without injecting them", () => {
+  const dataDir = tmpDir("hook-project-warning");
+  const projectRoot = tmpDir("hook-project-warning-root");
+  fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "@example/hook-project-warning" }), "utf8");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  json(run(["project", "init", "--json"], { cwd: projectRoot }));
+  fs.writeFileSync(
+    path.join(projectRoot, ".oh-my-experience", "experiences", "active", "legacy-card.md"),
+    "---\nid: legacy-card\nstatus: active\n---\n# Legacy\n",
+    "utf8",
+  );
+
+  const hook = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
+    input: JSON.stringify({ prompt: "unrelated prompt", cwd: projectRoot, session_id: "warning-session" }),
+  }));
+  assert.deepEqual(hook, {});
+  const events = fs.readFileSync(path.join(dataDir, "events.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  const event = events.find((item) => item.sessionId === "warning-session");
+  const projectLibrary = event.libraries.find((library) => library.scope === "project");
+  assert.equal(projectLibrary.warningCount, 1);
+  assert.match(projectLibrary.warningMessages.join("\n"), /failed to read project experience library/);
+  assert.equal(projectLibrary.warningMessages.join("\n").includes(dataDir), false);
+  assert.equal(projectLibrary.warningHashes.length, 1);
+});
+
 test("config can point to a custom data directory", () => {
   const dataDir = tmpDir("config-a");
   const nextDir = path.join(os.tmpdir(), `ome-e2e-config-b-${Date.now()}-${Math.random().toString(16).slice(2)}`);
@@ -967,8 +1109,8 @@ test("spool optional path reports without breaking codex workflow", () => {
   assert.equal(typeof result.spool.available, "boolean");
 });
 
-test("spool import reads official list/show JSON through PATH", () => {
-  const dataDir = tmpDir("spool-import");
+test("spool scan reads official list/show JSON through PATH", () => {
+  const dataDir = tmpDir("spool-scan");
   const binDir = tmpDir("spool-bin");
   const spoolPath = path.join(binDir, "spool");
   fs.writeFileSync(spoolPath, `#!/usr/bin/env node
@@ -980,9 +1122,30 @@ process.exit(1);
 `, "utf8");
   fs.chmodSync(spoolPath, 0o755);
   json(run(["init", "--data-dir", dataDir, "--json"], { env: { PATH: `${binDir}${path.delimiter}${process.env.PATH}` } }));
-  const result = json(run(["source", "import", "spool", "--limit", "1", "--data-dir", dataDir, "--json"], { env: { PATH: `${binDir}${path.delimiter}${process.env.PATH}` } }));
+  const result = json(run(["source", "scan", "spool", "--limit", "1", "--data-dir", dataDir, "--json"], { env: { PATH: `${binDir}${path.delimiter}${process.env.PATH}` } }));
   assert.equal(result.ok, true);
-  assert.deepEqual(result.imported, ["spool-1"]);
+  assert.deepEqual(result.indexed, ["spool-1"]);
   const sessions = JSON.parse(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8")).sessions;
   assert.equal(sessions[0].provider, "spool:claude");
+  assert.equal(sessions[0].summary, "");
+});
+
+test("spool scan skips oversized sessions without failing the whole scan", () => {
+  const dataDir = tmpDir("spool-scan-oversized");
+  const binDir = tmpDir("spool-bin-oversized");
+  const spoolPath = path.join(binDir, "spool");
+  fs.writeFileSync(spoolPath, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes('--version')) { console.log('spool-test 1.0.0'); process.exit(0); }
+if (args[0] === 'list') { console.log(JSON.stringify([{sessionUuid:'large-1', source:'codex'}])); process.exit(0); }
+if (args[0] === 'show') { console.log(JSON.stringify({session:{sessionUuid:'large-1', source:'codex'}, messages:[{role:'user', contentText:'x'.repeat(2000)}]})); process.exit(0); }
+process.exit(1);
+`, "utf8");
+  fs.chmodSync(spoolPath, 0o755);
+  json(run(["init", "--data-dir", dataDir, "--json"], { env: { PATH: `${binDir}${path.delimiter}${process.env.PATH}` } }));
+  const result = json(run(["source", "scan", "spool", "--limit", "1", "--max-session-bytes", "512", "--data-dir", dataDir, "--json"], { env: { PATH: `${binDir}${path.delimiter}${process.env.PATH}` } }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.indexed, []);
+  assert.equal(result.skipped.length, 1);
+  assert.match(result.skipped[0].reason, /exceeded 512 bytes/);
 });

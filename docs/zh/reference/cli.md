@@ -5,7 +5,7 @@ status: active
 
 # CLI 参考
 
-本页记录 `ome` 的公开命令表面。CLI 刻意保持克制：设置、召回、复盘审阅、经验库治理、来源导入、诊断和卸载。
+本页记录 `ome` 的公开命令表面。CLI 刻意保持克制：设置、召回、复盘审阅、经验库治理、来源扫描、诊断和卸载。
 
 ## 输出契约
 
@@ -55,14 +55,20 @@ ome match "<task>" --cwd /path/to/project --explain
 ## 来源
 
 ```bash
-ome import codex --sessions <dir>
 ome source status
+ome source scan codex --sessions <dir>
+ome source scan spool --limit 20
+ome source scan spool --query "browser validation" --source codex
+ome source scan spool --query "browser validation" --max-session-bytes 4194304
+ome source clean
+ome source clean --yes
 ome source connect spool --mode ask
-ome source import spool --limit 20
-ome import spool --query "browser validation" --source codex
+ome source connect spool --mode enabled
 ```
 
-Spool 是可选能力。Spool 不可用时，Codex session 导入和本地召回仍然可用。
+Spool 是可选能力。Spool 不可用时，Codex session 扫描和本地召回仍然可用。来源扫描只写 pointer index，不复制原始完整会话。`ome source clean` 默认 dry-run，`--yes` 才真正清掉历史 summary 和 materialized 标记。
+
+Spool 扫描遇到 `spool show --json` 输出过大的会话会跳过。优先缩小 query；如果确认这个大会话值得索引，再显式提高 `--max-session-bytes`。
 
 ## 复盘
 
@@ -100,7 +106,9 @@ ome project init
 它不会修改 `dataDir`。
 
 `ome project status --json` 会返回识别到的 `projectContext`、项目经验库路径、目录是否
-存在、是否可读，以及警告信息。
+存在、是否可读，以及警告信息。项目库存在时还会返回 `experiences` 和
+`invalidCards`；无效 active 或 draft 项目卡会让 `ok: false`，因为项目库会参与
+提示词阶段召回。
 
 ## 经验库
 
@@ -115,6 +123,8 @@ ome experience show <card-id> --section rule
 ome experience enable <card-id>
 ome experience enable <card-id> --scope project
 ome experience archive <card-id> --reason "superseded"
+ome experience migrate-legacy --scope project --dry-run
+ome experience migrate-legacy --scope project --backup
 ```
 
 生命周期保持显式：`candidate -> draft -> active -> archived`。
@@ -124,6 +134,11 @@ ome experience archive <card-id> --reason "superseded"
 `experience list --json` 是治理命令，所以遇到无效卡片文件时不会停在第一处解析
 错误，而是返回 `invalidCards`，其中包含 `status`、`path` 和 `message`。运行时召回
 仍然对 active 卡保持严格；无效 active 卡必须修复后才能参与召回。
+
+用 `ome experience migrate-legacy --dry-run` 预览旧版、缺少
+`schema: ome-card` 的卡片迁移结果。项目库加 `--scope project`。确认迁移列表无误后，
+再去掉 `--dry-run` 执行。迁移默认原地改写，不自动创建备份；只有你明确需要临时副本时
+才加 `--backup`。
 
 ## 评估
 

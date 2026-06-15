@@ -67,7 +67,13 @@ export function inspectProjectLibrary(projectRoot: string): ExperienceLibrary {
 
 export function readLibraryCards(library: ExperienceLibrary): CardIndexEntry[] {
   if (!library.readable) return [];
-  const index = buildCardIndex(library.dataDir);
+  let index: ReturnType<typeof buildCardIndex>;
+  try {
+    index = buildCardIndex(library.dataDir);
+  } catch (error: any) {
+    library.warnings.push(`failed to read ${library.scope} experience library: ${error.message || String(error)}`);
+    return [];
+  }
   return (index.experiences || []).map((card) => ({
     ...card,
     libraryScope: library.scope,
@@ -77,7 +83,9 @@ export function readLibraryCards(library: ExperienceLibrary): CardIndexEntry[] {
 }
 
 export function readLibraryStackCards(stack: LibraryStack): CardIndexEntry[] {
-  return stack.libraries.flatMap((library) => readLibraryCards(library));
+  const cards = stack.libraries.flatMap((library) => readLibraryCards(library));
+  stack.warnings = stack.libraries.flatMap((library) => library.warnings);
+  return cards;
 }
 
 export function initializeProjectLibrary(projectRoot: string) {

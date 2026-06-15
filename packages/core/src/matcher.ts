@@ -18,7 +18,7 @@ const TASK_TYPES = {
   security: ["secret", "token", "permission", "auth", "cors", "权限", "安全", "隐私", "不可逆"],
   docs: ["docs", "markdown", "roadmap", "文档", "口径", "溯源"],
   package: ["npm", "npx", "pypi", "package", "install", "tarball", "安装", "打包"],
-  import: ["import", "spool import", "codex session", "session jsonl", "会话导入", "导入会话", "导入"],
+  source: ["source scan", "spool scan", "codex session", "session jsonl", "来源扫描", "扫描会话", "索引来源"],
 };
 const OPERATIONS = {
   implement: ["implement", "build", "write", "新增", "实现", "开发", "做完"],

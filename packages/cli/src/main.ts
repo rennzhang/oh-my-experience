@@ -6,7 +6,9 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import {
   archiveCard,
+  auditStorage,
   compareRecallReports,
+  compactSessionIndex,
   createRetrospectiveRun,
   defaultDataDir,
   detectProjectContext,
@@ -25,6 +27,7 @@ import {
   listStarterCards,
   loadConfig,
   matchCardEntries,
+  migrateLegacyCards,
   normalizeLocale,
   explainMatchFromCards,
   projectLibraryPath,
@@ -32,7 +35,9 @@ import {
   previewApplyRetrospective,
   promoteDraft,
   renderAdditionalContext,
+  pruneMaterializedSessions,
   repairIndex,
+  readSessionIndex,
   readLibraryStackCards,
   resolveLibraryStack,
   runDoctor,
@@ -45,10 +50,10 @@ import {
   candidateFromLesson,
 } from "../../core/src/index.js";
 import { defaultConfigHome } from "../../core/src/storage.js";
-import { importCodexSessions } from "../../adapters/sources/codex-sessions/src/importer.js";
+import { scanCodexSessions } from "../../adapters/sources/codex-sessions/src/importer.js";
 import { hookPlan as codexHookPlan, hookStatus as codexHookStatus, installHook as installCodexHook, uninstallHook as uninstallCodexHook } from "../../adapters/agents/codex/src/hook-install.js";
 import { claudeHookPlan, claudeHookStatus, installClaudeHook, uninstallClaudeHook } from "../../adapters/agents/claude/src/hook-install.js";
-import { checkSpool, importSpoolSessions } from "../../adapters/sources/spool/src/spool.js";
+import { checkSpool, scanSpoolSessions } from "../../adapters/sources/spool/src/spool.js";
 import { runHook } from "../../hook-runtime/src/run.js";
 
 type CliFlags = Record<string, any>;
@@ -64,7 +69,6 @@ const KNOWN_COMMANDS = [
   "eval",
   "help",
   "hook",
-  "import",
   "init",
   "match",
   "project",
@@ -86,7 +90,6 @@ export async function runCli(argv: string[]) {
   if (command === "init") return initCommand(dataDir, args);
   if (command === "doctor") return doctorCommand(dataDir, args);
   if (command === "config") return configCommand(dataDir, subcommand, args);
-  if (command === "import") return importCommand(dataDir, subcommand, args);
   if (command === "reflect") return reflectCommand(scopedExperienceDataDir(dataDir, args), subcommand, args);
   if (command === "source") return sourceCommand(dataDir, subcommand, args);
   if (command === "experience") return experienceCommand(dataDir, subcommand, args);
@@ -158,9 +161,106 @@ function doctorCommand(dataDir: string, args: ParsedArgs) {
     codexHome: args.flags["codex-home"] ? path.resolve(args.flags["codex-home"]) : process.env.CODEX_HOME,
     claudeHome: args.flags["claude-home"] ? path.resolve(args.flags["claude-home"]) : undefined,
   };
-  if (!args.flags["repair-index"]) return print(runDoctor(dataDir, options), args);
+  if (!args.flags["repair-index"]) return print(withLocalDiagnostics(runDoctor(dataDir, options), args), args);
   const repairedIndex = repairIndex(dataDir);
-  return print({ repairedIndex, doctor: runDoctor(dataDir, options) }, args);
+  return print({ repairedIndex, doctor: withLocalDiagnostics(runDoctor(dataDir, options), args) }, args);
+}
+
+function withLocalDiagnostics(record: any, args: ParsedArgs) {
+  const errors = [...(Array.isArray(record.errors) ? record.errors : [])];
+  const warnings = [...(Array.isArray(record.warnings) ? record.warnings : [])];
+  const projectLibrary = inspectCurrentProjectLibraryHealth(args);
+  if (projectLibrary?.exists && projectLibrary.readable) {
+    for (const issue of projectLibrary.invalidCards || []) {
+      const message = `project card schema invalid: ${path.relative(projectLibrary.dataDir, issue.path)}: ${issue.message}`;
+      if (issue.status === "archived") warnings.push(`archived ${message}`);
+      else errors.push(message);
+    }
+  }
+  for (const warning of projectLibrary?.warnings || []) warnings.push(warning);
+  const codexSkill = inspectCodexSkillHealth(args);
+  if (codexSkill.warning) warnings.push(codexSkill.warning);
+  return {
+    ...record,
+    ok: errors.length === 0,
+    errors,
+    warnings,
+    checked: {
+      ...(record.checked || {}),
+      projectLibrary,
+      codexSkill,
+    },
+  };
+}
+
+function inspectCurrentProjectLibraryHealth(args: ParsedArgs) {
+  const cwd = args.flags.cwd ? path.resolve(args.flags.cwd) : process.cwd();
+  const projectContext = detectProjectContext(cwd);
+  if (!projectContext.root) return null;
+  const library = inspectProjectLibrary(projectContext.root);
+  const health: any = {
+    projectContext,
+    scope: "project",
+    dataDir: library.dataDir,
+    exists: library.exists,
+    readable: library.readable,
+    warnings: [...library.warnings],
+    experiences: 0,
+    invalidCards: [],
+    ok: true,
+  };
+  if (!library.exists || !library.readable) return health;
+  const inspection = inspectCards(library.dataDir);
+  health.experiences = inspection.cards.length;
+  health.invalidCards = inspection.issues;
+  health.ok = inspection.issues.every((issue) => issue.status === "archived");
+  return health;
+}
+
+function inspectCodexSkillHealth(args: ParsedArgs) {
+  const plan = planInitSkill(args, true);
+  const health: any = {
+    target: plan.target,
+    source: plan.source,
+    installed: plan.installed,
+    owned: plan.owned,
+    legacyOwned: plan.legacyOwned,
+    conflict: plan.conflict,
+    current: null,
+    bundled: null,
+    inSync: true,
+  };
+  if (!plan.installed || plan.conflict || !fs.existsSync(plan.source) || !fs.existsSync(plan.target)) {
+    return health;
+  }
+  health.current = directoryFingerprint(plan.target, new Set([OME_SKILL_MARKER]));
+  health.bundled = directoryFingerprint(plan.source, new Set());
+  health.inSync = health.current === health.bundled;
+  if (!health.inSync) {
+    health.warning = `installed Codex OME skill differs from bundled package: ${plan.target}. Run \`ome init --provider codex\` to refresh it.`;
+  }
+  return health;
+}
+
+function directoryFingerprint(root: string, skipNames: Set<string>): string {
+  const entries: string[] = [];
+  collectDirectoryFingerprintEntries(root, root, skipNames, entries);
+  return hashText(entries.sort().join("\n"));
+}
+
+function collectDirectoryFingerprintEntries(root: string, current: string, skipNames: Set<string>, entries: string[]): void {
+  if (!fs.existsSync(current)) return;
+  for (const item of fs.readdirSync(current, { withFileTypes: true })) {
+    if (skipNames.has(item.name)) continue;
+    const absolute = path.join(current, item.name);
+    const relative = path.relative(root, absolute).split(path.sep).join("/");
+    if (item.isDirectory()) {
+      entries.push(`dir:${relative}`);
+      collectDirectoryFingerprintEntries(root, absolute, skipNames, entries);
+    } else if (item.isFile()) {
+      entries.push(`file:${relative}:${hashText(fs.readFileSync(absolute, "utf8"))}`);
+    }
+  }
 }
 
 function configCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
@@ -438,7 +538,7 @@ function printInitDone(copy: InitCopy, dataDir: string, hookChoice: string, resu
   printPromptBlock(copy.starterPrompt, copy);
   console.log(`\n${bold(copy.afterRecallTitle)} ${dim(copy.afterRecallIntro)}`);
   console.log(`\n${bold(copy.recommendations)}`);
-  printRecommendation(1, copy.importSourcesRecommendation, copy.importSourcesDescription, copy.importSourcesGuide);
+  printRecommendation(1, copy.sourceScanRecommendation, copy.sourceScanDescription, copy.sourceScanGuide);
 }
 
 async function maybeSetupSpoolSource(copy: InitCopy, dataDir: string, prompt: PromptSession) {
@@ -719,21 +819,21 @@ function initCopy() {
     ].join("\n"),
     afterRecallTitle: "第一次召回体验后:",
     afterRecallIntro: "如果这次召回符合预期，再进入第一张经验卡或更完整的复盘流程。",
-    importSourcesRecommendation: "用 Spool 导入更多 Agent 历史",
-    importSourcesDescription: "导入 Claude CLI、Gemini CLI、opencode 等会话；不安装也不影响 Codex 默认召回。",
-    importSourcesGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/import-sources.md",
+    sourceScanRecommendation: "用 Spool 连接更多 Agent 历史",
+    sourceScanDescription: "扫描 Claude CLI、Gemini CLI、opencode 等会话索引；不安装也不影响 Codex 默认召回。",
+    sourceScanGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/source-scan.md",
     spoolStepPrompt: "可选：连接 Spool CLI",
     spoolStepDescription: "OME 的核心设置已经完成。Spool 只是扩大可扫描的历史会话范围，不是 Codex 召回的前置条件。",
     spoolWhyTitle: "为什么建议安装",
     spoolIntro: "Spool 是本机 AI 会话索引层，把 Claude、Codex、Gemini 等多 Agent 历史统一成可搜索素材池。",
-    spoolWithout: "不安装：OME 仍可从当前对话和显式导入的 Codex 会话取材，核心链路完整。",
+    spoolWithout: "不安装：OME 仍可从当前对话和显式扫描的 Codex 会话取材，核心链路完整。",
     spoolWith: "安装后：先索引命中、再按需取证据；比直接吞原始 session 更省 token、上下文更干净。",
     spoolRecommendation: "推荐安装：多 Agent 用户覆盖更全，同时避免大量思考过程、工具日志挤占上下文。",
     spoolGithubLabel: "GitHub:",
     spoolInstallLabel: "CLI 安装:",
-    spoolBoundary: "这里只装 CLI，不装桌面 App。导入内容仍需审核，不会自动成为 active 经验。",
-    spoolEnablePrompt: "检测到 Spool CLI，要启用 Spool 导入吗？",
-    spoolDetectedDescription: "本机 Spool 版本: {version}。启用后，OME 可以在你要求时导入 Spool 索引到本地经验素材池。",
+    spoolBoundary: "这里只装 CLI，不装桌面 App。扫描材料仍需审核，不会自动成为 active 经验。",
+    spoolEnablePrompt: "检测到 Spool CLI，要启用 Spool 来源吗？",
+    spoolDetectedDescription: "本机 Spool 版本: {version}。启用后，OME 可以在你要求时扫描 Spool 索引到本地经验素材池。",
     spoolInstallPrompt: "要现在安装 Spool CLI 吗？",
     spoolInstallDescription: "会执行 npm 全局安装；你也可以拒绝，之后按上面的 GitHub 和安装命令手动安装。",
     spoolInstalling: "正在安装 {package} ...",
@@ -741,7 +841,7 @@ function initCopy() {
     spoolInstallFailed: "Spool CLI 安装失败",
     spoolInstallFailedBody: "OME 主设置已完成；只是 Spool 可选增强没有启用。可以之后按官方地址手动安装。",
     spoolInstallMissingAfterInstall: "npm 安装命令完成，但当前 PATH 仍检测不到 spool 命令。请打开新终端后运行 ome source status 检查。",
-    spoolEnabled: "Spool 导入已启用。",
+    spoolEnabled: "Spool 来源已启用。",
     spoolSkipped: "已跳过 Spool；OME 核心召回照常可用。",
     unknownVersion: "未知",
     exitHint: "按任意键退出",
@@ -796,21 +896,21 @@ function initCopy() {
     ].join("\n"),
     afterRecallTitle: "After the first recall:",
     afterRecallIntro: "If the recall feels right, move on to the first-card guide or a fuller retrospective.",
-    importSourcesRecommendation: "Import more agent histories with Spool",
-    importSourcesDescription: "Import Claude CLI, Gemini CLI, opencode, and other supported histories. Codex recall works without it.",
-    importSourcesGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/import-sources.md",
+    sourceScanRecommendation: "Connect more agent histories with Spool",
+    sourceScanDescription: "Scan Claude CLI, Gemini CLI, opencode, and other supported history indexes. Codex recall works without it.",
+    sourceScanGuide: "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/source-scan.md",
     spoolStepPrompt: "Optional: connect Spool CLI",
     spoolStepDescription: "OME core setup is complete. Spool only expands the session history available for scans; Codex recall does not depend on it.",
     spoolWhyTitle: "Why install it",
     spoolIntro: "Spool is a local AI session index that unifies Claude, Codex, Gemini, and other agent histories into one searchable pool.",
-    spoolWithout: "Without it: OME still draws from the current conversation and explicitly imported Codex sessions; the core path is intact.",
+    spoolWithout: "Without it: OME still draws from the current conversation and explicitly scanned Codex sessions; the core path is intact.",
     spoolWith: "With it: index-first lookup, then evidence on demand; avoids dumping raw sessions into context and saves tokens.",
     spoolRecommendation: "Recommended for multi-agent users: broader coverage without flooding your context with think traces and tool logs.",
     spoolGithubLabel: "GitHub:",
     spoolInstallLabel: "CLI install:",
-    spoolBoundary: "CLI only; no desktop app. Imports still require review; lessons never auto-activate.",
-    spoolEnablePrompt: "Spool CLI detected. Enable Spool imports?",
-    spoolDetectedDescription: "Detected Spool version: {version}. If enabled, OME can import the Spool index into the local source pool when you ask.",
+    spoolBoundary: "CLI only; no desktop app. Scanned material still requires review; lessons never auto-activate.",
+    spoolEnablePrompt: "Spool CLI detected. Enable Spool sources?",
+    spoolDetectedDescription: "Detected Spool version: {version}. If enabled, OME can scan the Spool index into the local source pool when you ask.",
     spoolInstallPrompt: "Install Spool CLI now?",
     spoolInstallDescription: "This runs a global npm install. You can decline and install it later from the GitHub URL and command above.",
     spoolInstalling: "Installing {package} ...",
@@ -818,7 +918,7 @@ function initCopy() {
     spoolInstallFailed: "Spool CLI install failed",
     spoolInstallFailedBody: "OME core setup is complete; only the optional Spool enhancement was not enabled. You can install it manually later.",
     spoolInstallMissingAfterInstall: "npm completed, but the spool command is still not visible on PATH. Open a new terminal and run ome source status.",
-    spoolEnabled: "Spool imports enabled.",
+    spoolEnabled: "Spool sources enabled.",
     spoolSkipped: "Skipped Spool; OME core recall still works.",
     unknownVersion: "unknown",
     exitHint: "Press any key to exit",
@@ -994,16 +1094,6 @@ function configPointerPath() {
   return path.join(defaultConfigHome(), "config.json");
 }
 
-function importCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
-  if (subcommand === "codex") {
-    const sessions = args.flags.sessions || args.flags["sessions-dir"];
-    if (!sessions) throw new Error("usage: ome import codex --sessions <dir>");
-    return print(importCodexSessions(dataDir, path.resolve(sessions)), args);
-  }
-  if (subcommand === "spool") return print(importSpoolSessions(dataDir, spoolOptions(args)), args);
-  throw new Error("usage: ome import codex|spool");
-}
-
 function reflectCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
   if (!subcommand || subcommand === "start" || subcommand === "create") return createReflectRun(dataDir, args);
   if (subcommand === "resume") {
@@ -1153,7 +1243,9 @@ function withReviewPaths<T extends Record<string, any>>(dataDir: string, record:
 }
 
 function sourceCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
-  if (!subcommand || subcommand === "status") return print({ ok: true, spool: checkSpool(), sources: loadConfig(dataDir).sources }, args);
+  if (!subcommand || subcommand === "status") return print(inspectSourceState(dataDir), args);
+  if (subcommand === "scan") return print(scanSource(dataDir, args), args);
+  if (subcommand === "clean") return print(cleanSources(dataDir, args), args);
   if (subcommand === "connect") {
     const source = args.positionals[2];
     if (source !== "spool") throw new Error("usage: ome source connect spool --mode off|ask|enabled");
@@ -1162,12 +1254,96 @@ function sourceCommand(dataDir: string, subcommand: string | undefined, args: Pa
     const config = loadConfig(dataDir);
     return print(saveConfig(dataDir, { ...config, sources: { ...config.sources, spool: { mode } } }), args);
   }
-  if (subcommand === "import") {
-    const source = args.positionals[2];
-    if (source !== "spool") throw new Error("usage: ome source import spool");
-    return print(importSpoolSessions(dataDir, spoolOptions(args)), args);
+  throw new Error("usage: ome source status|scan codex|scan spool|clean|connect spool");
+}
+
+function scanSource(dataDir: string, args: ParsedArgs) {
+  const source = args.positionals[2];
+  if (source === "codex") {
+    const sessions = args.flags.sessions || args.flags["sessions-dir"];
+    if (!sessions) throw new Error("usage: ome source scan codex --sessions <dir>");
+    return {
+      ...scanCodexSessions(dataDir, path.resolve(sessions)),
+      command: "source.scan",
+      source,
+      storage: "pointer",
+    };
   }
-  throw new Error("usage: ome source status|connect spool|import spool");
+  if (source === "spool") {
+    return {
+      ...scanSpoolSessions(dataDir, spoolOptions(args)),
+      command: "source.scan",
+      source,
+      storage: "pointer",
+    };
+  }
+  throw new Error("usage: ome source scan codex|spool");
+}
+
+function cleanSources(dataDir: string, args: ParsedArgs) {
+  const dryRun = !args.flags.yes || Boolean(args.flags["dry-run"]);
+  const compact = compactSessionIndex(dataDir, { dryRun, dropSummaries: true });
+  const prune = pruneMaterializedSessions(dataDir, { dryRun, yes: !dryRun });
+  return {
+    ok: true,
+    dryRun,
+    compact,
+    prune,
+    next: dryRun ? "Run `ome source clean --yes` to apply." : "Source index cleaned.",
+  };
+}
+
+function inspectSourceState(dataDir: string) {
+  const index = readSessionIndex(dataDir);
+  const sessions = index.sessions || [];
+  const providerCounts = countBy(sessions.map((session) => session.provider));
+  const summaryBytes = sessions.reduce((sum, session) => sum + Buffer.byteLength(session.summary || "", "utf8"), 0);
+  const summaryRecords = sessions.filter((session) => Boolean(session.summary)).length;
+  const rawIndex = sourceIndexRawStats(dataDir);
+  return {
+    ok: true,
+    dataDir,
+    spool: checkSpool(),
+    sources: loadConfig(dataDir).sources,
+    sourceIndex: {
+      path: layout(dataDir).sourceIndex,
+      sessions: sessions.length,
+      providerCounts,
+      sourceExists: sessions.filter((session) => session.sourceExists).length,
+      missingSources: sessions.filter((session) => !session.sourceExists).length,
+      materialized: sessions.filter((session) => session.materialized || session.sessionFile).length,
+      messageArrays: rawIndex.messageArrays,
+      embeddedMessageRecords: rawIndex.embeddedMessageRecords,
+      summaryRecords,
+      summaryBytes,
+      maxSummaryBytes: sessions.reduce((max, session) => Math.max(max, Buffer.byteLength(session.summary || "", "utf8")), 0),
+    },
+    storage: auditStorage(dataDir),
+  };
+}
+
+function countBy(values: string[]) {
+  const counts: Record<string, number> = {};
+  for (const value of values) counts[value] = (counts[value] || 0) + 1;
+  return counts;
+}
+
+function sourceIndexRawStats(dataDir: string) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(layout(dataDir).sourceIndex, "utf8"));
+    const sessions = Array.isArray(raw.sessions) ? raw.sessions : [];
+    return {
+      messageArrays: sessions.filter((session: any) => Array.isArray(session.messages)).length,
+      embeddedMessageRecords: sessions.filter((session: any) => Array.isArray(session.messages) && session.messages.some(hasMessageText)).length,
+    };
+  } catch {
+    return { messageArrays: 0, embeddedMessageRecords: 0 };
+  }
+}
+
+function hasMessageText(message: any) {
+  if (!message || typeof message !== "object") return false;
+  return Boolean(String(message.text || message.content || message.contentText || "").trim());
 }
 
 function experienceCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
@@ -1203,7 +1379,14 @@ function experienceCommand(dataDir: string, subcommand: string | undefined, args
     if (!id) throw new Error("usage: ome experience archive <id> [--reason <reason>]");
     return print(archiveCard(targetDataDir, id, args.flags.reason || "archived"), args);
   }
-  throw new Error("usage: ome experience list|show|enable|archive");
+  if (subcommand === "migrate-legacy") {
+    return print(migrateLegacyCards(targetDataDir, {
+      backup: Boolean(args.flags.backup),
+      dryRun: Boolean(args.flags["dry-run"]),
+      status: args.flags.status || null,
+    }), args);
+  }
+  throw new Error("usage: ome experience list|show|enable|archive|migrate-legacy");
 }
 
 function scopedExperienceDataDir(dataDir: string, args: ParsedArgs): string {
@@ -1255,7 +1438,7 @@ function matchCommand(dataDir: string, args: ParsedArgs) {
     threshold: options.threshold,
     projectContext: stack.projectContext,
   });
-  return print({ ok: true, query, libraries: stack.libraries, matches, additionalContext: renderAdditionalContext(matches) }, args);
+  return print({ ok: true, query, warnings: stack.warnings, libraries: stack.libraries, matches, additionalContext: renderAdditionalContext(matches) }, args);
 }
 
 function projectCommand(_dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
@@ -1264,13 +1447,16 @@ function projectCommand(_dataDir: string, subcommand: string | undefined, args: 
   if (!projectContext.root) throw new Error("project command requires running inside a project");
   if (!subcommand || subcommand === "status") {
     const library = inspectProjectLibrary(projectContext.root);
+    const health = inspectCurrentProjectLibraryHealth({ ...args, flags: { ...args.flags, cwd } });
     return print({
-      ok: true,
+      ok: health?.ok ?? true,
       projectContext,
       projectLibrary: library.dataDir,
       exists: library.exists,
       readable: library.readable,
-      warnings: library.warnings,
+      warnings: health?.warnings ?? library.warnings,
+      experiences: health?.experiences ?? 0,
+      invalidCards: health?.invalidCards ?? [],
     }, args);
   }
   if (subcommand === "init") {
@@ -1357,6 +1543,7 @@ function spoolOptions(args: ParsedArgs) {
     project: args.flags.project,
     query: args.flags.query,
     since: args.flags.since,
+    maxSessionBytes: args.flags["max-session-bytes"] ? Number(args.flags["max-session-bytes"]) : undefined,
   };
 }
 
@@ -1427,7 +1614,7 @@ function renderHumanOutput(value: unknown, args: ParsedArgs): string {
   if (command === "doctor") return renderDoctorResult(record, zh);
   if (command === "hook") return renderHookResult(record, zh);
   if (command === "config") return renderConfigResult(record, subcommand, zh);
-  if (command === "import" || command === "source") return renderImportResult(record, subcommand, zh);
+  if (command === "source") return renderSourceResult(record, subcommand, zh);
   if (command === "reflect") return renderReflectResult(record, zh);
   if (command === "experience") return renderExperienceResult(record, subcommand, zh);
   if (command === "match") return renderMatchResult(record, Boolean(args.flags.explain), zh);
@@ -1465,9 +1652,9 @@ function renderInitResult(record: Record<string, any>, zh: boolean): string {
     }
     lines.push("");
     lines.push(zh ? "建议:" : "Recommendations:");
-    lines.push(`  ${zh ? "用 Spool 导入更多 Agent 历史" : "Import more agent histories with Spool"}`);
-    lines.push(`  ${zh ? "可把 Claude CLI、Gemini CLI、opencode 等会话导入 OME；不安装也不影响 Codex 默认召回。" : "Bring Claude CLI, Gemini CLI, opencode, and other supported histories into OME. Codex recall works without it."}`);
-    lines.push(`  ${zh ? "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/import-sources.md" : "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/import-sources.md"}`);
+    lines.push(`  ${zh ? "用 Spool 连接更多 Agent 历史" : "Connect more agent histories with Spool"}`);
+    lines.push(`  ${zh ? "可扫描 Claude CLI、Gemini CLI、opencode 等会话索引；不安装也不影响 Codex 默认召回。" : "Scan Claude CLI, Gemini CLI, opencode, and other supported history indexes. Codex recall works without it."}`);
+    lines.push(`  ${zh ? "https://github.com/rennzhang/oh-my-experience/blob/main/docs/zh/guides/source-scan.md" : "https://github.com/rennzhang/oh-my-experience/blob/main/docs/guides/source-scan.md"}`);
   }
   lines.push(jsonHint(zh));
   return lines.join("\n");
@@ -1533,23 +1720,67 @@ function renderConfigResult(record: Record<string, any>, subcommand: string, zh:
   return lines.join("\n");
 }
 
-function renderImportResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
-  if (typeof record.available === "boolean") {
+function renderSourceResult(record: Record<string, any>, subcommand: string, zh: boolean): string {
+  if (!subcommand || subcommand === "status") {
+    const spool = asRecord(record.spool);
+    const sourceIndex = asRecord(record.sourceIndex);
     return [
-      `Spool: ${record.available ? (zh ? "可用" : "available") : (zh ? "未检测到" : "not detected")}`,
-      record.version ? `Version: ${record.version}` : "",
-      record.message ? `${zh ? "说明" : "Message"}: ${record.message}` : "",
+      "Source status",
+      `Spool: ${spool.available ? (zh ? "可用" : "available") : (zh ? "未检测到" : "not detected")}`,
+      spool.version ? `Version: ${spool.version}` : "",
+      `Mode: ${asRecord(asRecord(record.sources).spool).mode || "off"}`,
+      `Sessions: ${sourceIndex.sessions || 0}`,
+      `Providers: ${formatCounts(asRecord(sourceIndex.providerCounts))}`,
+      `Missing sources: ${sourceIndex.missingSources || 0}`,
+      `Message arrays: ${sourceIndex.messageArrays || 0}`,
+      `Embedded message text: ${sourceIndex.embeddedMessageRecords || 0}`,
+      `Summary records: ${sourceIndex.summaryRecords || 0}`,
       jsonHint(zh),
     ].filter(Boolean).join("\n");
   }
-  const imported = Array.isArray(record.imported) ? record.imported.length : 0;
-  const failed = Array.isArray(record.failed) ? record.failed.length : 0;
-  return [
-    subcommand === "spool" ? "Spool import" : (zh ? "导入完成" : "Import complete"),
-    `${zh ? "已导入" : "Imported"}: ${imported}`,
-    `${zh ? "失败" : "Failed"}: ${failed}`,
-    jsonHint(zh),
-  ].join("\n");
+  if (subcommand === "scan") {
+    const indexed = Array.isArray(record.indexed) ? record.indexed.length : 0;
+    const skipped = Array.isArray(record.skipped) ? record.skipped.length : 0;
+    const failed = Array.isArray(record.failed) ? record.failed.length : 0;
+    return [
+      zh ? "来源扫描完成" : "Source scan complete",
+      `Source: ${record.source || ""}`,
+      `Storage: ${record.storage || "pointer"}`,
+      `${zh ? "已索引" : "Indexed"}: ${indexed}`,
+      `${zh ? "跳过" : "Skipped"}: ${skipped}`,
+      `${zh ? "失败" : "Failed"}: ${failed}`,
+      jsonHint(zh),
+    ].join("\n");
+  }
+  if (subcommand === "clean") {
+    const compact = asRecord(record.compact);
+    const prune = asRecord(record.prune);
+    return [
+      zh ? "来源索引清理" : "Source cleanup",
+      `Dry run: ${Boolean(record.dryRun)}`,
+      `Sessions: ${compact.sessions || 0}`,
+      `Saved bytes: ${compact.savedBytes || 0}`,
+      `Materialized pruned: ${prune.pruned || 0}`,
+      record.next ? `${zh ? "下一步" : "Next"}: ${record.next}` : "",
+      jsonHint(zh),
+    ].filter(Boolean).join("\n");
+  }
+  if (subcommand === "connect") {
+    const sources = asRecord(record.sources);
+    const spool = asRecord(sources.spool);
+    return [
+      zh ? "来源配置已更新" : "Source config updated",
+      `Spool mode: ${spool.mode || "off"}`,
+      jsonHint(zh),
+    ].join("\n");
+  }
+  return renderGenericResult(record, zh);
+}
+
+function formatCounts(counts: Record<string, any>) {
+  const entries = Object.entries(counts);
+  if (!entries.length) return "";
+  return entries.map(([key, value]) => `${key}=${value}`).join(", ");
 }
 
 function renderReflectResult(record: Record<string, any>, zh: boolean): string {
@@ -1849,11 +2080,10 @@ function printHelp() {
   ome uninstall [--provider codex|claude|all] [--delete-library --yes]
   ome version | ome -v
   ome config get|preview|set
-  ome import codex --sessions <dir>
-  ome source status|connect spool|import spool
+  ome source status|scan codex|scan spool|clean|connect spool
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume
-  ome experience list|show|enable|archive
+  ome experience list|show|enable|archive|migrate-legacy
   ome project init|status
   ome eval recall --suite <file>
   ome hook run|status
@@ -1883,11 +2113,10 @@ Core commands:
   ome uninstall [--provider codex|claude|all] [--delete-library --yes]
   ome version | ome -v
   ome config get|preview|set
-  ome import codex --sessions <dir>
-  ome source status|connect spool|import spool
+  ome source status|scan codex|scan spool|clean|connect spool
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume
-  ome experience list|show|enable|archive
+  ome experience list|show|enable|archive|migrate-legacy
   ome project init|status
   ome eval recall --suite <file>
   ome hook run|status

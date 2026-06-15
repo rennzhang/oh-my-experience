@@ -61,7 +61,7 @@ OME 不是事实记忆库，不替代 `AGENTS.md` / `CLAUDE.md`，也不是 skil
 -> prompt 阶段召回 -> 命中统计 -> 持续维护
 ```
 
-1. **导入会话**：从 Codex 导入本地会话，也可以接入可选的 Spool 索引。
+1. **扫描来源**：扫描 Codex 本地会话，也可以接入可选的 Spool 索引。
 2. **复盘扫描**：Agent 检查你纠正过它的地方，生成候选经验。
 3. **审核候选**：你逐条 approve、reject、merge 或 rewrite。
 4. **启用卡片**：只有 active 状态的经验会被 hook 召回。

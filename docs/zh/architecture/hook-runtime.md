@@ -56,7 +56,7 @@ ome init --provider claude
 Hook runtime 必须：
 
 - 内部错误时 fail open；
-- 避免 LLM、网络和长耗时 import；
+- 避免 LLM、网络和长耗时 source scan；
 - 避免写 active cards；
 - 默认不保存原始 prompt；
 - 记录结构化事件，供 stats 和 debugging 使用；

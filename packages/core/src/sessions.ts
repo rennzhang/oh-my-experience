@@ -27,26 +27,29 @@ export function writeSessionRecords(dataDir: string, records: SessionRecord[]) {
     const merged = mergeSourceRecords(current, nextRecords);
     const catalog = buildCatalog(dataDir, merged);
     writeJsonAtomic(layout(dataDir).sourceIndex, catalog, dataDir);
-    operationLog(dataDir, "sources.import", { imported: records.length, sessions: catalog.sessions.length });
+    operationLog(dataDir, "sources.scan", { indexed: records.length, sessions: catalog.sessions.length });
     return {
       ok: true,
       sessions: catalog.sessions.length,
-      imported: records.map((record) => record.id),
+      indexed: records.map((record) => record.id),
       catalogPath: layout(dataDir).sourceIndex,
     };
   });
 }
 
-export function rebuildSessionIndex(dataDir: string, { dryRun = false }: { dryRun?: boolean } = {}) {
+export function rebuildSessionIndex(dataDir: string, { dryRun = false, dropSummaries = false }: { dryRun?: boolean; dropSummaries?: boolean } = {}) {
   return withLock(dataDir, "sources-index", () => {
     const current = readSessionCatalog(dataDir);
     const beforeBytes = sourceIndexBytes(dataDir);
-    const catalog = buildCatalog(dataDir, current.sessions);
+    const sessions = dropSummaries
+      ? current.sessions.map((session) => ({ ...session, summary: "" }))
+      : current.sessions;
+    const catalog = buildCatalog(dataDir, sessions);
     const afterBytes = Buffer.byteLength(JSON.stringify(catalog, null, 2), "utf8");
     const result = {
       ok: true,
       dryRun,
-      index: catalog,
+      dropSummaries,
       sessions: catalog.sessions.length,
       beforeBytes,
       afterBytes,
@@ -60,6 +63,7 @@ export function rebuildSessionIndex(dataDir: string, { dryRun = false }: { dryRu
         beforeBytes,
         afterBytes,
         savedBytes: result.savedBytes,
+        dropSummaries,
       });
     }
     return result;
@@ -70,7 +74,7 @@ export function readSessionIndex(dataDir: string): SessionIndex {
   return readSessionCatalog(dataDir);
 }
 
-export function compactSessionIndex(dataDir: string, options: { dryRun?: boolean } = {}) {
+export function compactSessionIndex(dataDir: string, options: { dryRun?: boolean; dropSummaries?: boolean } = {}) {
   return rebuildSessionIndex(dataDir, options);
 }
 

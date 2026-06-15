@@ -23,7 +23,7 @@ corrections into reviewed cards.
 
 ## Build the library
 
-- [Import sources](import-sources.md): bring in Codex sessions and optional Spool data.
+- [Source scan](source-scan.md): index Codex sessions and optional Spool search results.
 - [Reflect and review](reflect-review.md): turn real work into reviewed cards.
 - [Global and project libraries](project-libraries.md): choose global storage, repository storage, or both.
 - [Evaluation](evaluation.md): test recall quality without polluting your real library.

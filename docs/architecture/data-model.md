@@ -83,7 +83,7 @@ uses active-card criteria, recall metadata, scope, and status.
 
 ## Source Index
 
-Source imports do not copy full session transcripts into OME. They write compact
+Source scans do not copy full session transcripts into OME. They write compact
 source pointers to `indexes/sources.json`:
 
 - `id`

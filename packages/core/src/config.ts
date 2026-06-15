@@ -197,7 +197,7 @@ export function migrateDataDir(previous: string, nextDataDir: string) {
     throw new Error(`target dataDir cannot be inside the current dataDir: ${target}`);
   }
   if (fs.existsSync(target) && !isDirectoryEmpty(target)) {
-    throw new Error(`target dataDir is not empty; choose an empty directory or run an explicit import: ${target}`);
+    throw new Error(`target dataDir is not empty; choose an empty directory or run an explicit migration: ${target}`);
   }
   fs.mkdirSync(target, { recursive: true });
   const counts = { files: 0, directories: 0 };

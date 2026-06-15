@@ -12,7 +12,7 @@ broad while project-specific lessons stay scoped.
 ## End-To-End Path
 
 ```text
-session/import/retrospective
+session/source-scan/retrospective
   -> candidate.scope
   -> reflect decision can override scope
   -> draft preserves scope

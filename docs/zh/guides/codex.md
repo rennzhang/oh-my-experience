@@ -31,18 +31,18 @@ Codex App 可能还需要在界面中手动信任 hook。
 如果 Codex App 要求信任 hook，请停下来提醒我在界面里确认。
 ```
 
-## 导入 Codex 会话
+## 扫描 Codex 会话
 
 ```bash
-ome import codex --sessions ~/.codex/sessions
+ome source scan codex --sessions ~/.codex/sessions
 ```
 
 **让 Agent 帮你：**
 
 ```text
-帮我导入 Codex 会话到 OME。
+帮我扫描 Codex 会话到 OME source index。
 
-运行 `ome import codex --sessions ~/.codex/sessions`，然后告诉我导入了多少条、
+运行 `ome source scan codex --sessions ~/.codex/sessions`，然后告诉我索引了多少条、
 跳过多少条，以及是否有解析失败的会话。
 ```
 

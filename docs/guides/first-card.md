@@ -37,7 +37,7 @@ The agent should write candidates with:
 - `engine_hints` only when a stable routed signal is needed;
 - the complete executable rule in `rule`.
 
-Then import them:
+Then submit them:
 
 ```bash
 ome reflect candidates RUN_ID --from-file candidates.json

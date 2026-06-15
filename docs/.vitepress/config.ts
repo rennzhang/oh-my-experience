@@ -64,7 +64,7 @@ const englishSidebar: DefaultTheme.Sidebar = {
     {
       text: "Build the library",
       items: [
-        { text: "Import sources", link: "/guides/import-sources" },
+        { text: "Source scan", link: "/guides/source-scan" },
         { text: "Reflect and review", link: "/guides/reflect-review" },
         { text: "Global and project libraries", link: "/guides/project-libraries" },
       ],
@@ -122,7 +122,7 @@ const englishSidebar: DefaultTheme.Sidebar = {
     {
       text: "Build the library",
       items: [
-        { text: "Import sources", link: "/guides/import-sources" },
+        { text: "Source scan", link: "/guides/source-scan" },
         { text: "Reflect and review", link: "/guides/reflect-review" },
         { text: "Global and project libraries", link: "/guides/project-libraries" },
       ],
@@ -153,7 +153,7 @@ const chineseSidebar: DefaultTheme.Sidebar = {
     {
       text: "建设经验库",
       items: [
-        { text: "导入源", link: "/zh/guides/import-sources" },
+        { text: "来源扫描", link: "/zh/guides/source-scan" },
         { text: "复盘与审阅", link: "/zh/guides/reflect-review" },
         { text: "全局与项目经验库", link: "/zh/guides/project-libraries" },
       ],
@@ -211,7 +211,7 @@ const chineseSidebar: DefaultTheme.Sidebar = {
     {
       text: "建设经验库",
       items: [
-        { text: "导入源", link: "/zh/guides/import-sources" },
+        { text: "来源扫描", link: "/zh/guides/source-scan" },
         { text: "复盘与审阅", link: "/zh/guides/reflect-review" },
         { text: "全局与项目经验库", link: "/zh/guides/project-libraries" },
       ],

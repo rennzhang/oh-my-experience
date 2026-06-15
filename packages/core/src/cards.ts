@@ -55,6 +55,19 @@ export interface CardInspection {
   issues: CardReadIssue[];
 }
 
+export interface LegacyCardMigration {
+  status: CardStatus;
+  path: string;
+  id: string;
+  title: string;
+}
+
+export interface LegacyCardMigrationSkipped {
+  status: CardStatus;
+  path: string;
+  reason: string;
+}
+
 const CARD_SCHEMA_NAME = "ome-card";
 
 export function cardPath(dataDir: string, status: CardStatus | string, id: string): string {
@@ -175,6 +188,89 @@ export function inspectCards(dataDir: string, status: CardStatus | null = null):
     cards: cards.sort((a, b) => a.id.localeCompare(b.id)),
     issues: issues.sort((a, b) => a.path.localeCompare(b.path)),
   };
+}
+
+export function migrateLegacyCards(dataDir: string, options: { backup?: boolean; dryRun?: boolean; status?: CardStatus | null } = {}) {
+  return withLock(dataDir, "cards", () => {
+    const plans = legacyCardMigrationPlans(dataDir, options.status || null);
+    const migrated: LegacyCardMigration[] = plans.migrations.map((item) => ({
+      status: item.card.status,
+      path: item.path,
+      id: item.card.id,
+      title: item.card.title,
+    }));
+    if (options.dryRun) {
+      return { ok: true, dryRun: true, backup: Boolean(options.backup), migrated, skipped: plans.skipped };
+    }
+    const backups: string[] = [];
+    for (const item of plans.migrations) {
+      if (options.backup) {
+        const backup = backupFile(dataDir, item.path, `legacy-card-${item.card.id}`);
+        if (backup) backups.push(backup);
+      }
+      writeTextAtomic(item.path, serializeCard(item.card), dataDir);
+    }
+    const activeInspection = inspectCards(dataDir, "active");
+    const warnings = activeInspection.issues.length
+      ? [`active index was not rebuilt because ${activeInspection.issues.length} active card(s) are still invalid`]
+      : [];
+    if (!activeInspection.issues.length) rebuildCardIndex(dataDir);
+    operationLog(dataDir, "cards.migrateLegacy", { backup: Boolean(options.backup), migrated: migrated.map((item) => item.id), skipped: plans.skipped.length });
+    return { ok: true, dryRun: false, backup: Boolean(options.backup), backups, migrated, skipped: plans.skipped, warnings };
+  });
+}
+
+function legacyCardMigrationPlans(dataDir: string, status: CardStatus | null) {
+  const inspection = inspectCards(dataDir, status);
+  const migrations: Array<{ path: string; card: ExperienceCard }> = [];
+  const skipped: LegacyCardMigrationSkipped[] = [];
+  for (const issue of inspection.issues) {
+    try {
+      migrations.push({ path: issue.path, card: parseLegacyCardFile(issue.path, issue.status) });
+    } catch (error: any) {
+      skipped.push({ status: issue.status, path: issue.path, reason: error.message || String(error) });
+    }
+  }
+  return { migrations, skipped };
+}
+
+function parseLegacyCardFile(filePath: string, fallbackStatus: CardStatus): ExperienceCard {
+  const parsed = matter(fs.readFileSync(filePath, "utf8"));
+  const data = parsed.data || {};
+  if (data.schema) throw new Error(`card already declares unsupported schema: ${data.schema}`);
+  const criteria = data.criteria && typeof data.criteria === "object" ? data.criteria : {};
+  const engineHints = data.engine_hints && typeof data.engine_hints === "object" ? data.engine_hints : {};
+  const recall = data.recall && typeof data.recall === "object" ? data.recall : {};
+  const body = parsed.content.trim();
+  const now = nowIso();
+  return ExperienceCardSchema.parse({
+    id: String(data.id || ""),
+    status: data.status || fallbackStatus,
+    title: data.title || data.id || "Untitled",
+    category: data.category,
+    summary: String(data.summary || ""),
+    rule: String(data.rule || extractRuleSection(body) || ""),
+    triggers: firstArray(recall.triggers, data.triggers, criteria.use_when),
+    negativeTriggers: firstArray(criteria.ignore_when, data.negative_triggers, data.negativeTriggers),
+    aliases: parseAliases(data.aliases || recall.aliases),
+    topics: firstArray(recall.topics, data.topics),
+    applicability: normalizeApplicabilityInput(data.scope || data.applicability),
+    intentModes: data.intentModes || criteria.intent_modes,
+    requiredSignals: firstArray(engineHints.positive, data.requiredSignals, data.required_signals),
+    blockedSignals: firstArray(engineHints.negative, data.blockedSignals, data.blocked_signals),
+    language: data.language || "auto",
+    recallPolicy: data.recall_policy || data.recallPolicy || recall.policy || "should",
+    risk: data.risk || recall.risk || "medium",
+    confidence: data.confidence || recall.confidence || "medium",
+    staleAfter: null,
+    sources: toArray(data.sources),
+    origin: data.origin || {},
+    sourceRefs: parseSourceRefs(data.source_refs || data.sourceRefs),
+    body,
+    createdAt: normalizeDateField(data.createdAt || data.created, () => now),
+    updatedAt: normalizeDateField(data.updatedAt || data.updated, () => now),
+    archivedReason: data.archived_reason || data.archivedReason,
+  });
 }
 
 export function getCard(dataDir: string, id: string): ExperienceCard {

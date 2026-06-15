@@ -16,9 +16,9 @@ packages/adapters/agents/codex
 packages/adapters/agents/claude
                          Claude hook setup/status adapter
 packages/adapters/sources/codex-sessions
-                         Codex local session import
+                         Codex local session scan
 packages/adapters/sources/spool
-                         optional official Spool discovery and import integration
+                         optional official Spool discovery and source scanning
 packages/hook-runtime    hot-path recall runtime for agent hooks
 skills/oh-my-experience  agent workflow instructions
 templates/               card template
@@ -54,7 +54,7 @@ Hook runtime must be fast and fail-open:
 
 - no LLM call;
 - no network call;
-- no session import;
+- no session scan;
 - no active card writes;
 - strict timeout;
 - bounded additional context.
@@ -73,7 +73,7 @@ Provider differences belong at the edge:
 - hook input parsing;
 - hook output shape;
 - hook setup/status paths;
-- session import formats.
+- session scan formats.
 
 Retrieval, scoring, context budgeting, stats, and card lifecycle must remain
 provider-neutral.

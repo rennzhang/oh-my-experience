@@ -13,14 +13,21 @@ type SpoolOptions = {
   project?: string;
   query?: string;
   since?: string;
+  maxSessionBytes?: number;
 };
+class SpoolSessionTooLargeError extends Error {
+  constructor(readonly uuid: string, readonly maxBytes: number) {
+    super(`spool show output exceeded ${maxBytes} bytes for ${uuid}; use a narrower query or inspect the session manually`);
+    this.name = "SpoolSessionTooLargeError";
+  }
+}
 
 export function checkSpool() {
   const result = spawnSync("spool", ["--version"], { encoding: "utf8" });
   if (result.error) {
     return {
       available: false,
-      message: "Spool is not installed. Install the official Spool CLI to enable optional multi-session import.",
+      message: "Spool is not installed. Install the official Spool CLI to enable optional multi-session source scanning.",
     };
   }
   return {
@@ -30,22 +37,23 @@ export function checkSpool() {
   };
 }
 
-export function importSpoolSessions(dataDir: string, options: SpoolOptions = {}) {
+export function scanSpoolSessions(dataDir: string, options: SpoolOptions = {}) {
   const status = checkSpool();
   if (!status.available) {
     return {
       ok: false,
-      imported: [] as string[],
+      indexed: [] as string[],
       skipped: [] as Array<{ reason: string; item: JsonRecord }>,
       failed: [] as Array<{ uuid: string; error: string }>,
       warnings: [status.message],
     };
   }
   const list = loadSpoolList(options);
-  const imported: string[] = [];
+  const indexed: string[] = [];
   const records: SessionRecord[] = [];
   const skipped: Array<{ reason: string; item: JsonRecord }> = [];
   const failed: Array<{ uuid: string; error: string }> = [];
+  const maxSessionBytes = options.maxSessionBytes ?? 2 * 1024 * 1024;
   for (const item of list) {
     const uuid = item.sessionUuid || item.uuid || item.id;
     if (!uuid) {
@@ -53,15 +61,16 @@ export function importSpoolSessions(dataDir: string, options: SpoolOptions = {})
       continue;
     }
     try {
-      const record = parseSpoolSession(showSpoolSession(String(uuid)));
+      const record = parseSpoolSession(showSpoolSession(String(uuid), maxSessionBytes));
       records.push(record);
-      imported.push(record.id);
+      indexed.push(record.id);
     } catch (error) {
-      failed.push({ uuid, error: error instanceof Error ? error.message : String(error) });
+      if (error instanceof SpoolSessionTooLargeError) skipped.push({ reason: error.message, item });
+      else failed.push({ uuid, error: error instanceof Error ? error.message : String(error) });
     }
   }
   if (records.length) writeSessionRecords(dataDir, records);
-  return { ok: failed.length === 0, provider: "spool", imported, skipped, failed, warnings: [] as string[] };
+  return { ok: failed.length === 0, provider: "spool", indexed, skipped, failed, warnings: [] as string[] };
 }
 
 function loadSpoolList(options: SpoolOptions): JsonRecord[] {
@@ -77,9 +86,14 @@ function loadSpoolList(options: SpoolOptions): JsonRecord[] {
   return Array.isArray(parsed) ? parsed : parsed.results || parsed.sessions || [];
 }
 
-function showSpoolSession(uuid: string): JsonRecord {
-  const result = spawnSync("spool", ["show", uuid, "--json"], { encoding: "utf8" });
-  if (result.status !== 0) throw new Error((result.stderr || result.stdout || `spool show failed: ${uuid}`).trim());
+function showSpoolSession(uuid: string, maxSessionBytes: number): JsonRecord {
+  const result = spawnSync("spool", ["show", uuid, "--json"], { encoding: "utf8", maxBuffer: maxSessionBytes });
+  if (result.error && (result.error as NodeJS.ErrnoException).code === "ENOBUFS") throw new SpoolSessionTooLargeError(uuid, maxSessionBytes);
+  if (result.status !== 0) {
+    const output = (result.stderr || result.stdout || `spool show failed: ${uuid}`).trim();
+    if (/maxBuffer|ENOBUFS|stdout maxBuffer length exceeded/i.test(output)) throw new SpoolSessionTooLargeError(uuid, maxSessionBytes);
+    throw new Error(output);
+  }
   return JSON.parse(result.stdout || "{}");
 }
 
@@ -100,8 +114,8 @@ function parseSpoolSession(raw: JsonRecord): SessionRecord {
     sourcePath,
     startedAt: session.startedAt || session.createdAt || nowIso(),
     cwd: session.cwd || session.projectDisplayPath || null,
-    summary: String(session.title || messages.slice(0, 2).map((message) => message.text).join(" ")).slice(0, 280),
-    messages,
+    summary: "",
+    messages: messages.map((message) => ({ ...message, text: "" })),
     metadataHash,
   });
 }

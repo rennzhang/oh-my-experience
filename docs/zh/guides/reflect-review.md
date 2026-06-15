@@ -40,7 +40,7 @@ OME 的核心价值在于：把你纠正 Agent 的真实经验，沉淀为可复
    - 你混入了无关改动
    - 你忘记了某个项目特有的流程
 3. 生成候选经验卡，写入临时文件。
-4. 运行 `ome reflect candidates RUN_ID --from-file FILE` 导入。
+4. 运行 `ome reflect candidates RUN_ID --from-file FILE` 提交候选。
 5. 运行 `ome reflect show RUN_ID` 展示所有候选。
 ```
 
@@ -96,6 +96,21 @@ Agent 展示候选后，你逐条决定。
 2. 下次 Agent 看到它，能避免犯同样的错吗？
 3. 使用标准和忽略标准够精确吗？会不会误触发？
 
+### 继续修订同一次扫描
+
+候选已经展示后，如果你继续给 Agent 一个链接、一段粘贴内容、一句纠正，或者说
+"这个可以参考吸收"，默认意思是修订当前 run 的候选，不是另开一轮扫描，也不是新增
+一张并列卡。
+
+Agent 应该更新同一个 run 的候选输入文件，然后运行：
+
+```bash
+ome reflect candidates RUN_ID --from-file UPDATED_FILE
+```
+
+除非你明确要求另起主题或单独做一张经验卡，否则 review 入口应该继续停留在同一个
+`RUN_ID`，直到你 approve、reject、merge 或 rewrite。
+
 ### 步骤 3：入库
 
 对每条候选做出决定后，让 Agent 应用结果：
@@ -129,7 +144,7 @@ ome match "一段任务描述" --explain
 | approve | 这条经验可复用、使用标准和忽略标准精确 | `ome reflect decide RUN_ID CANDIDATE_ID --action approve` |
 | reject | 太模糊、一次性、或已被覆盖 | `ome reflect decide RUN_ID CANDIDATE_ID --action reject` |
 | merge | 和另一条候选高度相似，合并 | `ome reflect decide RUN_ID CANDIDATE_ID --action merge --target OTHER_ID` |
-| rewrite | 方向对但表达不好，重写 | 直接在候选文件里改，然后重新导入 |
+| rewrite | 方向对但表达不好，重写 | 直接在候选文件里改，然后重新提交 |
 
 ## 保持经验库健康
 

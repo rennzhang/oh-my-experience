@@ -66,7 +66,7 @@ real work -> reflect scan -> candidates -> human review -> active cards
 -> prompt-time recall -> match stats -> ongoing maintenance
 ```
 
-1. **Import sessions** from local Codex history, or optionally from Spool.
+1. **Scan sources** from local Codex history, or optionally from Spool.
 2. **Run a reflect scan** so the agent finds places where you corrected it.
 3. **Review candidates** one by one: approve, reject, merge, or rewrite.
 4. **Activate cards** only after they are confirmed.

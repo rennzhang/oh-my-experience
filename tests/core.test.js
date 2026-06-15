@@ -1018,7 +1018,7 @@ test("Spool handoff cards require historical-session lookup intent", () => {
     summary: "Use stable Spool/session anchors when reusing historical conversation evidence.",
     rule: "Record Spool/session UUID, turn ids, sourceRefs and current source-of-truth checks.",
     triggers: ["Spool", "spool uuid", "session UUID", "历史会话", "会话交接"],
-    negativeTriggers: ["Spool 是可选导入来源", "不是当前召回前置条件"],
+    negativeTriggers: ["Spool 是可选扫描来源", "不是当前召回前置条件"],
     topics: ["spool", "session-handoff", "source-refs"],
     requiredSignals: ["historical_session_lookup"],
     recallPolicy: "should",
@@ -1028,8 +1028,8 @@ test("Spool handoff cards require historical-session lookup intent", () => {
     updatedAt: now,
   });
 
-  const optionalImport = matchCards(dataDir, "Spool 是可选导入来源，不是当前召回前置条件。", { threshold: 4 });
-  assert.equal(optionalImport.some((item) => item.card.id === "spool-session-context-anchoring"), false);
+  const optionalScan = matchCards(dataDir, "Spool 是可选扫描来源，不是当前召回前置条件。", { threshold: 4 });
+  assert.equal(optionalScan.some((item) => item.card.id === "spool-session-context-anchoring"), false);
   const historicalLookup = matchCards(dataDir, "用 spool 查 019e90a5-9539-7922-86f1-ea81f9a3b01f 的历史会话证据。", { threshold: 4 });
   assert.equal(historicalLookup[0]?.card.id, "spool-session-context-anchoring");
   assert.ok(historicalLookup[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "historical_session_lookup"));
@@ -1435,6 +1435,31 @@ test("session index compact dry-run reports savings without mutating", () => {
   const raw = JSON.parse(fs.readFileSync(layout(dataDir).sourceIndex, "utf8"));
   assert.equal(raw.storage, "sources");
   assert.equal("messages" in raw.sessions[0], false);
+});
+
+test("session index compact can drop source summaries", () => {
+  const dataDir = tmpDir("session-compact-drop-summary");
+  initializeDataDir({ dataDir });
+  const sourceFile = path.join(dataDir, "source.jsonl");
+  fs.writeFileSync(sourceFile, "{\"type\":\"message\"}\n", "utf8");
+  writeSessionRecords(dataDir, [{
+    id: "summary-session",
+    provider: "codex",
+    sourcePath: sourceFile,
+    startedAt: null,
+    cwd: null,
+    summary: "raw user-facing summary",
+    messages: [{ role: "user", text: "message", createdAt: null }],
+    metadataHash: "hash",
+  }]);
+
+  const dryRun = compactSessionIndex(dataDir, { dryRun: true, dropSummaries: true });
+  assert.equal(dryRun.dropSummaries, true);
+  assert.equal(readSessionIndex(dataDir).sessions[0].summary, "raw user-facing summary");
+
+  const applied = compactSessionIndex(dataDir, { dropSummaries: true });
+  assert.equal(applied.dropSummaries, true);
+  assert.equal(readSessionIndex(dataDir).sessions[0].summary, "");
 });
 
 test("storage compact keeps primary recall assets intact", () => {
