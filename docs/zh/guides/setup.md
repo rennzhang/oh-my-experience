@@ -9,7 +9,23 @@ status: active
 
 ## 安装 CLI
 
-当前 `0.1.0` 发布到 npm 前，先用源码试用：
+直接用 `npx` 运行最新发布版：
+
+```bash
+npx oh-my-experience@latest init
+```
+
+也可以全局安装命令：
+
+```bash
+npm install -g oh-my-experience
+ome init
+```
+
+全局安装会把 `ome` 命令加入 shell。`ome init` 会启动初始化向导，选择经验库路径、
+安装默认 provider 的 hook，并写入内置示例卡，方便你马上验证召回。
+
+本地源码开发：
 
 ```bash
 git clone https://github.com/rennzhang/oh-my-experience.git
@@ -19,30 +35,14 @@ npm run build
 node bin/ome.js init
 ```
 
-`0.1.0` 发布后，可以改用 npm 安装：
-
-```bash
-npm install -g oh-my-experience
-ome init
-```
-
-第一行安装全局 `ome` 命令；第二行启动初始化向导。初始化会选择经验库路径、
-安装默认 provider 的 hook，并写入内置示例卡，方便你马上验证召回。
-
-发布后如果不想全局安装，也可以用 `npx` 直接运行：
-
-```bash
-npx oh-my-experience@latest init
-```
-
 **让 Agent 帮你初始化：**
 
 ```text
 帮我完成 Oh My Experience 的初始化。
 
-1. 运行 `ome init`，选择默认经验库路径。
-2. 运行 `ome doctor`，确认经验库、配置和 hook 状态正常。
-3. 运行 `ome hook status --provider codex`，检查 Codex hook 状态。
+1. 运行 `npx oh-my-experience@latest init`，选择默认经验库路径。
+2. 运行 `npx oh-my-experience@latest doctor`，确认经验库、配置和 hook 状态正常。
+3. 运行 `npx oh-my-experience@latest hook status --provider codex`，检查 Codex hook 状态。
 
 把每一步的结果告诉我；如果有写入 hook、修改配置或需要我确认的地方，先说明。
 ```
@@ -56,7 +56,7 @@ npx oh-my-experience@latest init
 非交互环境：
 
 ```bash
-ome init -y --data-dir ~/.oh-my-experience
+npx oh-my-experience@latest init -y --data-dir ~/.oh-my-experience
 ```
 
 `-y` 会跳过交互确认，适合脚本、CI 或 Agent runner。显式传入

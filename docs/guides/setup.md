@@ -10,7 +10,24 @@ install and configuration details.
 
 ## Install the CLI
 
-Before the current `0.1.0` package is published to npm, use the source checkout:
+Run the latest published CLI directly with `npx`:
+
+```bash
+npx oh-my-experience@latest init
+```
+
+Or install the command globally:
+
+```bash
+npm install -g oh-my-experience
+ome init
+```
+
+Global installation adds the `ome` command to your shell. `ome init` starts the
+setup wizard, chooses a library path, installs the default provider hook, and
+writes starter cards so you can verify recall immediately.
+
+For local development from source:
 
 ```bash
 git clone https://github.com/rennzhang/oh-my-experience.git
@@ -20,31 +37,14 @@ npm run build
 node bin/ome.js init
 ```
 
-After `0.1.0` is published, the npm path is:
-
-```bash
-npm install -g oh-my-experience
-ome init
-```
-
-The first command installs the global `ome` command. The second starts the setup
-wizard, which chooses a library path, installs the default provider hook, and
-writes starter cards so you can verify recall immediately.
-
-If you do not want a global install after publication, run it with `npx`:
-
-```bash
-npx oh-my-experience@latest init
-```
-
 **Have your agent do it:**
 
 ```text
 Help me set up Oh My Experience.
 
-1. Run `ome init` and accept the default library path.
-2. Run `ome doctor` to verify the library, config, and hook state.
-3. Run `ome hook status --provider codex` to check the Codex hook state.
+1. Run `npx oh-my-experience@latest init` and accept the default library path.
+2. Run `npx oh-my-experience@latest doctor` to verify the library, config, and hook state.
+3. Run `npx oh-my-experience@latest hook status --provider codex` to check the Codex hook state.
 
 Report each result. If anything writes hooks, changes config, or needs my confirmation, call it out first.
 ```
@@ -60,7 +60,7 @@ shows the current config as defaults.
 For non-interactive environments:
 
 ```bash
-ome init -y --data-dir ~/.oh-my-experience
+npx oh-my-experience@latest init -y --data-dir ~/.oh-my-experience
 ```
 
 `-y` skips interactive prompts for scripts, CI, or agent runners. Passing

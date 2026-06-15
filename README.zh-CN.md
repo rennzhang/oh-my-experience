@@ -9,6 +9,7 @@
 
 <p align="center">
   <a href="https://github.com/rennzhang/oh-my-experience/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/rennzhang/oh-my-experience/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://www.npmjs.com/package/oh-my-experience"><img alt="npm version" src="https://img.shields.io/npm/v/oh-my-experience.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Node.js >=20" src="https://img.shields.io/badge/node-%3E%3D20-339933.svg">
   <img alt="Local-first" src="https://img.shields.io/badge/local--first-yes-111827.svg">
@@ -30,19 +31,18 @@ OME 不是让你写更多规则，而是让提醒出现得更准：在 Agent 还
 ## 快速试用
 
 ```bash
+npx oh-my-experience@latest init
+npx oh-my-experience@latest match "修复登录页 UI 并在浏览器里验证" --explain
+```
+
+本地开发源码版本：
+
+```bash
 git clone https://github.com/rennzhang/oh-my-experience.git
 cd oh-my-experience
 npm install
 npm run build
 node bin/ome.js init
-node bin/ome.js match "修复登录页 UI 并在浏览器里验证" --explain
-```
-
-当前 `0.1.0` 发布到 npm 后，快速路径会变成：
-
-```bash
-npx oh-my-experience@latest init
-npx oh-my-experience@latest match "修复登录页 UI 并在浏览器里验证" --explain
 ```
 
 预期输出形态：

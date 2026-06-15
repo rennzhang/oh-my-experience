@@ -5,20 +5,11 @@ Use this reference for install, init, config, and hook setup.
 ## Default Flow
 
 ```bash
-npm install
-npm run build
-node bin/ome.js init
-node bin/ome.js match "fix UI and validate in browser" --explain
-```
-
-After the current `0.1.0` release is published to npm:
-
-```bash
 npx oh-my-experience@latest init
 npx oh-my-experience@latest match "fix UI and validate in browser" --explain
 ```
 
-For a global install after publication:
+For a global install:
 
 ```bash
 npm install -g oh-my-experience

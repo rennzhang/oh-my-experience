@@ -9,6 +9,7 @@
 
 <p align="center">
   <a href="https://github.com/rennzhang/oh-my-experience/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/rennzhang/oh-my-experience/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://www.npmjs.com/package/oh-my-experience"><img alt="npm version" src="https://img.shields.io/npm/v/oh-my-experience.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Node.js >=20" src="https://img.shields.io/badge/node-%3E%3D20-339933.svg">
   <img alt="Local-first" src="https://img.shields.io/badge/local--first-yes-111827.svg">
@@ -28,19 +29,18 @@ mistake.
 ## Quick Try
 
 ```bash
+npx oh-my-experience@latest init
+npx oh-my-experience@latest match "fix UI and validate in browser" --explain
+```
+
+For local development from source:
+
+```bash
 git clone https://github.com/rennzhang/oh-my-experience.git
 cd oh-my-experience
 npm install
 npm run build
 node bin/ome.js init
-node bin/ome.js match "fix UI and validate in browser" --explain
-```
-
-After the current `0.1.0` release is published to npm:
-
-```bash
-npx oh-my-experience@latest init
-npx oh-my-experience@latest match "fix UI and validate in browser" --explain
 ```
 
 Expected shape:
