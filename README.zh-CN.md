@@ -11,7 +11,7 @@
   <a href="https://github.com/rennzhang/oh-my-experience/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/rennzhang/oh-my-experience/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://www.npmjs.com/package/oh-my-experience"><img alt="npm version" src="https://img.shields.io/npm/v/oh-my-experience.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <img alt="Node.js >=20" src="https://img.shields.io/badge/node-%3E%3D20-339933.svg">
+  <img alt="Node.js 20 plus" src="https://img.shields.io/badge/node-20%2B-339933.svg">
   <img alt="Local-first" src="https://img.shields.io/badge/local--first-yes-111827.svg">
 </p>
 
