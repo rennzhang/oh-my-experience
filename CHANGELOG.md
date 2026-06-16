@@ -6,6 +6,18 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.2.1 - 2026-06-16
+
+### Changed
+
+- Clarified hook guidance for OME retrospective and source-scan tasks: matched
+  subject-area cards are active-card overlap signals, not source evidence or
+  final used-card disclosures.
+- Documented the same retrospective recall boundary in English and Chinese
+  source-scan, retrieval API, retrieval architecture, skill, and LLM-facing docs.
+- Softened README and LLM intro wording so prompt-time recall is described as
+  conditional on a relevant approved lesson.
+
 ## 0.2.0 - 2026-06-16
 
 ### Added
