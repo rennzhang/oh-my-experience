@@ -114,7 +114,7 @@ ome match "Fix UI and validate in browser" --explain --json
       ]
     }
   ],
-  "additionalContext": "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.\\nFinal report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
+  "additionalContext": "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.\\nBefore acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
 }
 ```
 

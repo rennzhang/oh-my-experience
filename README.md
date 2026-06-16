@@ -35,11 +35,10 @@ npx oh-my-experience@latest init
 Then send a real task to your agent:
 
 ```text
-Based on this checkout redesign plan: create a single-file checkout page prototype.
-Create a goal and start now. Finish the whole change end to end and verify it yourself.
-
-Before changing files, mention whether OME recalled any relevant experience.
-If it did, explain the card in one short sentence and then continue normally.
+Create a goal and start now: in /tmp/ome-todo-demo, build a small single-page Todo app with plain HTML, CSS, and JavaScript.
+It should let me add tasks, mark tasks complete, delete tasks, clear completed tasks, show the remaining count, persist tasks in localStorage, and look usable on a narrow mobile viewport.
+Verify it through the real browser entry before reporting completion.
+After finishing, guide me through the OME lifecycle: scan this full run, summarize reusable lessons, review the generated drafts with me, and only add approved drafts to the experience library.
 ```
 
 The installed hook handles recall automatically. For troubleshooting, ask your
@@ -86,8 +85,9 @@ need them.
 When you use Codex with a `/goal`-style request:
 
 ```text
-Based on the checkout redesign plan, create a goal and start now. Finish the
-whole feature end to end and verify it yourself.
+Create a goal and start now: in /tmp/ome-todo-demo, build a small single-page
+Todo app. It should support add, complete, delete, clear completed, remaining
+count, localStorage persistence, and browser verification.
 ```
 
 OME can recall the approved card `Enter full-closure delivery mode when a goal

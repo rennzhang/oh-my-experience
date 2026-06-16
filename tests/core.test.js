@@ -726,6 +726,7 @@ test("hook context is neutral and carries scope hints", () => {
   const context = renderAdditionalContext(matches, { maxChars: 2000 });
   assert.match(context, /OME matched experience cards/);
   assert.match(context, /Matched does not mean used/);
+  assert.match(context, /Before acting, if any matched card is applicable/);
   assert.match(context, /Final report: if you actually used any card/);
   assert.match(context, /\*\*本次使用 N条 OME 经验卡：\*\*/);
   assert.match(context, /Summary: Keep hook output neutral/);
@@ -918,21 +919,6 @@ test("negative triggers disambiguate overloaded terms like goal", () => {
   assert.equal(docsExample.some((item) => item.card.id === "agent-goal-routine"), false);
   const englishDocsExample = matchCards(dataDir, "write documentation that explains how to create a goal in Codex", { threshold: 20 });
   assert.equal(englishDocsExample.some((item) => item.card.id === "agent-goal-routine"), false);
-});
-
-test("starter draft approval flow only recalls for OME approval work", () => {
-  const dataDir = tmpDir("starter-review-surface-gate");
-  initializeDataDir({ dataDir });
-  const docsSync = matchCards(
-    dataDir,
-    "Roadmap 已经迁到 docs，source/user-voice 里有用户原话，需要同步 roadmap、architecture、reference docs，不要只改 README。",
-    { threshold: 40 },
-  );
-  assert.equal(docsSync.some((item) => item.card.id === "starter-ai-first-review-surface"), false);
-
-  const reviewSurface = matchCards(dataDir, "Design the OME AI-first draft approval flow so users can approve generated experience drafts without manual card creation.");
-  assert.equal(reviewSurface[0]?.card.id, "starter-ai-first-review-surface");
-  assert.ok(reviewSurface[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "ome_review_surface"));
 });
 
 test("starter architecture card recalls for cohesive root-cause implementation work", () => {
@@ -1258,28 +1244,12 @@ test("matcher handles partial trigger tokens and Chinese variants", () => {
   assert.equal(matchCards(dataDir, "在浏览器里验证前端页面", { timeoutMs: -1, failOpenOnTimeout: true }).length, 0);
 });
 
-test("starter lessons recall Linear-style Kanban workflow guidance", () => {
-  const dataDir = tmpDir("starter-kanban");
-  initializeDataDir({ dataDir });
-  const query = [
-    "Create a single HTML file for a Kanban board page.",
-    "Only build the board page, not a landing page or a full app.",
-    "Use a Linear-inspired, work-focused style with clear columns, readable task cards, obvious status, and low visual noise.",
-  ].join(" ");
-  const matches = matchCards(dataDir, query);
-  assert.equal(matches[0]?.card.id, "starter-product-design-real-workflow");
-  assert.match(matches[0]?.card.summary || "", /workflow clarity and operational density/);
-  const context = renderAdditionalContext(matches);
-  assert.match(context, /Build Linear-style tool screens around workflow, not decoration/);
-  assert.match(context, /workflow clarity and operational density/);
-});
-
 test("starter lessons recall the first-run goal execution example", () => {
   const dataDir = tmpDir("starter-goal-example");
   initializeDataDir({ dataDir });
   const query = [
-    "Based on this checkout redesign plan: create a single-file checkout page prototype.",
-    "Create a goal and start now. Finish the whole change end to end and verify it yourself.",
+    "Create a goal and start now: in /tmp/ome-todo-demo, build a small single-page Todo app with plain HTML, CSS, and JavaScript.",
+    "It should let me add tasks, mark tasks complete, delete tasks, clear completed tasks, show the remaining count, persist tasks in localStorage, and verify it through the real browser entry.",
   ].join(" ");
   const matches = matchCards(dataDir, query);
   assert.equal(matches[0]?.card.id, "starter-agent-goal-execution");

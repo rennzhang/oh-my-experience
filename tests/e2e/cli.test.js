@@ -574,10 +574,15 @@ test("interactive init exposes first-run choices without migration prompts", () 
   assert.match(result.stdout, /Send this to your selected agent so the hook can recall relevant experience automatically/);
   assert.match(result.stdout, /Copy this task into your selected agent/);
   assert.match(result.stdout, /```text/);
-  assert.match(result.stdout, /checkout redesign plan/);
+  assert.match(result.stdout, /\/tmp/);
+  assert.match(result.stdout, /ome-todo-demo/);
+  assert.match(result.stdout, /Todo app/);
   assert.match(result.stdout, /Create a goal and start now/);
-  assert.match(result.stdout, /Finish the whole change end to end and verify it yourself/);
-  assert.match(result.stdout, /Before changing files, mention whether OME recalled any relevant experience/);
+  assert.match(result.stdout, /localStorage/);
+  assert.match(result.stdout, /real browser entry/);
+  assert.match(result.stdout, /scan this full run/);
+  assert.match(result.stdout, /review the generated drafts/);
+  assert.match(result.stdout, /only add approved drafts/);
   assert.match(result.stdout, /```/);
   assert.match(result.stdout, /Suggestions:/);
   assert.match(result.stdout, /Turn real corrections into cards/);

@@ -20,8 +20,9 @@ examples, feature explanations, or business-goal discussion.
 When the user sends:
 
 ```text
-Based on the checkout redesign plan, create a goal and start now. Finish the
-whole feature end to end and verify it yourself.
+Create a goal and start now: in /tmp/ome-todo-demo, build a small single-page
+Todo app. It should support add, complete, delete, clear completed, remaining
+count, localStorage persistence, and browser verification.
 ```
 
 Before the agent starts editing, OME recognizes that this is real goal
@@ -90,10 +91,10 @@ The final response can disclose the experience card only if the agent actually
 used it:
 
 ```text
-Completed the checkout prototype end to end, verified the primary flow, and
-listed the remaining risks.
+Completed the Todo app in /tmp/ome-todo-demo, verified add, complete, delete,
+clear completed, and local persistence, then listed the remaining risks.
 
-**OME experience cards used in this response: 1** Enter full-closure delivery mode when a goal starts
+**本次使用 1条 OME 经验卡：** Enter full-closure delivery mode when a goal starts
 ```
 
 If the user is only discussing business goals, OKRs, or asking what `/goal`

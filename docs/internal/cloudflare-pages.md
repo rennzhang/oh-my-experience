@@ -4,6 +4,9 @@ This is an internal maintainer note. It is committed under `docs/internal/` so
 the deployment path stays close to the documentation source, but VitePress
 excludes this folder from the public documentation site.
 
+For the end-to-end release sequence, start from
+`docs/internal/release-runbook.md`.
+
 ## Public site
 
 - Cloudflare Pages project: Git integration project for `rennzhang/oh-my-experience`
@@ -38,10 +41,11 @@ npm run release:prepare -- 0.2.0
 ```
 
 `release:prepare` only updates `package.json` and `package-lock.json`, then runs
-the release validation and `npm pack --dry-run`. It does not commit, tag,
-publish to npm, push, or deploy docs. npm publishing is handled by the GitHub
-Actions Trusted Publishing workflow after a release tag is pushed. Documentation
-deployment is handled by Cloudflare after the release commit is pushed.
+the release validation and `npm pack --dry-run`. It does not commit, tag, push,
+publish to npm, or deploy docs. npm publishing is handled by the GitHub Actions
+Trusted Publishing workflow after a release tag is pushed. Documentation
+deployment is handled by Cloudflare after the release commit is pushed to
+`main`.
 
 ## Manual deploys
 

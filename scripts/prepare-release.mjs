@@ -24,7 +24,9 @@ run("npm", ["pack", "--dry-run"]);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 console.log(`Release candidate prepared: ${pkg.version}`);
-console.log("Review package.json/package-lock.json, then commit, tag, publish, and deploy docs explicitly.");
+console.log("Next: review package.json/package-lock.json/CHANGELOG.md, commit, tag, and push the tag.");
+console.log("Do not run local npm publish. GitHub Trusted Publishing handles npm after the tag push.");
+console.log("Cloudflare Pages deploys docs from the pushed main branch.");
 
 function assertCleanWorktree() {
   const result = spawnSync("git", ["status", "--porcelain"], {

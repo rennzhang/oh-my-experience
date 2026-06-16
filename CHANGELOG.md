@@ -6,6 +6,27 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.1.5 - 2026-06-16
+
+### Changed
+
+- Reduced the built-in starter library to three broadly useful lessons: goal
+  execution, real-entry validation, and root-cause/KISS implementation.
+- Replaced the first-run demo with a visible `/tmp/ome-todo-demo` Todo app task
+  that exercises automatic recall, browser validation, and the retrospective
+  lifecycle.
+- Added a hook-context instruction for agents to state the applicable OME
+  reminder in one short sentence before acting.
+- Clarified the internal release path: npm publishing uses GitHub Trusted
+  Publishing from release tags, while Cloudflare Pages deploys docs from `main`.
+
+### Fixed
+
+- Removed old checkout, FizzBuzz, and word-count first-run examples from README,
+  docs, and tests.
+- Prevented future local `npm publish` confusion by adding a maintainer release
+  runbook and updating release script guidance.
+
 ## 0.1.4 - 2026-06-15
 
 ### Added

@@ -3,6 +3,9 @@
 This is an internal maintainer note. It keeps npm publishing aligned with the
 community-standard OIDC flow and avoids local OTP prompts.
 
+For the end-to-end release sequence, start from
+`docs/internal/release-runbook.md`.
+
 ## npm package setting
 
 Configure this once on npmjs.com:
@@ -20,6 +23,9 @@ Trusted publishing uses GitHub Actions OIDC. Do not add `NPM_TOKEN` for the
 normal release path.
 
 ## Standard release flow
+
+The normal release path is tag-triggered GitHub Actions publishing. Do not run
+local `npm publish` for standard releases.
 
 1. Prepare the release locally:
 
@@ -52,5 +58,6 @@ If a tag already exists before this workflow is available, run the
 Publisher is configured. The manual run publishes the current `main` package
 version through the same OIDC path.
 
-Use local `npm publish` only as emergency fallback. It will require npm 2FA/OTP
-and should not be the normal path.
+Use local `npm publish` only as emergency fallback after explicitly deciding to
+bypass this workflow. It will require npm 2FA/OTP and should not be the normal
+path.

@@ -3,6 +3,9 @@
 This is an internal maintainer checklist. It is intentionally kept under
 `docs/internal/` and is not shown in the public documentation site.
 
+Start from `docs/internal/release-runbook.md` for the canonical release flow.
+This checklist is the final launch review, not a separate publishing path.
+
 ## Pre-launch gate
 
 - `npm run check`
@@ -17,6 +20,9 @@ This is an internal maintainer checklist. It is intentionally kept under
 
 Use npm Trusted Publishing through GitHub Actions. Do not switch public docs to
 npx-first until npm shows the intended version.
+
+Do not run local `npm publish` for the normal path. It will require npm
+OTP/browser verification by design.
 
 1. Confirm `package.json` version and `CHANGELOG.md`.
 2. Run the full pre-launch gate.
@@ -98,14 +104,15 @@ After pushing the release commit:
 
 ## Announcement assets
 
-Prepare one short terminal demo:
+Prepare one short agent-task demo:
 
 ```text
-$ codex "create a goal and finish this feature end to end"
+User:
+Based on this plan, create a goal and finish the feature end to end.
 
-OME matched experience cards:
-- Enter full-closure delivery mode when a goal starts
-  Why: task looks like real goal execution.
+What OME changes:
+The agent sees the approved goal-execution lesson before acting, so it plans,
+implements, verifies, and reports the result instead of only creating a title.
 ```
 
 Prepare one sentence:
