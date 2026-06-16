@@ -114,7 +114,7 @@ ome match "Fix UI and validate in browser" --explain --json
       ]
     }
   ],
-  "additionalContext": "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.\\nBefore acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
+  "additionalContext": "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.\\nBefore acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
 }
 ```
 
@@ -129,7 +129,9 @@ ome match "Fix UI and validate in browser" --explain --json
 `additionalContext` 的框架提示固定使用英文，且只包含紧凑索引信息。卡片规则正文不会
 被注入。命中卡片只是候选，不代表 Agent 已经采用。框架会要求 Agent 忽略无关或冲突
 卡片，只在判断适用后再读取规则，并在最终回复里只披露实际使用过的卡：
-`**本次使用 N条 OME 经验卡：** [经验卡名称](<经验卡路径>)`。经验卡名称会渲染为指向相关经验卡路径的 Markdown 链接。
+`**本次使用 N条 OME 经验卡：** [经验卡名称](<经验卡路径>)`。复盘或来源扫描任务中，
+命中的主题旧卡是 active overlap 信号，不是来源证据，应写入复盘审计而不是披露为 used
+card。经验卡名称会渲染为指向相关经验卡路径的 Markdown 链接。
 
 ## Budgeted Context
 

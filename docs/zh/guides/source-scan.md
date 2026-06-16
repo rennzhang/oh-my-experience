@@ -48,6 +48,15 @@ ome source user-index show <hit-id> --index <file> --context 4 --json
 source index，也不会自动总结经验卡。query 展开、反例搜索、上下文回读和最终综合仍由
 Agent 负责。
 
+## 复盘时命中的经验卡
+
+Agent 做复盘时，prompt-time recall 仍可能命中已有 OME 卡。这是正常的：流程治理卡可以
+提醒 Agent 扫描要严谨、证据要回到原话、候选要停在审批阶段。
+
+这些命中的旧卡不是新经验的来源证据。主题相关旧卡只能作为 active 卡重叠检查，判断新
+结果应该保留、合并、改写还是拒绝。最终回复里的 used-card footer 只应列出本轮真正采用
+的流程或治理卡，不应把主题旧卡列成“本次使用”。
+
 ## 没有 Spool
 
 直接扫描 Codex 会话：

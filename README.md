@@ -23,8 +23,8 @@
 
 Oh My Experience is a local-first experience layer for AI coding agents. It
 turns real Codex and Claude corrections into reviewed experience cards, then
-recalls the right lesson at prompt time before the agent repeats the same
-mistake.
+can recall a relevant approved lesson at prompt time before the agent repeats
+the same kind of mistake.
 
 ## Quick Try
 

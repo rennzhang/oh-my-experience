@@ -732,6 +732,7 @@ test("hook context is neutral and carries scope hints", () => {
   assert.match(context, /OME matched experience cards/);
   assert.match(context, /Matched does not mean used/);
   assert.match(context, /Before acting, if any matched card is applicable/);
+  assert.match(context, /For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence/);
   assert.match(context, /Final report: if you actually used any card/);
   assert.match(context, /\*\*本次使用 N条 OME 经验卡：\*\*/);
   assert.match(context, /Summary: Keep hook output neutral/);

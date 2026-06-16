@@ -53,6 +53,18 @@ temporary index file, does not update the long-term source index, and does not
 summarize experience cards. The agent still owns query expansion, counterexample
 search, context replay, and final synthesis.
 
+## Matched Cards During Retrospectives
+
+Prompt-time recall can still match existing OME cards while an agent is running a
+retrospective. That is expected: process and governance cards can help the agent
+scan carefully.
+
+Those matched cards are not source evidence for a new experience. Subject-area
+matches should be recorded only as active-card overlap checks, such as whether
+the result should be kept separate, merged, rewritten, or rejected. The final
+used-card footer should mention only process or governance cards the agent
+actually applied during the retrospective.
+
 ## Without Spool
 
 Scan Codex sessions directly:

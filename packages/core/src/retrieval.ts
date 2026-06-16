@@ -360,7 +360,7 @@ function contextBlock(result: MatchResult, index: number, copy: ContextCopy): st
 function contextCopy(): ContextCopy {
   return {
     heading: "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.",
-    finalReport: "Before acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.",
+    finalReport: "Before acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.",
     summary: "Summary",
     scope: "Scope",
     useWhen: "Use if",

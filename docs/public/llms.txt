@@ -1,6 +1,6 @@
 # Oh My Experience
 
-Oh My Experience is a local-first experience layer for AI coding agents. It turns real Codex and Claude work into approved experience cards, then recalls the right lessons at prompt time through local hooks.
+Oh My Experience is a local-first experience layer for AI coding agents. It turns real Codex and Claude work into approved experience cards, then can recall relevant approved lessons at prompt time through local hooks.
 
 ## Start here
 
@@ -21,6 +21,7 @@ Oh My Experience is a local-first experience layer for AI coding agents. It turn
 - Global cards can still be scoped by project metadata without adding files to a repository.
 - Prompt-time recall happens through Codex and Claude UserPromptSubmit hooks.
 - Deep retrospectives should build a temporary Codex/Claude user-only evidence index before Agent query expansion and context replay.
+- During retrospectives, matched subject-area cards are overlap signals, not source evidence or final used-card disclosures.
 - Retrospectives create candidates; they do not directly create active cards.
 - Draft approval stays Markdown-first; candidates do not become active without explicit enabling.
 - OME is local-first. Hook runtime does not call an LLM.

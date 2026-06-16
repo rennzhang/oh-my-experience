@@ -115,7 +115,7 @@ ome match "Fix UI and validate in browser" --explain --json
       ]
     }
   ],
-  "additionalContext": "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.\\nBefore acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
+  "additionalContext": "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.\\nBefore acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
 }
 ```
 
@@ -139,6 +139,9 @@ not proof that the agent used them. The frame tells the agent to ignore
 unrelated or conflicting cards, fetch the rule only when a card applies, and to
 mention only cards it actually used in the final response:
 `**本次使用 N条 OME 经验卡：** [Card title](<card-path>)`.
+For retrospective or source-scan tasks, matched subject-area cards are overlap
+signals, not source evidence; they should be recorded in the retrospective audit
+rather than disclosed as used cards.
 Card titles are rendered as Markdown links to the relevant experience card
 paths.
 
