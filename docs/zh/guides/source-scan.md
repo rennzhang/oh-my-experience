@@ -5,16 +5,15 @@ status: active
 
 # 来源扫描
 
-OME 只依赖 Codex 本地会话也可以启动。这样已经足够创建本地经验库，并验证提示词
-阶段的经验召回。
+OME 的核心复盘链路默认使用 Codex 和 Claude 本地会话文件。这样已经足够创建本地
+经验库，并做高质量证据审计，不需要依赖可选来源桥。
 
 Spool 是本机 AI 会话索引层，把 Claude、Codex、Gemini 等多 Agent 历史统一成
 可搜索素材池。
 
-不安装 Spool 时，OME 仍可从当前对话和显式扫描的 Codex 会话取材，核心链路
-完整；安装后，OME 可以先索引命中、再按需取证据，避免直接吞原始 session 导致
-token 占用高、上下文变脏。多 Agent 用户建议启用：覆盖更全，也能避开大量思考
-过程和工具日志噪音。
+不安装 Spool 时，OME 仍可从 Codex/Claude 原生来源和当前对话取材，核心链路完整；
+安装后，OME 可以把更多 provider 作为补充来源纳入。Spool 能提升额外 agent 覆盖，
+但不是 Codex/Claude 合格深扫的前提。
 
 ## 干净存储模型
 
@@ -30,6 +29,25 @@ ome source clean --yes
 
 第一条是 dry-run。第二条会清掉历史 summary 和 materialized session 标记。
 
+## 原生用户证据索引
+
+复盘前先构建临时 user-only 索引：
+
+```bash
+ome source user-index build --provider all --json
+```
+
+命令会输出 `indexPath`。Agent 后续用这个文件反复搜索和回读上下文：
+
+```bash
+ome source user-index search "browser validation" --index <file> --json
+ome source user-index show <hit-id> --index <file> --context 4 --json
+```
+
+`user-index` 是给 Agent 用的证据工作台。它把用户消息放进临时索引文件，不更新长期
+source index，也不会自动总结经验卡。query 展开、反例搜索、上下文回读和最终综合仍由
+Agent 负责。
+
 ## 没有 Spool
 
 直接扫描 Codex 会话：
@@ -41,7 +59,10 @@ ome source scan codex --sessions ~/.codex/sessions
 Agent 仍然必须把 focus lens 展开成多组短搜索：用户可能说过的原话、同义表达、
 反向表达、验收标准、拒收理由、相关路径或模块名。
 
-## 有 Spool
+合格深扫优先走上面的原生 `user-index`。`source scan codex` 仍然是 pointer source
+catalog 命令。
+
+## Spool 作为补充来源
 
 先检查并启用 Spool 来源：
 
@@ -57,7 +78,7 @@ spool status
 spool sync
 ```
 
-优先 search-first 取证据：
+优先 search-first 补充取证据：
 
 ```bash
 spool search "browser validation" --source codex --limit 10 --json
@@ -66,6 +87,7 @@ spool show <uuid> --json
 
 同一个 lens 要跑多条短 query，并在 retrospective audit 里记录 query 族。
 `minimal intrusion no baggage` 这类单条 query 只能算一个探针，不能代表主题已经搜完。
+Spool 命中只当额外线索；核心证据仍要尽量回到原生 user-only 索引和原始上下文。
 
 然后只扫描高价值切片：
 

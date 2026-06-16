@@ -9,6 +9,7 @@ Oh My Experience is a local-first experience layer for AI coding agents. It turn
 - First experience card: /guides/first-card
 - Examples: /guides/examples
 - Setup: /guides/setup
+- Source scan: /guides/source-scan
 - Global and project libraries: /guides/project-libraries
 - Codex hook: /guides/codex
 - Claude hook: /guides/claude
@@ -19,6 +20,7 @@ Oh My Experience is a local-first experience layer for AI coding agents. It turn
 - `dataDir` is the global library; optional project libraries live at `<project-root>/.oh-my-experience/`.
 - Global cards can still be scoped by project metadata without adding files to a repository.
 - Prompt-time recall happens through Codex and Claude UserPromptSubmit hooks.
+- Deep retrospectives should build a temporary Codex/Claude user-only evidence index before Agent query expansion and context replay.
 - Retrospectives create candidates; they do not directly create active cards.
 - Draft approval stays Markdown-first; candidates do not become active without explicit enabling.
 - OME is local-first. Hook runtime does not call an LLM.

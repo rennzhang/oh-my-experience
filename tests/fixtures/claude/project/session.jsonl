@@ -1,0 +1,2 @@
+{"timestamp":"2026-05-28T04:00:00.000Z","type":"user","message":{"role":"user","content":[{"type":"text","text":"Claude 也要作为一等来源参与 OME 深扫。"}]},"cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T04:00:10.000Z","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"我会把 Claude 会话纳入 user-only evidence index。"}]},"cwd":"/tmp/example"}

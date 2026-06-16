@@ -46,6 +46,12 @@ ome source scan codex --sessions ~/.codex/sessions
 跳过多少条，以及是否有解析失败的会话。
 ```
 
+做复盘深扫时，优先使用临时 user-only 证据索引，不要只依赖 pointer scan：
+
+```bash
+ome source user-index build --provider codex --sessions ~/.codex/sessions --json
+```
+
 ## 用 Codex Agent 做复盘
 
 Codex Agent 可以独立完成整个 reflect 流程。

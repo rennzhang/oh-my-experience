@@ -73,6 +73,9 @@ specific project context.
 
 ```bash
 ome source status
+ome source user-index build --provider all
+ome source user-index search "browser validation" --index <file>
+ome source user-index show <hit-id> --index <file> --context 4
 ome source scan codex --sessions <dir>
 ome source scan spool --limit 20
 ome source scan spool --query "browser validation" --source codex
@@ -83,10 +86,15 @@ ome source connect spool --mode ask
 ome source connect spool --mode enabled
 ```
 
-Spool is optional. If it is unavailable, Codex session scanning and local recall
-still work. Source scans write pointer indexes; they do not copy full original
-transcripts. `ome source clean` is a dry run by default and `--yes` applies the
-cleanup of legacy summaries and materialized markers.
+`ome source user-index` is the native evidence workbench for retrospectives. It
+builds a temporary user-only index from Codex and Claude session files, supports
+repeated lexical searches, and replays source context for agent judgment. It does
+not update the long-term source index or generate experience cards.
+
+Spool is optional. If it is unavailable, native Codex/Claude user indexing and
+local recall still work. Source scans write pointer indexes; they do not copy
+full original transcripts. `ome source clean` is a dry run by default and `--yes`
+applies the cleanup of legacy summaries and materialized markers.
 
 Spool scans skip sessions whose `spool show --json` output is too large for the
 current safety limit. Use a narrower query first; if the session is expected to

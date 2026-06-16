@@ -5,17 +5,17 @@ status: active
 
 # Source Scan
 
-OME can start with Codex local sessions only. That is enough to create a local
-experience library and validate prompt-time recall.
+OME's core retrospective path uses native Codex and Claude session files. That
+is enough to create a local experience library and run high-quality evidence
+review without any optional source bridge.
 
 Spool is a local AI session index that unifies Claude, Codex, Gemini, and other
 agent histories into one searchable pool.
 
-Without Spool, OME still draws from the current conversation and explicitly
-scanned Codex sessions; the core path is intact. With Spool, OME can do
-index-first lookup and pull evidence on demand, which avoids dumping raw
-sessions into context and saves tokens. Recommended for multi-agent users:
-broader coverage without flooding context with think traces and tool logs.
+Without Spool, OME still draws from native Codex/Claude sources and the current
+conversation; the core path is intact. With Spool, OME can add more providers as
+a supplemental source. Spool improves coverage for extra agents, but it is not
+required for a qualified Codex/Claude deep scan.
 
 ## Clean Storage Model
 
@@ -33,6 +33,26 @@ ome source clean --yes
 The first command is a dry run. The second removes legacy summaries and
 materialized-session markers from the source index.
 
+## Native User Evidence Index
+
+Build a temporary user-only index before a retrospective:
+
+```bash
+ome source user-index build --provider all --json
+```
+
+The command prints an `indexPath`. Agents use that file for repeated searches:
+
+```bash
+ome source user-index search "browser validation" --index <file> --json
+ome source user-index show <hit-id> --index <file> --context 4 --json
+```
+
+`user-index` is an evidence workbench for agents. It keeps user messages in a
+temporary index file, does not update the long-term source index, and does not
+summarize experience cards. The agent still owns query expansion, counterexample
+search, context replay, and final synthesis.
+
 ## Without Spool
 
 Scan Codex sessions directly:
@@ -45,7 +65,10 @@ Agents should still expand the focus lens into several short searches before
 writing a retrospective audit: likely user wording, synonyms, opposite phrasing,
 acceptance criteria, rejection reasons, and nearby module or path names.
 
-## With Spool
+For qualified deep scans, prefer the native `user-index` path above. `source
+scan codex` remains a pointer-index command for source cataloging.
+
+## With Spool As Supplemental Source
 
 Check availability and enable Spool as a source:
 
@@ -61,7 +84,7 @@ spool status
 spool sync
 ```
 
-Prefer search-first evidence lookup:
+Prefer search-first supplemental lookup:
 
 ```bash
 spool search "browser validation" --source codex --limit 10 --json
@@ -70,7 +93,9 @@ spool show <uuid> --json
 
 Run several short searches for the same lens and record the query family in the
 retrospective audit. A single query such as `minimal intrusion no baggage` is
-only one probe, not evidence that the theme was fully searched.
+only one probe, not evidence that the theme was fully searched. Spool hits should
+be treated as extra leads; core evidence still goes through native user-only
+indexing and original context replay when available.
 
 Then scan only the high-value slice:
 

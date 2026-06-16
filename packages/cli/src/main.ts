@@ -40,11 +40,17 @@ import {
   resolveLibraryStack,
   runDoctor,
   saveConfig,
+  buildUserMessageIndex,
   setConfigValue,
+  searchUserMessageIndex,
+  showUserIndexContext,
+  readUserMessageIndex,
+  writeUserMessageIndex,
   writeCandidates,
   addDecision,
   applyRetrospective,
   candidateFromLesson,
+  type UserIndexSourceInput,
 } from "../../core/src/index.js";
 import { defaultConfigHome } from "../../core/src/storage.js";
 import { scanCodexSessions } from "../../adapters/sources/codex-sessions/src/importer.js";
@@ -1198,6 +1204,7 @@ function withReviewPaths<T extends Record<string, any>>(dataDir: string, record:
 
 function sourceCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
   if (!subcommand || subcommand === "status") return print(inspectSourceState(dataDir), args);
+  if (subcommand === "user-index") return print(userIndexCommand(dataDir, args), args);
   if (subcommand === "scan") return print(scanSource(dataDir, args), args);
   if (subcommand === "clean") return print(cleanSources(dataDir, args), args);
   if (subcommand === "connect") {
@@ -1208,7 +1215,115 @@ function sourceCommand(dataDir: string, subcommand: string | undefined, args: Pa
     const config = loadConfig(dataDir);
     return print(saveConfig(dataDir, { ...config, sources: { ...config.sources, spool: { mode } } }), args);
   }
-  throw new Error("usage: ome source status|scan codex|scan spool|clean|connect spool");
+  throw new Error("usage: ome source status|user-index build|user-index search|user-index show|scan codex|scan spool|clean|connect spool");
+}
+
+function userIndexCommand(dataDir: string, args: ParsedArgs) {
+  const action = args.positionals[2];
+  if (action === "build") return buildUserIndexCommand(dataDir, args);
+  if (action === "search") return searchUserIndexCommand(args);
+  if (action === "show") return showUserIndexCommand(args);
+  throw new Error("usage: ome source user-index build|search|show");
+}
+
+function buildUserIndexCommand(dataDir: string, args: ParsedArgs) {
+  const { sources, unavailableSources } = userIndexSources(args);
+  if (!sources.length) {
+    throw new Error(`no user-index sources available; unavailable: ${unavailableSources.join(", ") || "none"}`);
+  }
+  const index = buildUserMessageIndex(sources);
+  const outputPath = args.flags.out || args.flags.output
+    ? path.resolve(String(args.flags.out || args.flags.output))
+    : defaultUserIndexPath(dataDir);
+  return {
+    ...writeUserMessageIndex(index, outputPath),
+    command: "source.user-index.build",
+    unavailableSources,
+  };
+}
+
+function searchUserIndexCommand(args: ParsedArgs) {
+  const query = args.positionals.slice(3).join(" ").trim() || String(args.flags.query || "");
+  const indexPath = userIndexPathArg(args);
+  if (!query) throw new Error("usage: ome source user-index search <query> --index <file>");
+  const index = readUserMessageIndex(indexPath);
+  return {
+    ok: true,
+    command: "source.user-index.search",
+    indexPath,
+    query,
+    hits: searchUserMessageIndex(index, query, {
+      limit: args.flags.limit ? Number(args.flags.limit) : undefined,
+      provider: args.flags.provider ? String(args.flags.provider) : undefined,
+    }),
+  };
+}
+
+function showUserIndexCommand(args: ParsedArgs) {
+  const hitId = args.positionals[3] || args.flags.hit || args.flags["hit-id"];
+  if (!hitId) throw new Error("usage: ome source user-index show <hit-id> --index <file>");
+  const indexPath = userIndexPathArg(args);
+  return {
+    command: "source.user-index.show",
+    indexPath,
+    ...showUserIndexContext(readUserMessageIndex(indexPath), String(hitId), {
+      context: args.flags.context ? Number(args.flags.context) : undefined,
+      maxChars: args.flags["max-chars"] ? Number(args.flags["max-chars"]) : undefined,
+    }),
+  };
+}
+
+function userIndexPathArg(args: ParsedArgs): string {
+  const indexPath = args.flags.index || args.flags["index-path"];
+  if (!indexPath) throw new Error("user-index command requires --index <file>");
+  return path.resolve(String(indexPath));
+}
+
+function defaultUserIndexPath(dataDir: string): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return path.join(os.tmpdir(), `oh-my-experience-user-indexes-${userTempSuffix()}`, hashText(path.resolve(dataDir)).slice(0, 16), `${stamp}.json`);
+}
+
+function userTempSuffix(): string {
+  if (typeof process.getuid === "function") return String(process.getuid());
+  return hashText(os.homedir()).slice(0, 8);
+}
+
+function userIndexSources(args: ParsedArgs): { sources: UserIndexSourceInput[]; unavailableSources: string[] } {
+  const providers = userIndexProviders(args);
+  const explicit = Boolean(args.flags.provider || args.flags.providers);
+  const sources: UserIndexSourceInput[] = [];
+  const unavailableSources: string[] = [];
+  for (const provider of providers) {
+    const root = provider === "claude" ? claudeSessionsDir(args, providers.length === 1) : codexSessionsDir(args, providers.length === 1);
+    if (fs.existsSync(root)) sources.push({ provider, root });
+    else {
+      unavailableSources.push(`${provider}:${root}`);
+      if (explicit && providers.length === 1) throw new Error(`${provider} sessions directory not found: ${root}`);
+    }
+  }
+  return { sources, unavailableSources };
+}
+
+function userIndexProviders(args: ParsedArgs): Array<"codex" | "claude"> {
+  const raw = String(args.flags.provider || args.flags.providers || "all");
+  const values = raw.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+  if (!values.length || values.some((item) => ["none", "skip", "no", "off"].includes(item))) return [];
+  if (values.some((item) => ["all", "both"].includes(item))) return ["codex", "claude"];
+  const normalized = values.map((item) => {
+    if (item === "codex") return "codex";
+    if (["claude", "cloud"].includes(item)) return "claude";
+    throw new Error(`unsupported user-index provider: ${item}; use codex, claude, or all`);
+  });
+  return Array.from(new Set(normalized)) as Array<"codex" | "claude">;
+}
+
+function codexSessionsDir(args: ParsedArgs, allowGenericSessions: boolean): string {
+  return path.resolve(String(args.flags["codex-sessions"] || (allowGenericSessions ? args.flags.sessions : "") || path.join(codexHome(args), "sessions")));
+}
+
+function claudeSessionsDir(args: ParsedArgs, allowGenericSessions: boolean): string {
+  return path.resolve(String(args.flags["claude-sessions"] || (allowGenericSessions ? args.flags.sessions : "") || path.join(claudeHome(args), "projects")));
 }
 
 function scanSource(dataDir: string, args: ParsedArgs) {
@@ -1697,6 +1812,46 @@ function renderSourceResult(record: Record<string, any>, subcommand: string): st
       jsonHint(),
     ].filter(Boolean).join("\n");
   }
+  if (subcommand === "user-index") {
+    if (record.command === "source.user-index.build") {
+      const sources = Array.isArray(record.sources) ? record.sources : [];
+      return [
+        "User index built",
+        `Index: ${record.indexPath || ""}`,
+        `Messages: ${record.messages || 0}`,
+        `Sources: ${sources.map((source) => `${asRecord(source).provider}:${asRecord(source).messages || 0}`).join(", ")}`,
+        Array.isArray(record.unavailableSources) && record.unavailableSources.length ? `Unavailable: ${record.unavailableSources.join(", ")}` : "",
+        jsonHint(),
+      ].filter(Boolean).join("\n");
+    }
+    if (record.command === "source.user-index.search") {
+      const hits = Array.isArray(record.hits) ? record.hits : [];
+      return [
+        "User index search",
+        `Query: ${record.query || ""}`,
+        `Hits: ${hits.length}`,
+        ...hits.slice(0, 8).map((hit) => {
+          const item = asRecord(hit);
+          return `  - ${item.id} ${item.provider}:${item.line} ${item.snippet || ""}`;
+        }),
+        jsonHint(),
+      ].join("\n");
+    }
+    if (record.command === "source.user-index.show") {
+      const context = Array.isArray(record.context) ? record.context : [];
+      return [
+        "User index context",
+        `Hit: ${asRecord(record.hit).id || ""}`,
+        ...context.map((item) => {
+          const message = asRecord(item);
+          const marker = message.isHit ? "*" : " ";
+          return `${marker} ${message.role}:${message.line} ${String(message.text || "").replace(/\s+/g, " ").slice(0, 220)}`;
+        }),
+        jsonHint(),
+      ].join("\n");
+    }
+    return renderGenericResult(record);
+  }
   if (subcommand === "scan") {
     const indexed = Array.isArray(record.indexed) ? record.indexed.length : 0;
     const skipped = Array.isArray(record.skipped) ? record.skipped.length : 0;
@@ -2031,7 +2186,7 @@ Core commands:
   ome uninstall [--provider codex|claude|all] [--delete-library --yes]
   ome version | ome -v
   ome config get|preview|set
-  ome source status|scan codex|scan spool|clean|connect spool
+  ome source status|user-index build|user-index search|user-index show|scan codex|scan spool|clean|connect spool
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume
   ome experience list|show|enable|archive|migrate-legacy

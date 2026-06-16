@@ -22,7 +22,7 @@ title: 指南
 
 ## 建设经验库
 
-- [来源扫描](source-scan.md)：索引 Codex 会话和可选的 Spool 搜索结果。
+- [来源扫描](source-scan.md)：构建 Codex/Claude 原生用户证据，并可选用 Spool 补充。
 - [复盘与草稿审批](reflect-review.md)：把真实工作转成经过确认的经验卡。
 - [全局与项目经验库](project-libraries.md)：选择全局存储、仓库存储，或两者并用。
 - [评估](evaluation.md)：在不污染真实经验库的前提下测试召回质量。

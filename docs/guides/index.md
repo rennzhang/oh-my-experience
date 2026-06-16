@@ -23,7 +23,7 @@ corrections into approved cards.
 
 ## Build the library
 
-- [Source scan](source-scan.md): index Codex sessions and optional Spool search results.
+- [Source scan](source-scan.md): build native Codex/Claude user evidence and optionally supplement with Spool.
 - [Reflect and draft approval](reflect-review.md): turn real work into approved cards.
 - [Global and project libraries](project-libraries.md): choose global storage, repository storage, or both.
 - [Evaluation](evaluation.md): test recall quality without polluting your real library.

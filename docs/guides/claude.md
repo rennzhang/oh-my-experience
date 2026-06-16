@@ -63,5 +63,6 @@ Only extract reusable execution judgment. Don't turn one-off context into experi
 
 ## Rule
 
-Do not fork retrieval logic for Claude. The Claude adapter only handles hook
-input, install/status paths, and output formatting.
+Do not fork retrieval logic for Claude. Claude-specific code handles hook
+input, install/status paths, output formatting, and native session parsing for
+the temporary user-only evidence index.

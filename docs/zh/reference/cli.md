@@ -60,6 +60,9 @@ ome match "<task>" --cwd /path/to/project --explain
 
 ```bash
 ome source status
+ome source user-index build --provider all
+ome source user-index search "browser validation" --index <file>
+ome source user-index show <hit-id> --index <file> --context 4
 ome source scan codex --sessions <dir>
 ome source scan spool --limit 20
 ome source scan spool --query "browser validation" --source codex
@@ -70,7 +73,9 @@ ome source connect spool --mode ask
 ome source connect spool --mode enabled
 ```
 
-Spool 是可选能力。Spool 不可用时，Codex session 扫描和本地召回仍然可用。来源扫描只写 pointer index，不复制原始完整会话。`ome source clean` 默认 dry-run，`--yes` 才真正清掉历史 summary 和 materialized 标记。
+`ome source user-index` 是复盘用的原生证据工作台。它从 Codex 和 Claude 会话文件构建临时 user-only 索引，支持多次词面搜索，并围绕命中回放原始上下文供 Agent 判断。它不会更新长期 source index，也不会生成经验卡。
+
+Spool 是可选能力。Spool 不可用时，Codex/Claude 原生 user-index 和本地召回仍然可用。来源扫描只写 pointer index，不复制原始完整会话。`ome source clean` 默认 dry-run，`--yes` 才真正清掉历史 summary 和 materialized 标记。
 
 Spool 扫描遇到 `spool show --json` 输出过大的会话会跳过。优先缩小 query；如果确认这个大会话值得索引，再显式提高 `--max-session-bytes`。
 

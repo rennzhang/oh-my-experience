@@ -15,3 +15,4 @@ export * from "./similarity.js";
 export * from "./sessions.js";
 export * from "./stats.js";
 export * from "./storage.js";
+export * from "./user-index.js";

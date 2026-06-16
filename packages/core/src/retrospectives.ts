@@ -154,6 +154,13 @@ function validateRetrospectiveAudit(audit: RetrospectiveAudit, allowIncomplete: 
     ["evidenceClusters", audit.evidenceClusters.length],
     ["activeCardOverlapQa", audit.activeCardOverlapQa.trim().length],
   ].filter(([, length]) => !length).map(([field]) => field);
+  if (audit.sourceCoverage === "all-accessible") {
+    if (!audit.userOnlyIndexBuilt) missing.push("userOnlyIndexBuilt=true");
+    if (!audit.nativeSourcesCovered.length) missing.push("nativeSourcesCovered");
+    if (!audit.queryFamilies.length) missing.push("queryFamilies");
+    if (!audit.contextReplaySamples.length) missing.push("contextReplaySamples");
+    if (audit.spoolSupplement === "unknown") missing.push("spoolSupplement");
+  }
   if (audit.incomplete) missing.push("incomplete=false");
   if (missing.length && !allowIncomplete) {
     throw new Error(`retrospective source audit is incomplete: ${missing.join(", ")}; complete the audit or use --allow-incomplete-audit`);
@@ -478,7 +485,9 @@ function renderAuditStatus(audit: RetrospectiveAudit | null): string {
   }
   const focusLens = audit.focusLens.trim() || legacyFocusLens(audit.scope);
   const sourceCoverage = audit.sourceCoverage !== "unknown" ? audit.sourceCoverage : legacySourceCoverage(audit.scope);
-  return `审计：coverage=${sourceCoverage} / focus=${focusLens} / sources=${audit.searchedSources.length} / gaps=${audit.remainingEvidenceGaps.length}`;
+  const userIndex = audit.userOnlyIndexBuilt ? "user-index=yes" : "user-index=no";
+  const nativeSources = audit.nativeSourcesCovered.length ? `native=${audit.nativeSourcesCovered.join(",")}` : "native=none";
+  return `审计：coverage=${sourceCoverage} / focus=${focusLens} / ${userIndex} / ${nativeSources} / sources=${audit.searchedSources.length} / gaps=${audit.remainingEvidenceGaps.length}`;
 }
 
 function legacyFocusLens(scope: RetrospectiveAudit["scope"]): string {

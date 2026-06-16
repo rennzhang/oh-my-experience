@@ -46,6 +46,13 @@ Run `ome source scan codex --sessions ~/.codex/sessions`, then tell me how many
 sessions were indexed, how many were skipped, and whether any failed to parse.
 ```
 
+For retrospective deep scans, use the temporary user-only evidence index instead
+of relying on pointer scans alone:
+
+```bash
+ome source user-index build --provider codex --sessions ~/.codex/sessions --json
+```
+
 ## Running a reflect scan with Codex
 
 Codex agents can run the full reflect flow. Copy and paste this prompt:

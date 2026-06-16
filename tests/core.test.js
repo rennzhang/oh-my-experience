@@ -59,6 +59,11 @@ function completeAudit(overrides = {}) {
     scope: "focused",
     focusLens: "fixture focus",
     sourceCoverage: "all-accessible",
+    nativeSourcesCovered: ["codex", "claude"],
+    userOnlyIndexBuilt: true,
+    queryFamilies: ["fixture focus", "fixture correction"],
+    contextReplaySamples: ["fixture-session.jsonl:1"],
+    spoolSupplement: "unavailable",
     searchedSources: ["fixture-session.jsonl"],
     unavailableSources: [],
     noiseFilters: ["user messages only"],
@@ -441,7 +446,7 @@ test("retrospective candidates persist complete source audit", () => {
   assert.equal(raw.audit.sourceCoverage, "all-accessible");
   assert.equal(raw.audit.searchedSources.length, 2);
   assert.equal(raw.audit.incomplete, false);
-  assert.match(fs.readFileSync(path.join(run.runDir, "experience-review.md"), "utf8"), /审计：coverage=all-accessible \/ focus=fixture focus \/ sources=2 \/ gaps=0/);
+  assert.match(fs.readFileSync(path.join(run.runDir, "experience-review.md"), "utf8"), /审计：coverage=all-accessible \/ focus=fixture focus \/ user-index=yes \/ native=codex,claude \/ sources=2 \/ gaps=0/);
 });
 
 test("retrospective source audit requires explicit source coverage", () => {

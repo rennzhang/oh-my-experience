@@ -68,6 +68,7 @@ need them.
 - Local-first recall: no network calls on the prompt-time path.
 - Draft approval before recall: `candidate -> draft -> active -> archived`.
 - Codex and Claude hooks using the same local runtime.
+- Native Codex/Claude user-only evidence indexing for deep retrospectives.
 - Global libraries plus optional project libraries at `.oh-my-experience/`.
 - Explainable matching with scores, reasons, and compact injected context.
 - Evaluation fixtures for checking missed or noisy recall before release.
@@ -143,7 +144,7 @@ user is only discussing docs, OKRs, or what `/goal` means. See the walkthrough i
 real session -> reflect scan -> draft approval -> confirmed active card -> prompt-time recall -> stats -> refinement
 ```
 
-1. Import or inspect real coding-agent sessions.
+1. Build native user-only evidence from Codex/Claude sessions, optionally supplemented by Spool.
 2. Turn repeated corrections into experience drafts.
 3. Approve, merge, rewrite, or reject drafts before activation.
 4. Confirm what becomes active, then let hooks recall active cards when a matching task appears.
@@ -167,6 +168,7 @@ node bin/ome.js init
 - [First Experience Card](docs/guides/first-card.md)
 - [Examples](docs/guides/examples.md)
 - [Setup](docs/guides/setup.md)
+- [Source Scan](docs/guides/source-scan.md)
 - [Global and project libraries](docs/guides/project-libraries.md)
 - [CLI Reference](docs/reference/cli.md)
 - [Retrieval Engine](docs/architecture/retrieval-engine.md)

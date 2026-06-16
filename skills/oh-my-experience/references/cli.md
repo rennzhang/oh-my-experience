@@ -63,6 +63,9 @@ ome project init
 
 ```bash
 ome source status
+ome source user-index build --provider all --codex-sessions ~/.codex/sessions --claude-sessions ~/.claude/projects
+ome source user-index search "browser validation" --index <file>
+ome source user-index show <hit-id> --index <file> --context 4
 ome source scan codex --sessions <dir>
 ome source scan spool --limit 20
 ome source scan spool --query "browser validation" --source codex
@@ -80,8 +83,12 @@ spool show <uuid> --json
 规则：
 
 - Spool 是可选依赖；不可用时继续使用 Codex 或本地来源。
+- `source user-index` 是 reflect 深扫的默认证据底座：它只建立临时 user-only 索引，默认支持 Codex + Claude 原始 JSONL 来源，不写入长期 source index，也不替 Agent 做经验判断。
+- `source user-index build` 默认写入系统临时目录；输出里的 `indexPath` 传给后续 `search` 和 `show`。只有显式传 `--out` / `--output` 时才写到指定路径。
+- `source user-index search` 只做词面检索和命中定位；Agent 仍必须自行拆 query family。
+- `source user-index show` 围绕命中回读原始上下文；候选卡证据必须优先锚定用户原话，再参考上下文理解因果。
 - Spool mode 只能是 `off`、`ask` 或 `enabled`。用户要求打开配置时用 `enabled`；只想逐次选择时用 `ask`。
-- 复盘扫描默认先由 Agent 做语义展开，再逐条 `spool search` 定位，最后用 `ome source scan spool` 窄扫描；不要把单条 query 或宽泛主题直接扫入大量 Spool 记录。
+- 复盘扫描默认先构建 Codex/Claude `user-index`，再由 Agent 做语义展开并多次 `source user-index search` / `show`；Spool 只作为第二辅助来源补充更多 provider 或额外线索。
 - 深扫需要当前历史时，先记录 `spool status`，再运行 `spool sync`，并把同步前后状态写进 `searchedSources`。
 - Spool search 是词面检索入口，不承担语义展开；Agent 必须自行拆同义、近义、反向和边界 query，并在 `searchedSources` 记录 query 族。
 - 宽泛概念或单条 query 命中少不代表主题不存在；用更多语义入口、本地 Codex 全文扫或已扫描 source index 补覆盖。

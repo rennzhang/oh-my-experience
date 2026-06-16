@@ -63,5 +63,5 @@ ome init --provider all
 
 ## 规则
 
-不要为 Claude 分叉 retrieval logic。Claude adapter 只处理 hook input、
-install/status 路径和 output formatting。
+不要为 Claude 分叉 retrieval logic。Claude 相关代码只处理 hook input、
+install/status 路径、output formatting，以及临时 user-only 证据索引用的原生会话解析。

@@ -16,7 +16,7 @@ site.
 
 ## Medium priority
 
-- /guides/source-scan - Codex source scanning and optional Spool search-backed scanning.
+- /guides/source-scan - native Codex/Claude user-only evidence indexing and optional Spool supplemental scanning.
 - /guides/evaluation - deterministic recall evaluation and hook evaluation.
 - /reference/cli - complete CLI command surface.
 - /reference/config - configuration schema and data directory behavior.

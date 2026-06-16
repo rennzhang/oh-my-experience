@@ -66,7 +66,7 @@ real work -> reflect scan -> draft approval -> refine -> confirm library add
 -> prompt-time recall -> match stats -> ongoing maintenance
 ```
 
-1. **Scan sources** from local Codex history, or optionally from Spool.
+1. **Scan sources** from native Codex/Claude history, with optional Spool supplements.
 2. **Run a reflect scan** so the agent finds places where you corrected it.
 3. **Approve and refine** the extracted experience drafts in the draft approval page.
 4. **Confirm library add** before anything can be recalled later.

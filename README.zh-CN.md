@@ -67,6 +67,7 @@ OME 把它们移出常驻上下文，只在任务匹配时召回。
 - 本地优先：prompt 阶段召回不走网络。
 - 先审批再召回：经验卡遵循 `candidate -> draft -> active -> archived`。
 - Codex 和 Claude hook 共用同一套本地 runtime。
+- 原生 Codex/Claude user-only 证据索引，用于复盘深扫。
 - 支持全局经验库，也支持项目根目录 `.oh-my-experience/`。
 - 可解释召回：能看到命中的卡、分数、原因和压入上下文。
 - 隔离评估：调召回策略前可以先测漏召和误召。
@@ -117,7 +118,7 @@ Agent 在行动前看到了正确的执行判断。
 真实会话 -> 复盘扫描 -> 经验草稿审批 -> 确认 active 卡 -> prompt 阶段召回 -> 统计 -> 迭代
 ```
 
-1. 扫描或检查真实编码 Agent 会话。
+1. 从 Codex/Claude 会话构建原生 user-only 证据，可选用 Spool 补充。
 2. 把重复纠正和返工点整理成经验草稿。
 3. 先审批、合并、重写或拒绝，再决定是否启用。
 4. 明确确认哪些经验成为 active，之后由 hook 在任务匹配时召回。
@@ -140,6 +141,7 @@ node bin/ome.js init
 - [第一张经验卡](docs/zh/guides/first-card.md)
 - [实际案例](docs/zh/guides/examples.md)
 - [安装配置](docs/zh/guides/setup.md)
+- [来源扫描](docs/zh/guides/source-scan.md)
 - [全局与项目经验库](docs/zh/guides/project-libraries.md)
 - [CLI 参考](docs/zh/reference/cli.md)
 - [召回引擎](docs/zh/architecture/retrieval-engine.md)

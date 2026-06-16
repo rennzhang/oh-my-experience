@@ -34,6 +34,11 @@ function completeAudit(overrides = {}) {
     scope: "focused",
     focusLens: "fixture focus",
     sourceCoverage: "all-accessible",
+    nativeSourcesCovered: ["codex", "claude"],
+    userOnlyIndexBuilt: true,
+    queryFamilies: ["fixture focus", "fixture correction"],
+    contextReplaySamples: ["fixture-session.jsonl:1"],
+    spoolSupplement: "unavailable",
     searchedSources: ["fixture-session.jsonl"],
     unavailableSources: [],
     noiseFilters: ["user messages only"],
@@ -112,7 +117,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   assert.equal(candidates.reviewFile, path.join(dataDir, "retrospectives", retrospective.runId, "experience-review.md"));
   assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /经验草稿审批/);
   assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), new RegExp(`复盘编号：${retrospective.runId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
-  assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /审计：coverage=all-accessible \/ focus=fixture focus \/ sources=1 \/ gaps=0/);
+  assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /审计：coverage=all-accessible \/ focus=fixture focus \/ user-index=yes \/ native=codex,claude \/ sources=1 \/ gaps=0/);
   assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /### 经验总结/);
   assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /### 触发时机/);
   assert.match(fs.readFileSync(candidates.reviewFile, "utf8"), /### 可复用规则/);
@@ -179,6 +184,82 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const stats = json(run(["stats", "--data-dir", dataDir, "--json"]));
   assert.equal(stats.cardRecallCount[cardId], 1);
   assert.equal(json(run(["doctor", "--data-dir", dataDir, "--json"])).ok, true);
+});
+
+test("source user-index builds searchable Codex and Claude user evidence", () => {
+  const dataDir = tmpDir("user-index");
+  const built = json(run([
+    "source", "user-index", "build",
+    "--provider", "all",
+    "--codex-sessions", path.join(root, "tests", "fixtures", "codex"),
+    "--claude-sessions", path.join(root, "tests", "fixtures", "claude"),
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+  assert.equal(built.command, "source.user-index.build");
+  assert.equal(built.ephemeral, true);
+  assert.equal(built.messages, 4);
+  assert.equal(fs.existsSync(built.indexPath), true);
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(built.indexPath).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(path.dirname(built.indexPath)).mode & 0o777, 0o700);
+  }
+
+  const codexSearch = json(run([
+    "source", "user-index", "search", "浏览器验证",
+    "--index", built.indexPath,
+    "--json",
+  ]));
+  assert.equal(codexSearch.hits.length, 1);
+  assert.equal(codexSearch.hits[0].provider, "codex");
+
+  const claudeSearch = json(run([
+    "source", "user-index", "search", "Claude 一等来源",
+    "--index", built.indexPath,
+    "--json",
+  ]));
+  assert.equal(claudeSearch.hits.length, 1);
+  assert.equal(claudeSearch.hits[0].provider, "claude");
+
+  const context = json(run([
+    "source", "user-index", "show", claudeSearch.hits[0].id,
+    "--index", built.indexPath,
+    "--context", "1",
+    "--json",
+  ]));
+  assert.equal(context.hit.provider, "claude");
+  assert.equal(context.context.some((message) => message.isHit && message.role === "user"), true);
+  assert.equal(context.context.some((message) => message.role === "assistant"), true);
+
+  const noiseSearch = json(run([
+    "source", "user-index", "search", "System prompt should",
+    "--index", built.indexPath,
+    "--json",
+  ]));
+  assert.equal(noiseSearch.hits.length, 0);
+
+  const staleIndexPath = path.join(dataDir, "stale-user-index.json");
+  const staleIndex = JSON.parse(fs.readFileSync(built.indexPath, "utf8"));
+  staleIndex.messages[0].line = 999;
+  fs.writeFileSync(staleIndexPath, JSON.stringify(staleIndex), "utf8");
+  const staleShow = run([
+    "source", "user-index", "show", staleIndex.messages[0].id,
+    "--index", staleIndexPath,
+    "--json",
+  ]);
+  assert.notEqual(staleShow.status, 0);
+  assert.match(staleShow.stdout, /no longer matches source context/);
+
+  const invalidProvider = run([
+    "source", "user-index", "build",
+    "--provider", "copilot",
+    "--data-dir", dataDir,
+    "--json",
+  ]);
+  assert.notEqual(invalidProvider.status, 0);
+  assert.match(invalidProvider.stdout, /unsupported user-index provider/);
+
+  assert.equal(fs.existsSync(path.join(dataDir, "indexes", "sources.json")), false);
 });
 
 test("experience list reports invalid archived cards without crashing", () => {

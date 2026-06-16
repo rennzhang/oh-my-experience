@@ -83,10 +83,29 @@ Agent 收到以下指令时执行本指南：
 ### 默认来源清单
 
 1. Codex 会话（`.jsonl`）
-2. 执行日志
-3. 任务轨迹
-4. 已扫描的 session record
-5. 用户指定的其他来源
+2. Claude 会话（本地 Claude Code JSONL / transcript）
+3. 执行日志
+4. 任务轨迹
+5. 已扫描的 session record
+6. 用户指定的其他来源
+7. Spool 可选辅助来源（仅当用户已安装/启用；不作为合格深扫前提）
+
+### 原生 user-only 证据层
+
+默认合格深扫必须先构建 Codex + Claude 原生 user-only 索引：
+
+```bash
+ome source user-index build --provider all --json
+```
+
+执行要求：
+
+- `user-index` 只作为临时证据工作台，不写入长期 source index，也不进入 prompt-time recall。
+- 没有 Spool 不算缺口；Codex/Claude 原生来源缺失、无法读取或未扫描才写入 `unavailableSources` / `remainingEvidenceGaps`。
+- 所有 query family 先跑 `ome source user-index search "<query>" --index <file> --json`。
+- 高价值命中必须再跑 `ome source user-index show <hit-id> --index <file> --context <n> --json` 回读原始上下文。
+- `sourceCoverage=all-accessible` 的 audit 必须包含 `userOnlyIndexBuilt: true`、`nativeSourcesCovered`、`queryFamilies`、`contextReplaySamples`。
+- 证据锚点优先是用户原话；assistant/tool 上下文只能用于理解因果、最终路径和反例，不能替代用户证据。
 
 ### Agent 语义展开
 
@@ -103,25 +122,25 @@ Agent 收到以下指令时执行本指南：
 
 ### Spool 分支策略
 
-先运行 `ome source status --json`，只按真实状态选路线。Spool 是来源加速器，不改变候选生命周期，也不替代原话验证。
+先运行 `ome source status --json`，只按真实状态选路线。Spool 是可选第二辅助来源，不改变候选生命周期，不替代原生 user-only 索引，也不替代原话验证。
 
 #### 无 Spool / Spool off
 
 适用：Spool 不可用、未安装、配置为 `off`，或用户不允许启用。
 
-- 继续走 Codex 本地会话、已扫描 source index 和用户提供来源；不要因为没有 Spool 就停止复盘。
+- 继续走 Codex/Claude 原生 user-only 索引、已扫描 source index 和用户提供来源；不要因为没有 Spool 就停止复盘。
 - `searchedSources` 里写明实际枚举的 sessions 目录、source index 和代表性原始记录。
 - 建立清洗后的用户消息索引：只保留可识别的用户输入，过滤 system / developer / AGENTS / assistant summary / worker prompt / IDE 注入上下文。
 - 按 Agent 语义展开跑多组本地搜索；不要用单个关键词或单条 `rg` 命中代表主题覆盖。
 - 对关键词计数保持克制：计数只说明索引信号，不能直接当候选证据。
 - 高价值证据必须回到原始 `.jsonl` 行或 session record，确认角色、上下文和用户是否在纠正、验收或拒收。
-- `unavailableSources` 写清 Spool 不可用或关闭；如果本地来源已完整枚举，`sourceCoverage` 仍可为 `all-accessible`。
+- Spool 不可用或关闭只写入 `spoolSupplement: "unavailable"` 或 `spoolSupplement: "skipped"`；如果 Codex/Claude 原生来源已完整枚举，`sourceCoverage` 仍可为 `all-accessible`。
 
 #### 有 Spool / Spool enabled
 
 适用：`ome source status` 显示 Spool 可用，且配置为 `ask` 或 `enabled`；如果用户要求"打开 Spool 配置"，优先使用 `ome source connect spool --mode enabled`。
 
-- 深扫前先记录 `spool status`；需要最新历史时运行 `spool sync`，并记录同步前后 session 数、来源分布和时间。
+- 深扫前仍必须先完成 Codex/Claude 原生 `user-index`。随后记录 `spool status`；需要最新扩展历史时运行 `spool sync`，并记录同步前后 session 数、来源分布和时间。
 - 默认 **search-first，不要 scan-first**。先按 Agent 语义展开运行多条 `spool search "<短 query>" --json --limit <n>` 定位候选会话，再合并去重并决定是否扫描索引。
 - 查询要拆成两类：
   - 精确用户原话：短语、纠正、验收标准、拒收理由。Spool 通常更快、更干净。
@@ -130,8 +149,8 @@ Agent 收到以下指令时执行本指南：
 - 扫描只索引少量高价值命中：优先用窄 query + limit，或先 `spool show --json <uuid>` 验证后再 `ome source scan spool`。不要用宽泛主题直接扫入大量 Spool 历史。
 - 如果宽 query 命中超大会话、部分失败或输出过大，不把它当复盘失败；改用更窄 query、`spool search` 结果和代表性 source scan，并把失败写进 `unavailableSources` 或 `remainingEvidenceGaps`。
 - Spool 命中的 current-run assistant 文本、OME 开发会话总结、assistant 转述都按噪声处理，除非能回到独立用户原话。
-- 有 Spool 时，最佳证据形态是：Spool session UUID / source / startedAt / cwd / role / snippet + 选中记录扫描结果 + 必要的本地全文补扫。
-- 如果只用了代表性 Spool query 而没有覆盖所有可访问来源，`sourceCoverage` 用 `bounded`，并写清边界；如果 Spool index、本地来源和用户指定来源都按计划覆盖，才用 `all-accessible`。
+- 有 Spool 时，最佳补充证据形态是：Spool session UUID / source / startedAt / cwd / role / snippet + 选中记录扫描结果 + 原生 user-index 回读证据。
+- 如果只用了代表性 Spool query 而没有完成 Codex/Claude 原生 user-index，`sourceCoverage` 用 `bounded`，并写清边界；如果原生来源和用户指定来源都按计划覆盖，Spool 只是增强项，缺失 Spool 不影响 `all-accessible`。
 
 ---
 
@@ -152,7 +171,7 @@ focusLens: <用户指定，无则 "">
 
 ### 步骤 3：扫描来源
 
-按 `references/cli.md` 扫描 Codex、Spool 或用户提供的来源。启用 Spool 时先 search 后窄 scan；不要把宽泛主题的 Spool scan 当作第一步。
+按 `references/cli.md` 先构建 Codex/Claude 原生 user-index，再按 query family 搜索和回读上下文。启用 Spool 时先 search 后窄 scan；不要把宽泛主题的 Spool scan 当作第一步。
 
 ### 步骤 4：枚举实际搜索的来源
 
