@@ -28,7 +28,7 @@ OME helps you:
 
 - Keep `AGENTS.md` and `CLAUDE.md` small.
 - Stop losing hard-won execution lessons in chat history.
-- Help agents remember the right skill, check, or release gate.
+- Help agents remember the skill, guide, check, or release gate that mattered last time.
 - Approve and confirm every lesson before it can be recalled later.
 - Stay local by default.
 
@@ -47,6 +47,11 @@ OME adds a different layer: execution experience.
 Execution experience usually comes from a judgment formed during real work:
 why a step mattered last time, when it should matter again, which similar cases
 should not trigger it, and what reminder the agent should see before acting.
+
+Sometimes that reminder is a direct rule. Sometimes it is a note to look at a
+specific skill, guide, checklist, or project convention. In both cases, OME keeps
+the reviewed experience as a card and recalls the card only when the task looks
+relevant.
 
 It is not always-on project guidance, and it is not a tool manual. It is
 recalled lightly when the current task matches, so rule files stay small and

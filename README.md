@@ -63,6 +63,10 @@ work, Git safety, review, or one specific project. OME keeps those lessons out
 of always-on context and recalls them only when the current task is likely to
 need them.
 
+An experience card can also remind the agent which skill, guide, checklist, or
+project convention mattered last time. OME still stores the lesson as a reviewed
+card; how the agent uses that reminder stays part of the workflow.
+
 ## What You Get
 
 - Local-first recall: no network calls on the prompt-time path.
