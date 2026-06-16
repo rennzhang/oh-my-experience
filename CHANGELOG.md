@@ -6,6 +6,21 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.2.2 - 2026-06-16
+
+### Changed
+
+- Treat clean-refactor and implementation-chain cleanup wording as architecture
+  quality signals so architecture-gated cards can be recalled by natural user
+  prompts such as "the cleanest effective change".
+- Documented the post-enable recall smoke gate for agents and maintainers in
+  the skill reference and English/Chinese CLI docs.
+
+### Fixed
+
+- Included the retrospective run id and draft approval link in human
+  `ome reflect decide` output, avoiding ambiguous blank review output.
+
 ## 0.2.1 - 2026-06-16
 
 ### Changed
