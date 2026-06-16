@@ -166,6 +166,17 @@ The lifecycle stays explicit: `candidate -> draft -> active -> archived`.
 `list --json` returns full cards by default. Add `--compact` or `--index` when
 a script only needs the title index (`id`, `title`, `status`, `category`).
 
+After enabling a draft, agents and maintainers should run a recall smoke with
+realistic future task wording:
+
+```bash
+ome match "<real task wording>" --json
+```
+
+This confirms the new active card can actually be recalled. It is a debugging
+and validation path for agents and maintainers, not the normal first-run
+instruction for end users.
+
 `experience list --json` is a governance command, so it reports invalid card
 files instead of stopping at the first parse error. The response includes
 `invalidCards` with `status`, `path`, and `message`. Runtime recall remains

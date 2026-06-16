@@ -140,6 +140,15 @@ ome experience migrate-legacy --scope project --backup
 `list --json` 默认返回完整卡片；脚本只需要标题索引时用
 `--compact` 或 `--index`，只返回 `id`、`title`、`status`、`category`。
 
+启用 draft 后，Agent 和维护者应使用真实未来任务话术做一次召回冒烟：
+
+```bash
+ome match "<真实任务话术>" --json
+```
+
+这用于确认新的 active 卡确实能被召回。它是 Agent 和维护者的调试、验收路径，
+不是普通用户首装后的默认下一步。
+
 `experience list --json` 是治理命令，所以遇到无效卡片文件时不会停在第一处解析
 错误，而是返回 `invalidCards`，其中包含 `status`、`path` 和 `message`。运行时召回
 仍然对 active 卡保持严格；无效 active 卡必须修复后才能参与召回。

@@ -131,7 +131,10 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   assert.doesNotMatch(humanShow.stdout, /candidates\.json/);
   const added = json(run(["reflect", "add", retrospective.runId, "--title", "Git diff scope", "--category", "Git 操作", "--summary", "Unrelated files were mixed", "--rule", "Keep the diff scoped", "--triggers", "git status,commit", "--topics", "git", "--data-dir", dataDir, "--json"]));
   assert.equal(added.candidates.length, 2);
-  json(run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--category", "产品与 UI", "--data-dir", dataDir, "--json"]));
+  const humanDecide = run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--category", "产品与 UI", "--data-dir", dataDir]);
+  assert.equal(humanDecide.status, 0, `${humanDecide.stderr}\n${humanDecide.stdout}`);
+  assert.match(humanDecide.stdout, new RegExp(`Reflect id: ${retrospective.runId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  assert.match(humanDecide.stdout, /Draft approval:/);
   const dryRun = json(run(["reflect", "apply", retrospective.runId, "--dry-run", "--data-dir", dataDir, "--json"]));
   assert.equal(dryRun.dryRun, true);
   assert.equal(dryRun.drafts.length, 1);

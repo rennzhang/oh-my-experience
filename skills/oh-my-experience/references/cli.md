@@ -226,7 +226,7 @@ ome match "<task>" --cwd <project-root> --explain
 复盘前后都可使用：
 
 - 复盘前：确认已有 active 卡是否覆盖当前场景。
-- 复盘后：验证新候选的未来触发场景是否能被表达清楚。
+- 复盘后：验证新候选的未来触发场景是否能被表达清楚；用户确认入库并启用 active 后，必须用真实任务话术做 recall smoke，确认 `matches` 命中目标卡。
 - 在项目目录里运行时，召回会读取全局 `dataDir` 和可选项目库。
 - 项目卡命中时，additional context 的完整卡片命令会带 `--scope project`。
 

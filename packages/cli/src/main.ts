@@ -1125,13 +1125,14 @@ function reflectCommand(dataDir: string, subcommand: string | undefined, args: P
     const rewriteFile = args.flags["rewrite-file"];
     const rewrite = rewriteFile ? JSON.parse(fs.readFileSync(rewriteFile, "utf8")) : {};
     if (args.flags.category) rewrite.category = args.flags.category;
-    return print(addDecision(dataDir, runId, {
+    const decision = addDecision(dataDir, runId, {
       candidateId,
       action,
       reason: args.flags.reason || "",
       targetCardId: args.flags.target,
       rewrite: Object.keys(rewrite).length ? rewrite : undefined,
-    }), args);
+    });
+    return print(withReviewPaths(dataDir, { ...decision, runId }), args);
   }
   if (subcommand === "apply") {
     const runId = args.positionals[2];

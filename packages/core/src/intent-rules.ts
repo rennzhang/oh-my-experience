@@ -264,6 +264,8 @@ const SIGNAL_RULES: SignalRule[] = [
       /(?:高内聚|低耦合|根因|source\s+of\s+truth|KISS|clean\s+architecture|maintainable|cohesive|coupling).{0,80}(?:优化|修复|实现|重构|治理|逻辑|架构|模块|clean|refactor)/i,
       /(?:优化|修复|实现|重构|治理|逻辑|架构|模块|clean|refactor).{0,80}(?:高内聚|低耦合|根因|source\s+of\s+truth|KISS|maintainable|cohesive|coupling)/i,
       /(?:不要|不能|避免|删除).{0,50}(?:兼容包袱|历史包袱|fallback|两套真相|stale branches|compatibility clutter)/i,
+      /(?:干净改法|干净重构|最干净有效的改法|链路清理|清理链路|最终态重构).{0,80}(?:现有实现|代码变更|实现|链路|重构|清理|优化|改法)/i,
+      /(?:现有实现|代码变更|实现|链路|重构|清理|优化|改法).{0,80}(?:干净改法|干净重构|最干净有效的改法|链路清理|清理链路|最终态重构)/i,
     ],
   },
   {

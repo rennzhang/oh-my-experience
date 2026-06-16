@@ -230,6 +230,12 @@ test("matcher suppresses positive signals in explicit near-miss examples", () =>
   assert.equal(uiNoise.ruleSignals.some((signal) => signal.id === "ui_surface"), false);
 });
 
+test("clean refactor wording is treated as architecture quality work", () => {
+  const envelope = buildTaskEnvelope("最干净有效的改法是什么，基于现有实现看看哪些链路需要清理");
+
+  assert.ok(envelope.ruleSignals.some((signal) => signal.id === "architecture_quality"));
+});
+
 test("init creates only the compact root storage model", () => {
   const dataDir = tmpDir("compact-layout");
 
@@ -935,6 +941,36 @@ test("starter architecture card recalls for cohesive root-cause implementation w
   assert.equal(match[0]?.card.id, "starter-code-kiss-root-cause");
   assert.ok(match[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "architecture_quality"));
   assert.match(renderAdditionalContext(match), /cohesive architecture, clean logic, or a root-cause fix/);
+});
+
+test("architecture-gated cards recall for clean implementation-chain cleanup wording", () => {
+  const dataDir = tmpDir("clean-refactor-architecture-quality");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  writeCard(dataDir, {
+    id: "clean-refactor-chain",
+    status: "active",
+    title: "干净重构先梳理现有链路",
+    category: "工程质量",
+    summary: "干净重构前先梳理现有实现链路。",
+    rule: "Map the current implementation chain before choosing the cleanup boundary.",
+    triggers: ["最干净有效的改法", "哪些链路需要清理"],
+    negativeTriggers: ["只是润色 prompt"],
+    topics: ["engineering-quality"],
+    requiredSignals: ["architecture_quality"],
+    blockedSignals: ["explain_only"],
+    recallPolicy: "must",
+    risk: "high",
+    body: "Map the current implementation chain before choosing the cleanup boundary.",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const matches = matchCards(dataDir, "最干净有效的改法是什么，基于现有实现看看哪些链路需要清理");
+
+  assert.equal(matches[0]?.card.id, "clean-refactor-chain");
+  assert.ok(matches[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "architecture_quality"));
 });
 
 test("browser validation cards require a UI or browser surface", () => {
