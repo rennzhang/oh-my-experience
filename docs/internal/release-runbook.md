@@ -25,7 +25,10 @@ git push origin v$(node -p "require('./package.json').version")
 ```
 
 6. GitHub Actions publishes npm through Trusted Publishing.
-7. Cloudflare Pages deploys docs from the pushed `main` branch.
+7. Deploy docs through Cloudflare Pages. If Git integration is active, the push
+   to `main` deploys docs automatically. The current Pages project is Direct
+   Upload, so run the documented deploy command in
+   `docs/internal/cloudflare-pages.md` after pushing `main`.
 
 ## Never do this in the normal path
 
@@ -54,6 +57,8 @@ npx oh-my-experience@latest init --help
 
 After Cloudflare Pages finishes:
 
+- Confirm `wrangler pages deployment list --project-name oh-my-experience --json`
+  shows the current commit hash as the latest Production `Source`.
 - Open the public homepage.
 - Open Quickstart.
 - Open Examples.
