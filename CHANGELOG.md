@@ -6,6 +6,28 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.2.0 - 2026-06-16
+
+### Added
+
+- Added native Codex/Claude `ome source user-index build/search/show` commands
+  for temporary user-only evidence indexing and original context replay.
+- Added retrospective audit fields for user-only index coverage, native source
+  coverage, query families, context replay samples, and Spool supplement status.
+
+### Changed
+
+- Made qualified retrospective guidance start from native Codex/Claude user-only
+  evidence, with Spool kept as an optional supplemental source.
+- Updated English, Chinese, skill, and LLM-facing docs to explain that agents own
+  semantic query expansion, counterexample search, and final synthesis.
+
+### Fixed
+
+- Hardened user-index privacy and correctness around private temp files,
+  unsupported provider errors, stale source context, and explicit Spool audit
+  values.
+
 ## 0.1.5 - 2026-06-16
 
 ### Changed
