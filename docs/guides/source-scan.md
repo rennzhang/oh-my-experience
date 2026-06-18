@@ -61,8 +61,8 @@ scan carefully.
 
 Those matched cards are not source evidence for a new experience. Subject-area
 matches should be recorded only as active-card overlap checks, such as whether
-the result should be kept separate, merged, rewritten, or rejected. The final
-used-card footer should mention only process or governance cards the agent
+the result is new, should be merged, narrowed, archived, or kept separate. The final
+used-card disclosure should mention only process or governance cards the agent
 actually applied during the retrospective.
 
 ## Without Spool

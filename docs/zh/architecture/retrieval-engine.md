@@ -61,6 +61,10 @@ matcher.normalize
 - 很长的用户提示词，且需要在不把 raw prompt text 写入日志的情况下提炼核心
   intent。
 
+卡片语言会影响召回质量，因为 `summary`、criteria、triggers 和 topics 都是 lexical recall
+表面的一部分。用户自然用中文工作时，中文卡通常比翻译成英文的卡更容易召回：未来 prompt
+更可能复用同一套中文说法，卡片也能保留用户当初纠正出的边界。
+
 ## 评分策略
 
 当前评分模型保持本地和确定性：
@@ -196,8 +200,8 @@ lessons，而不是长 card bodies。
 渲染后的 hook context 保持中立：
 
 ```text
-OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
-Before acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
+OME matched experience cards. Matched does not mean used: decide per card whether to use it fully, use only relevant parts, or ignore it; apply only cards whose workflow meaning fits the current task.
+Before acting, if any matched card is applicable, state in one short sentence, in the user's response language when it is English or Chinese, what OME reminded you to consider, then proceed normally. You may use all matching cards, choose only some, use only relevant parts, or ignore all matches when none fit the user's real intent. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line in the user's response language when it is English or Chinese that states the number of OME experience cards used and includes only the `Final link if used` values for cards you applied; omit the line if none applied.
 1. [high risk][must] Browser validation (browser-validation)
    Summary: ...
    Use if: ...

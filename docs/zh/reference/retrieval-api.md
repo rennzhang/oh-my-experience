@@ -114,7 +114,7 @@ ome match "Fix UI and validate in browser" --explain --json
       ]
     }
   ],
-  "additionalContext": "OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.\\nBefore acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
+  "additionalContext": "OME matched experience cards. Matched does not mean used: decide per card whether to use it fully, use only relevant parts, or ignore it; apply only cards whose workflow meaning fits the current task.\\nBefore acting, if any matched card is applicable, state in one short sentence, in the user's response language when it is English or Chinese, what OME reminded you to consider, then proceed normally. You may use all matching cards, choose only some, use only relevant parts, or ignore all matches when none fit the user's real intent. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line in the user's response language when it is English or Chinese that states the number of OME experience cards used and includes only the `Final link if used` values for cards you applied; omit the line if none applied.\\n..."
 }
 ```
 
@@ -127,11 +127,12 @@ ome match "Fix UI and validate in browser" --explain --json
 `ruleSignals` 是从 prompt 派生出来的内部召回提示。正向 engine hint 会在 prompt 强烈像目标工作流时加权；负向 engine hint 用于压住常见误召回。它们是启发式，不是最终使用标准。Hook 上下文展示自然语言使用标准和自然语言命中原因，不暴露 hint id。
 
 `additionalContext` 的框架提示固定使用英文，且只包含紧凑索引信息。卡片规则正文不会
-被注入。命中卡片只是候选，不代表 Agent 已经采用。框架会要求 Agent 忽略无关或冲突
-卡片，只在判断适用后再读取规则，并在最终回复里只披露实际使用过的卡：
-`**本次使用 N条 OME 经验卡：** [经验卡名称](<经验卡路径>)`。复盘或来源扫描任务中，
-命中的主题旧卡是 active overlap 信号，不是来源证据，应写入复盘审计而不是披露为 used
-card。经验卡名称会渲染为指向相关经验卡路径的 Markdown 链接。
+被注入。命中卡片只是候选，不代表 Agent 已经采用。框架会要求 Agent 逐条判断：可以
+完整采用、只采用相关部分、忽略无关或冲突卡，或在全部不贴合时全部弃用。Agent 只在
+判断适用后再读取规则，并在最终回复里只披露实际使用过的卡。披露行应使用用户回复语言，
+说明实际使用了几张 OME 经验卡，并且只包含已采用卡片的 `Final link if used` 链接。复盘或
+来源扫描任务中，命中的主题旧卡是 active overlap 信号，不是来源证据，应写入复盘审计而不是
+披露为 used card。卡片标题会渲染为指向相关经验卡路径的 Markdown 链接。
 
 ## Budgeted Context
 

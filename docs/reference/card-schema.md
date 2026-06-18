@@ -94,8 +94,23 @@ short enough for hook context, but complete enough for model judgment.
 
 ## Language
 
-Cards may be written in English or Chinese. Cross-language recall should be
-handled through triggers and aliases, not hot-path translation.
+Card fields use the language chosen when the card is created or approved. OME
+currently supports only English and Chinese for approved card content and
+user-visible recall output. The fixed hook frame around card fields stays
+English, but user-authored card content is not translated in the hot path. The
+prompt frame can ask agents to write user-visible recall reminders and used-card
+disclosure in the user's response language when it is English or Chinese.
+Direct source evidence may keep its original language in retrospective audit
+records. Cross-language recall should be handled through triggers, aliases, and
+preserved technical tokens, not hook-time translation.
+
+Card language is also a recall signal. Prefer the language that matches how the
+user will likely ask for the same workflow later. For Chinese source evidence
+and Chinese user phrasing, a Chinese `summary`, `criteria`, and triggers often
+preserve the most useful recall anchors.
+
+`auto` and `mixed` are compatibility or internal detection states. New approved
+cards should use `en` or `zh` content.
 
 ## Retrieval Fields
 

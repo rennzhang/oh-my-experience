@@ -88,13 +88,13 @@ claiming completion when evidence is missing.
 ## What The User Sees
 
 The final response can disclose the experience card only if the agent actually
-used it:
+used it. In an English conversation, that can look like:
 
 ```text
 Completed the Todo app in /tmp/ome-todo-demo, verified add, complete, delete,
 clear completed, and local persistence, then listed the remaining risks.
 
-**本次使用 1条 OME 经验卡：** Enter full-closure delivery mode when a goal starts
+**OME experience cards used: 1** Enter full-closure delivery mode when a goal starts
 ```
 
 If the user is only discussing business goals, OKRs, or asking what `/goal`

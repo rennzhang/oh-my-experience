@@ -69,6 +69,9 @@ A good experience is a specific behavior correction. Vague principles, one-file
 details, or summaries without an actionable future rule should not enter the
 library.
 
+OME supports English and Chinese experience drafts. Choose the language you
+expect to use when asking for the same kind of work later.
+
 ### Step 2: Approve And Refine
 
 After the agent shows the draft approval page, you can reply in plain language:
@@ -127,7 +130,7 @@ More cards is not better. A few long-term habits:
 
 - **Fewer, sharper cards.** 10 cards that recall precisely beat 50 vague rules.
 - **Check stats regularly.** `ome stats` shows which cards haven't matched — consider archiving them.
-- **Deduplicate.** If a new experience feels similar to an old one, merge before adding it.
+- **Deduplicate.** Run a similarity check before adding; merge, narrow, archive, or keep separate deliberately.
 - **Fix over-triggering.** If a card fires on unrelated tasks, tighten `criteria.ignore_when`, `recall.triggers`, topics, or scope.
 
 ---

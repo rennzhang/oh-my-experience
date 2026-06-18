@@ -62,6 +62,12 @@ The retrieval engine must handle:
 - very long user prompts where the core intent must be distilled without
   storing raw prompt text in logs.
 
+Card language affects retrieval quality because `summary`, criteria, triggers,
+and topics are part of the lexical recall surface. When a user naturally works
+in Chinese, Chinese cards often recall better than translated English cards: the
+future prompt is more likely to reuse the same wording, and the card keeps the
+same boundaries the user originally corrected.
+
 ## Scoring Strategy
 
 The current scoring model is local and deterministic:
@@ -226,8 +232,8 @@ prefers concise, high-impact lessons over long card bodies.
 The rendered hook context stays neutral:
 
 ```text
-OME matched experience cards. Matched does not mean used: apply a card only when its workflow meaning fits the current task; ignore unrelated or conflicting cards.
-Before acting, if any matched card is applicable, state in one short sentence what OME reminded you to consider, then proceed normally. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line `**本次使用 N条 OME 经验卡：** ...` using only the `Final link if used` values for cards you applied; omit the line if none applied.
+OME matched experience cards. Matched does not mean used: decide per card whether to use it fully, use only relevant parts, or ignore it; apply only cards whose workflow meaning fits the current task.
+Before acting, if any matched card is applicable, state in one short sentence, in the user's response language when it is English or Chinese, what OME reminded you to consider, then proceed normally. You may use all matching cards, choose only some, use only relevant parts, or ignore all matches when none fit the user's real intent. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line in the user's response language when it is English or Chinese that states the number of OME experience cards used and includes only the `Final link if used` values for cards you applied; omit the line if none applied.
 1. [high risk][must] Browser validation (browser-validation)
    Summary: ...
    Use if: ...

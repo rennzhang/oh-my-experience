@@ -41,7 +41,7 @@ scope:
   level: project
   project_key: github.com/example/app
   module_path: apps/web
-language: en
+language: zh
 ```
 
 ````markdown
@@ -87,7 +87,17 @@ Hook 上下文不会注入完整规则，只注入轻量候选索引，并要求
 
 ## 语言
 
-卡片可以用英文或中文编写。跨语言召回应通过 triggers 和 aliases 处理，而不是在 hook 热路径翻译。
+卡片字段使用创建或审批这张卡时选择的语言。OME 目前只支持英文和中文作为已审批卡片内容
+和用户可见 recall 输出语言。包裹它们的固定 hook frame 使用英文，但用户创建的卡片内容不会
+在热路径被翻译。Prompt frame 可以要求 Agent 在用户回复语言为英文或中文时，用该语言输出
+可见的 recall reminder 和 used-card disclosure。直接来源证据可以在 retrospective audit 中
+保留原语言。跨语言召回应通过 triggers、aliases 和保留的技术 token 处理，而不是在 hook 热路径翻译。
+
+卡片语言本身也是召回信号。优先选择用户未来最可能再次描述同类工作流时会使用的语言。
+如果来源证据和用户话术主要是中文，中文 `summary`、`criteria` 和 triggers 通常能保留最有用
+的召回锚点。
+
+`auto` 和 `mixed` 是兼容或内部检测状态。新审批卡片应该使用 `en` 或 `zh` 内容。
 
 ## 召回字段
 
