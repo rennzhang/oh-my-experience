@@ -6,6 +6,30 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.2.3 - 2026-06-18
+
+### Added
+
+- Added lightweight OME skill references for language policy and active-card
+  similarity checks, covering pre-ingest deduplication and library governance.
+
+### Changed
+
+- Clarified prompt-time recall guidance so agents may use all matched cards,
+  select only fitting cards or card parts, or ignore all matches when none fit.
+- Documented OME language layers: fixed framework instructions stay English,
+  approved card content targets English or Chinese, source evidence may keep its
+  original language, and user-visible OME recall prose follows English or
+  Chinese response language.
+- Required retrospectives to record similarity-check recommendations before
+  presenting candidate cards.
+
+### Fixed
+
+- Corrected Chinese schema docs to mark Chinese card examples as `language: zh`.
+- Added release coverage for Chinese card content inside the English hook frame
+  and replaced obsolete mounted-card wording checks with real legacy templates.
+
 ## 0.2.2 - 2026-06-16
 
 ### Changed
