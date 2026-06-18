@@ -54,6 +54,20 @@ function tmpDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `ome-${name}-`));
 }
 
+const obsoleteDisclosurePattern = /mounted experience cards|本次挂载|本次使用 N条 OME 经验卡|可能相关的过往经验|关键词命中可能存在歧义/;
+
+function similarityCheckFixture(candidate = "fixture candidate") {
+  return [
+    "similarityCheck:",
+    `- candidate: ${candidate}`,
+    "  adjacent: none",
+    "  candidateAction: new",
+    "  adjacentAction: none",
+    "  reason: independent fixture scenario",
+    "  next: none",
+  ].join("\n");
+}
+
 function completeAudit(overrides = {}) {
   return {
     scope: "focused",
@@ -70,7 +84,7 @@ function completeAudit(overrides = {}) {
     evidenceClusters: ["fixture cluster"],
     userCorrections: [],
     rejectedInterpretations: [],
-    activeCardOverlapQa: "no overlapping active card",
+    activeCardOverlapQa: similarityCheckFixture(),
     remainingEvidenceGaps: [],
     ...overrides,
   };
@@ -451,6 +465,9 @@ test("retrospective candidates persist complete source audit", () => {
   assert.equal(raw.audit.focusLens, "fixture focus");
   assert.equal(raw.audit.sourceCoverage, "all-accessible");
   assert.equal(raw.audit.searchedSources.length, 2);
+  assert.match(raw.audit.activeCardOverlapQa, /similarityCheck:/);
+  assert.match(raw.audit.activeCardOverlapQa, /candidateAction: new/);
+  assert.match(raw.audit.activeCardOverlapQa, /adjacentAction: none/);
   assert.equal(raw.audit.incomplete, false);
   assert.match(fs.readFileSync(path.join(run.runDir, "experience-review.md"), "utf8"), /审计：coverage=all-accessible \/ focus=fixture focus \/ user-index=yes \/ native=codex,claude \/ sources=2 \/ gaps=0/);
 });
@@ -737,20 +754,54 @@ test("hook context is neutral and carries scope hints", () => {
   const context = renderAdditionalContext(matches, { maxChars: 2000 });
   assert.match(context, /OME matched experience cards/);
   assert.match(context, /Matched does not mean used/);
+  assert.match(context, /decide per card whether to use it fully, use only relevant parts, or ignore it/);
   assert.match(context, /Before acting, if any matched card is applicable/);
+  assert.match(context, /in the user's response language when it is English or Chinese/);
+  assert.match(context, /use all matching cards, choose only some, use only relevant parts, or ignore all matches/);
   assert.match(context, /For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence/);
   assert.match(context, /Final report: if you actually used any card/);
-  assert.match(context, /\*\*本次使用 N条 OME 经验卡：\*\*/);
+  assert.match(context, /states the number of OME experience cards used/);
   assert.match(context, /Summary: Keep hook output neutral/);
   assert.match(context, /Rule: ome experience show neutral-context --section rule/);
   assert.match(context, /Use if: neutral hook context/);
   assert.match(context, /Ignore if: unrelated task/);
   assert.match(context, /Final link if used: \[Neutral context wording\]\(<experiences\/active\/neutral-context\.md>\)/);
   assert.doesNotMatch(context, /Candidate links:/);
-  assert.doesNotMatch(context, /本次挂载/);
-  assert.doesNotMatch(context, /Final mounted-card disclosure/);
-  assert.doesNotMatch(context, /must follow|必须遵守/i);
-  assert.doesNotMatch(context, /可能相关的过往经验|关键词命中可能存在歧义/);
+  assert.doesNotMatch(context, obsoleteDisclosurePattern);
+  assert.doesNotMatch(context, /must follow/i);
+});
+
+test("hook context keeps Chinese card content inside the English frame", () => {
+  const dataDir = tmpDir("context-chinese-card");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  writeCard(dataDir, {
+    id: "chinese-context",
+    status: "active",
+    title: "浏览器验证",
+    category: "测试验收",
+    summary: "当 UI 改动影响用户路径时，应打开真实浏览器验证。",
+    rule: "用真实浏览器走用户路径，再检查控制台。",
+    triggers: ["浏览器验证"],
+    negativeTriggers: ["纯后端"],
+    topics: ["frontend"],
+    recallPolicy: "must",
+    risk: "high",
+    body: "用真实浏览器走用户路径，再检查控制台。",
+    createdAt: now,
+    updatedAt: now,
+  });
+  const matches = matchCards(dataDir, "请做 浏览器验证");
+  assert.equal(matches[0]?.card.id, "chinese-context");
+  const context = renderAdditionalContext(matches, { maxChars: 2000 });
+  assert.match(context, /OME matched experience cards/);
+  assert.match(context, /Summary: 当 UI 改动影响用户路径时/);
+  assert.match(context, /Rule: ome experience show chinese-context --section rule/);
+  assert.match(context, /Use if: 浏览器验证/);
+  assert.match(context, /Ignore if: 纯后端/);
+  assert.match(context, /Final link if used: \[浏览器验证\]\(<experiences\/active\/chinese-context\.md>\)/);
+  assert.doesNotMatch(context, obsoleteDisclosurePattern);
 });
 
 test("candidate links include all rendered cards without claiming usage", () => {
@@ -787,8 +838,9 @@ test("candidate links include all rendered cards without claiming usage", () => 
   const matches = matchCards(dataDir, "alpha-mounted-validation beta-mounted-validation");
   assert.equal(matches.length, 2);
   const context = renderAdditionalContext(matches);
-  assert.match(context, /\*\*本次使用 N条 OME 经验卡：\*\*/);
-  assert.doesNotMatch(context, /本次挂载/);
+  assert.match(context, /states the number of OME experience cards used/);
+  assert.match(context, /Final link if used/);
+  assert.doesNotMatch(context, obsoleteDisclosurePattern);
   assert.match(context, /\[Alpha mounted card\]\(<experiences\/active\/alpha-mounted-card\.md>\)/);
   assert.match(context, /\[Beta mounted card\]\(<experiences\/active\/beta-mounted-card\.md>\)/);
 });

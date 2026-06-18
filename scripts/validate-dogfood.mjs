@@ -96,11 +96,18 @@ function assertHookInjected(cardId, dataDir) {
     if (!context.includes(cardId)) {
       fail("hook-run-validation", `expected hook additionalContext to include ${cardId}`);
     }
-    if (!context.includes("**本次使用 N条 OME 经验卡：**")) {
-      fail("hook-run-validation", "expected hook additionalContext to include used-card disclosure template");
+    if (!context.includes("states the number of OME experience cards used")) {
+      fail("hook-run-validation", "expected hook additionalContext to include user-language used-card disclosure guidance");
     }
-    if (context.includes("本次挂载")) {
-      fail("hook-run-validation", "expected hook additionalContext not to use mounted-card wording");
+    const obsoleteDisclosure = [
+      "mounted experience cards",
+      "本次挂载",
+      "本次使用 N条 OME 经验卡",
+      "可能相关的过往经验",
+      "关键词命中可能存在歧义",
+    ].find((pattern) => context.includes(pattern));
+    if (obsoleteDisclosure) {
+      fail("hook-run-validation", `expected hook additionalContext not to use obsolete disclosure wording: ${obsoleteDisclosure}`);
     }
     if (!context.includes("Final link if used:")) {
       fail("hook-run-validation", "expected hook additionalContext to include final-use links");

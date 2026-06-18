@@ -14,6 +14,20 @@ function tmpDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `ome-e2e-${name}-`));
 }
 
+const obsoleteDisclosurePattern = /mounted experience cards|本次挂载|本次使用 N条 OME 经验卡|可能相关的过往经验|关键词命中可能存在歧义/;
+
+function similarityCheckFixture(candidate = "fixture candidate") {
+  return [
+    "similarityCheck:",
+    `- candidate: ${candidate}`,
+    "  adjacent: none",
+    "  candidateAction: new",
+    "  adjacentAction: none",
+    "  reason: independent fixture scenario",
+    "  next: none",
+  ].join("\n");
+}
+
 function run(args, options = {}) {
   const result = spawnSync(process.execPath, [bin, ...args], {
     cwd: options.cwd || root,
@@ -45,7 +59,7 @@ function completeAudit(overrides = {}) {
     evidenceClusters: ["fixture cluster"],
     userCorrections: [],
     rejectedInterpretations: [],
-    activeCardOverlapQa: "no overlapping active card",
+    activeCardOverlapQa: similarityCheckFixture(),
     remainingEvidenceGaps: [],
     ...overrides,
   };
@@ -169,7 +183,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   assert.equal(explained.matches[0].id, cardId);
   assert.ok(explained.matches[0].reasons.length > 0);
   assert.match(explained.additionalContext, new RegExp(`Rule: ome experience show ${cardId} --section rule`));
-  assert.doesNotMatch(explained.additionalContext, /本次挂载/);
+  assert.doesNotMatch(explained.additionalContext, obsoleteDisclosurePattern);
   const suiteFile = path.join(dataDir, "recall-suite.json");
   fs.writeFileSync(suiteFile, JSON.stringify({ cases: [{ id: "ui", prompt: "修复 UI 并做 浏览器验证", expectedCards: [cardId] }] }), "utf8");
   const evalReport = json(run(["eval", "recall", "--suite", suiteFile, "--use-current-library", "--data-dir", dataDir, "--json"]));
@@ -1167,8 +1181,8 @@ test("hook run applies project scope from real cwd payload", () => {
     input: JSON.stringify({ prompt: "project cwd browser", cwd: appDir, session_id: "s1" }),
   }));
   assert.ok(hit.hookSpecificOutput.additionalContext.includes("Project cwd browser card"));
-  assert.ok(hit.hookSpecificOutput.additionalContext.includes("**本次使用 N条 OME 经验卡：**"));
-  assert.ok(!hit.hookSpecificOutput.additionalContext.includes("本次挂载"));
+  assert.ok(hit.hookSpecificOutput.additionalContext.includes("states the number of OME experience cards used"));
+  assert.doesNotMatch(hit.hookSpecificOutput.additionalContext, obsoleteDisclosurePattern);
   assert.ok(hit.hookSpecificOutput.additionalContext.includes(`[Project cwd browser card](<${path.join(dataDir, "experiences", "active", `${cardId}.md`)}>)`));
   const miss = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
     input: JSON.stringify({ prompt: "project cwd browser", cwd: otherDir, session_id: "s2" }),
