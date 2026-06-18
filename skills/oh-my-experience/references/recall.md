@@ -29,9 +29,13 @@ are reported with `libraryScope: project`, and their full-card command uses
 
 1. Read only matched `active` cards.
 2. Summarize them as a short task constraint list.
-3. Apply constraints only when they truly fit the current task.
+3. Decide adoption per card: use all matched cards, use only the fitting cards,
+   use only the fitting parts of a card, or ignore all matches if none fit the
+   user's real intent.
 4. Preserve the user's latest request as the source of truth.
-5. Do not paste full card bodies into the final answer unless asked.
+5. Do not explain every ignored match; mention ignored matches only when all
+   matches are discarded, a match looks surprising, or the user asks.
+6. Do not paste full card bodies into the final answer unless asked.
 
 ## Quality Rules
 
@@ -39,7 +43,7 @@ are reported with `libraryScope: project`, and their full-card command uses
   intentionally small; add cards only when they materially change the next
   action.
 - Treat `goal`, `review`, `release`, and similar overloaded terms carefully; they may be ordinary business words, not agent workflow triggers.
-- Treat matched cards as candidates, not commands. Apply a card only when its workflow meaning fits the current task.
+- Treat matched cards as candidates, not commands. Apply a card only when its workflow meaning fits the current task; using some or none is valid.
 - Use the natural-language `Use if` and `Ignore if` lines as the main decision boundary.
 - Treat engine hints as recall heuristics, not as instructions to the model.
 - Use `ome match --explain --json` when a match looks surprising; inspect natural-language criteria, engine hint reasons, and match reasons before changing the card or scoring.

@@ -1,18 +1,21 @@
-# OME CLI 操作参考
+# OME CLI Reference
 
-本参考给 Agent 读取。`ome` CLI 仍然是 OME 数据写入的 source of truth，但公开命令面保持克制：初始化、召回、来源扫描、复盘、经验治理、评估、诊断和卸载。
+This reference is for agents. The `ome` CLI is the source of truth for OME
+data writes. Keep the public command surface focused on initialization, recall,
+source scanning, retrospectives, experience governance, evaluation, diagnostics,
+and uninstall.
 
-## 使用原则
+## Usage Principles
 
-- 不要绕过 CLI 直接写 cards、reflect runs、indexes、hooks 或 skill ownership 文件。
-- 需要给脚本、hook 或另一个 Agent 消费时使用 `--json`。
-- 面向用户展示时使用默认人类输出，不要把内部 JSON 直接甩给用户。
-- 运行测试、eval 或验证命令时优先隔离 dataDir，不污染真实经验库。
-- 涉及删除经验库、覆盖 hooks、覆盖 skill、卸载数据时必须先得到用户确认。
-- 包内开发时可用 `node bin/ome.js` 替代全局 `ome`。
-- 默认第一成功路径是 `ome init -> 用户把真实任务发给 Agent -> Agent 自动召回并解释是否命中 OME`。不要要求用户手动跑 `ome match` 作为首装验收；`match` 是给 hook、Agent、eval 和排障用的调试入口。
+- Do not bypass the CLI to write cards, reflect runs, indexes, hooks, or skill ownership files.
+- Use `--json` when another script, hook, or agent will consume the output.
+- Use default human output for user-facing explanations; do not hand internal JSON to users by default.
+- Isolate `dataDir` when running tests, evals, or validation commands.
+- Ask for explicit confirmation before deleting a library, overwriting hooks, overwriting skills, or deleting data.
+- In package-local development, use `node bin/ome.js` instead of the global `ome` binary.
+- The default first-success path is `ome init -> user sends a real task to the agent -> the agent receives automatic recall and can explain whether OME matched`. Do not require the user to run `ome match` manually as first-install validation; `match` is a debugging entrypoint for hooks, agents, eval, and troubleshooting.
 
-## 初始化与配置
+## Init And Config
 
 ```bash
 ome init
@@ -24,16 +27,16 @@ ome init --no-hook
 ome init --reset-config
 ```
 
-规则：
+Rules:
 
-- `ome init` 可重复运行。
-- 交互式终端中会打开设置流程。
-- CI、管道、Agent runner 中会跳过交互，使用 flags/defaults。
-- `--no-hook` 只初始化或更新经验库，不安装 Agent hook 或 OME skill。
-- `--reset-config` 只恢复运行配置，不删除 experiences、source indexes、reflect runs。
-- Claude hook 生效走 `ome init --provider claude` 或 `ome init --provider all`，不要要求用户记忆单独的 hook install 命令。
+- `ome init` can be rerun.
+- A real interactive terminal opens the setup flow.
+- CI, pipes, and agent runners skip interaction and use flags/defaults.
+- `--no-hook` initializes or updates the library only; it does not install an agent hook or OME skill.
+- `--reset-config` restores runtime config without deleting experiences, source indexes, or reflect runs.
+- Claude hook setup uses `ome init --provider claude` or `ome init --provider all`; do not ask users to remember a separate hook install command.
 
-查看或修改 dataDir：
+Inspect or change `dataDir`:
 
 ```bash
 ome config get
@@ -41,25 +44,25 @@ ome config preview dataDir ~/Documents/Oh-My-Experience
 ome config set dataDir ~/Documents/Oh-My-Experience
 ```
 
-规则：
+Rules:
 
-- `dataDir` 只控制全局经验库和运行状态。
-- 项目级经验库固定在 `<project-root>/.oh-my-experience/`，不通过 config 配置。
+- `dataDir` controls the global experience library and runtime state.
+- Project libraries always live at `<project-root>/.oh-my-experience/`; they are not configured through `ome config`.
 
-项目经验库：
+Project libraries:
 
 ```bash
 ome project status
 ome project init
 ```
 
-规则：
+Rules:
 
-- `ome project init` 只在当前项目根目录创建 `.oh-my-experience/`。
-- 项目库适合保存随仓库同行的经验卡；个人或隐私经验仍放全局库。
-- `ome project status --json` 会返回项目上下文、项目库路径、存在性、可读性、warnings、经验数量和 `invalidCards`；项目 active / draft 坏卡会让 `ok: false`。
+- `ome project init` creates `.oh-my-experience/` only at the current project root.
+- Project libraries are for cards that should travel with a repository; personal or private experiences stay in the global library.
+- `ome project status --json` returns project context, project library path, existence, readability, warnings, experience counts, and `invalidCards`. Invalid project active/draft cards make `ok: false`.
 
-## 来源扫描
+## Source Scanning
 
 ```bash
 ome source status
@@ -80,57 +83,57 @@ spool search "browser validation" --source codex --limit 10 --json
 spool show <uuid> --json
 ```
 
-规则：
+Rules:
 
-- Spool 是可选依赖；不可用时继续使用 Codex 或本地来源。
-- `source user-index` 是 reflect 深扫的默认证据底座：它只建立临时 user-only 索引，默认支持 Codex + Claude 原始 JSONL 来源，不写入长期 source index，也不替 Agent 做经验判断。
-- `source user-index build` 默认写入系统临时目录；输出里的 `indexPath` 传给后续 `search` 和 `show`。只有显式传 `--out` / `--output` 时才写到指定路径。
-- `source user-index search` 只做词面检索和命中定位；Agent 仍必须自行拆 query family。
-- `source user-index show` 围绕命中回读原始上下文；候选卡证据必须优先锚定用户原话，再参考上下文理解因果。
-- Spool mode 只能是 `off`、`ask` 或 `enabled`。用户要求打开配置时用 `enabled`；只想逐次选择时用 `ask`。
-- 复盘扫描默认先构建 Codex/Claude `user-index`，再由 Agent 做语义展开并多次 `source user-index search` / `show`；Spool 只作为第二辅助来源补充更多 provider 或额外线索。
-- 深扫需要当前历史时，先记录 `spool status`，再运行 `spool sync`，并把同步前后状态写进 `searchedSources`。
-- Spool search 是词面检索入口，不承担语义展开；Agent 必须自行拆同义、近义、反向和边界 query，并在 `searchedSources` 记录 query 族。
-- 宽泛概念或单条 query 命中少不代表主题不存在；用更多语义入口、本地 Codex 全文扫或已扫描 source index 补覆盖。
-- 宽 query 命中超大会话、输出过大或部分失败时，改用更窄 query / `spool show --json <uuid>` / 代表性扫描，并把降级写入 audit。
-- 确认某个大会话值得索引时，才显式提高 `--max-session-bytes`；不要把它当默认宽扫开关。
-- 用户给 session id 时，不要传给 `ome reflect start`；在来源审计阶段读取原记录。
-- `source scan` 只写 pointer source index，默认不保存原始摘要；扫描后必须记录实际搜索过的来源，写入 `searchedSources`。
-- `ome source clean` 默认 dry-run；确认后用 `ome source clean --yes` 清掉历史 summary 和物化残留。
+- Spool is optional. If it is unavailable, continue with Codex, Claude, or local sources.
+- `source user-index` is the default evidence workbench for deep retrospectives. It builds a temporary user-only index from raw Codex and Claude JSONL sources, does not write the long-term source index, and does not make experience judgments for the agent.
+- `source user-index build` writes to the system temp directory by default. Pass the returned `indexPath` to `search` and `show`. It writes to a chosen path only when `--out` / `--output` is explicit.
+- `source user-index search` only locates lexical hits; the agent still owns query-family expansion.
+- `source user-index show` replays raw context around a hit. Candidate-card evidence should anchor on user wording first, with surrounding context used only for causality and counterexamples.
+- Spool mode is only `off`, `ask`, or `enabled`. Use `enabled` when the user asks to turn it on; use `ask` for per-run confirmation.
+- Deep scans build the Codex/Claude `user-index` first. The agent then expands meaning and runs multiple `source user-index search` / `show` queries. Spool is only a secondary supplemental source.
+- When current history matters, record `spool status`, run `spool sync`, and write the before/after state into `searchedSources`.
+- Spool search is lexical. The agent must split synonyms, near-synonyms, opposite phrasing, and boundary queries, then record query families in `searchedSources`.
+- Sparse hits for one broad concept or one query do not prove absence. Try more semantic entries, local Codex full-text search, or an existing source index.
+- If a broad query hits oversized sessions, produces too much output, or partially fails, use narrower queries, `spool show --json <uuid>`, or representative scans, and write the degradation into the audit.
+- Raise `--max-session-bytes` only after confirming a specific large session is worth indexing. Do not make it the default broad-scan switch.
+- When the user gives a session id, do not pass it to `ome reflect start`; read the source record during source audit.
+- `source scan` writes a pointer source index only. It does not save raw summaries by default. After scanning, record actual searched sources in `searchedSources`.
+- `ome source clean` is dry-run by default. Use `ome source clean --yes` only after confirmation to remove historical summaries and materialized residue.
 
-## 复盘 Run
+## Reflect Runs
 
-创建复盘容器：
+Create a reflect container:
 
 ```bash
 ome reflect start
 ome reflect start --scope project
-ome reflect start --focus "<关注点>"
+ome reflect start --focus "<focus>"
 ```
 
-规则：
+Rules:
 
-- `--focus` 是主题镜头，不是来源范围。
-- 没有用户明确限制来源集合时，`sourceCoverage` 默认仍是 `all-accessible`。
-- 不要把 focused scan 理解成只扫少量相关会话。
+- `--focus` is an analysis lens, not a source bound.
+- Unless the user explicitly limits the source set, `sourceCoverage` remains `all-accessible`.
+- Do not treat a focused scan as permission to read only a few related sessions.
 
-查看复盘 run：
+Inspect reflect runs:
 
 ```bash
 ome reflect list
 ome reflect show <run-id>
 ```
 
-快速手动加一条经验：
+Quick manual lesson entry:
 
 ```bash
 ome reflect add <run-id> --title "Browser validation" --summary "..." --rule "..."
-ome reflect add <run-id> --title "Browser validation" --category "测试验收" --summary "..." --rule "..."
+ome reflect add <run-id> --title "Browser validation" --category "Testing" --summary "..." --rule "..."
 ```
 
-## 候选写入与审计
+## Candidate Writes And Audit
 
-写入候选：
+Write candidates:
 
 ```bash
 ome reflect candidates <run-id> --from-file <file>
@@ -138,13 +141,13 @@ ome reflect candidates <run-id> --scope project --from-file <file>
 ome reflect candidates <run-id> --from-file <file> --audit-file <audit.json>
 ```
 
-不完整审计只在明确接受时使用：
+Use incomplete audit only when explicitly accepted:
 
 ```bash
 ome reflect candidates <run-id> --from-file <file> --allow-incomplete-audit --incomplete-audit-reason "source access limited"
 ```
 
-写入前必须有 source audit。audit 至少覆盖：
+Candidate writes require source audit. The audit must cover at least:
 
 - `focusLens`
 - `sourceCoverage`
@@ -157,18 +160,18 @@ ome reflect candidates <run-id> --from-file <file> --allow-incomplete-audit --in
 - `activeCardOverlapQa`
 - `remainingEvidenceGaps`
 
-`sourceCoverage: unknown` 默认不得写候选。
+`sourceCoverage: unknown` must not write candidates by default.
 
-## 草稿审批生命周期
+## Draft Approval Lifecycle
 
-候选决定：
+Candidate decisions:
 
 ```bash
 ome reflect decide <run-id> <candidate-id> --action approve
-ome reflect decide <run-id> <candidate-id> --action approve --category "产品与 UI"
+ome reflect decide <run-id> <candidate-id> --action approve --category "Product UI"
 ```
 
-应用到 draft：
+Apply to draft:
 
 ```bash
 ome reflect apply <run-id> --dry-run
@@ -177,20 +180,20 @@ ome reflect apply <run-id>
 ome reflect apply <run-id> --scope project
 ```
 
-启用 active：
+Enable active:
 
 ```bash
 ome experience enable <card-id>
 ome experience enable <card-id> --scope project
 ```
 
-规则：
+Rules:
 
-- 生命周期必须显式：`candidate -> draft -> active -> archived`。
-- 复盘流程只能先生成 review/candidate；不要直接创建 active 卡。
-- 用户审批前不要替用户启用 draft。
+- Keep the lifecycle explicit: `candidate -> draft -> active -> archived`.
+- Retrospectives only create review/candidate material first. Do not directly create active cards.
+- Do not enable a draft before user approval.
 
-## 卡片查看与治理
+## Card Inspection And Governance
 
 ```bash
 ome experience list
@@ -205,14 +208,19 @@ ome experience migrate-legacy --scope project --dry-run
 ome experience migrate-legacy --scope project --backup
 ```
 
-分类由候选、审批意见和卡片内容自然产生；不要要求用户维护单独的 category 命令。Starter lessons 由 `init` 安装，后续治理走正常经验库 review 和 archive，不再暴露单独 starter 命令。
-`list --json` 默认返回完整卡片。只需要索引时使用 `--compact` 或
-`--index`，避免把完整规则正文拉进上下文。
-旧版卡缺少 `schema: ome-card` 时，不要手改 active；先运行
-`ome experience migrate-legacy --scope project --dry-run` 预览，再按用户确认执行。
-迁移默认原地改写，不自动备份；只有用户明确要求临时备份时才加 `--backup`。
+Categories come from candidates, approval comments, and card content. Do not ask
+users to maintain a separate category command. Starter lessons are installed by
+`init`; later governance uses normal library review and archive commands.
 
-## 匹配与召回调试
+`list --json` returns full cards by default. Use `--compact` or `--index` when
+you only need an index and want to avoid loading full rule text.
+
+When old cards are missing `schema: ome-card`, do not edit active cards by hand.
+Run `ome experience migrate-legacy --scope project --dry-run` first, then execute
+only after user confirmation. Migration rewrites in place by default; add
+`--backup` only when the user explicitly wants a temporary backup.
+
+## Match And Recall Debugging
 
 ```bash
 ome match "<task>"
@@ -221,16 +229,19 @@ ome match "<task>" --explain
 ome match "<task>" --cwd <project-root> --explain
 ```
 
-`ome match` 是 Agent、hook、eval 和排障入口，不是普通用户首装后的下一步。面向用户时，优先让用户发送真实任务，由已安装 hook 自动召回；只有需要解释、验证或调试时才展示 `match`。
+`ome match` is for agents, hooks, eval, and troubleshooting. It is not the next
+step for ordinary users after setup. For users, prefer sending a real task and
+letting the installed hook recall automatically. Show `match` only for
+explanation, validation, or debugging.
 
-复盘前后都可使用：
+Use `match` before and after retrospectives:
 
-- 复盘前：确认已有 active 卡是否覆盖当前场景。
-- 复盘后：验证新候选的未来触发场景是否能被表达清楚；用户确认入库并启用 active 后，必须用真实任务话术做 recall smoke，确认 `matches` 命中目标卡。
-- 在项目目录里运行时，召回会读取全局 `dataDir` 和可选项目库。
-- 项目卡命中时，additional context 的完整卡片命令会带 `--scope project`。
+- Before: check whether an active card already covers the scenario.
+- After: verify that the future trigger scenario can be phrased clearly. After the user approves, applies, and enables the active card, run a recall smoke with real task wording and confirm `matches` contains the target card.
+- In a project directory, recall reads the global `dataDir` and optional project library.
+- When a project card matches, the rendered full-card command in additional context includes `--scope project`.
 
-## 评估
+## Evaluation
 
 ```bash
 ome eval recall --suite <file>
@@ -240,12 +251,12 @@ ome eval recall --suite my-suite.json --use-current-library
 ome eval recall --compare before.json after.json
 ```
 
-规则：
+Rules:
 
-- `ome eval recall` 是确定性的，不调用 AI 模型。
-- 默认使用临时 fixture 库，不写入真实经验库。
-- 只有明确要评估当前 active 库时才使用 `--use-current-library`。
-- Hook runtime validation 应走真实 `ome hook run` 或项目测试，不再暴露独立 `eval hook` 命令。
+- `ome eval recall` is deterministic and does not call an AI model.
+- It uses a temporary fixture library by default and does not write the real library.
+- Use `--use-current-library` only when the user explicitly wants to evaluate the current active library.
+- Hook runtime validation should use real `ome hook run` or project tests; do not expose a separate `eval hook` command.
 
 ## Hook
 
@@ -254,15 +265,15 @@ ome hook status
 ome hook run
 ```
 
-规则：
+Rules:
 
-- 安装和卸载 hook / skill 走 `ome init` / `ome uninstall`。
-- `ome hook run` 是 Codex/Claude 已安装 hook 的 runtime 入口，不能删除。
-- Hook 运行时会从 prompt payload 推导项目上下文，并应用卡片 `scope`。
-- 如果项目库存在，Hook 会读取项目 active 卡；hook events 仍写入全局 `dataDir`。
-- 不要在复盘任务里顺手改 hook；复盘和 setup 是不同生命周期。
+- Install and uninstall hooks/skills through `ome init` / `ome uninstall`.
+- `ome hook run` is the runtime entrypoint for installed Codex/Claude hooks and must remain available.
+- Hook runtime derives project context from the prompt payload and applies card `scope`.
+- If a project library exists, the hook reads project active cards; hook events still write to global `dataDir`.
+- Do not change hooks as a side effect of retrospective work. Retrospectives and setup are separate lifecycle stages.
 
-## Doctor 与状态
+## Doctor And Status
 
 ```bash
 ome stats
@@ -273,26 +284,27 @@ ome -v
 which -a ome
 ```
 
-`ome doctor` 应检查：
+`ome doctor` should check:
 
-- dataDir 可写性
-- 配置 schema
-- 卡片生命周期完整性
-- active index 一致性
-- reflect 状态
-- hook 状态
+- `dataDir` writability
+- config schema
+- card lifecycle integrity
+- active index consistency
+- reflect state
+- hook status
 - event JSONL
-- 包运行时要求
-- PATH 中冲突的 `ome` 二进制
+- package runtime requirements
+- conflicting `ome` binaries on `PATH`
 
-判定边界：
+Decision boundaries:
 
-- 无效 active / draft 卡是错误，会阻塞 `doctor.ok`。
-- 无效 archived 卡是治理 warning；archived 不参与运行时召回，但要在 `checked.invalidCards` 和 warnings 中可见。
+- Invalid active/draft cards are errors and block `doctor.ok`.
+- Invalid archived cards are governance warnings. Archived cards do not enter runtime recall, but they should still appear in `checked.invalidCards` and warnings.
 
-`--repair-index` 会重建 `indexes/experiences.json` 后再检查。只有在索引不一致或手动改过经验文件后使用。
+`--repair-index` rebuilds `indexes/experiences.json` and then checks again. Use
+it only after index inconsistency or manual experience-file edits.
 
-## 卸载
+## Uninstall
 
 ```bash
 ome uninstall
@@ -303,4 +315,4 @@ ome uninstall --keep-skill
 ome uninstall --delete-library --yes
 ```
 
-`ome uninstall` 默认保留经验库。删除经验库是不可逆操作，必须由用户明确确认。
+`ome uninstall` keeps the experience library by default. Library deletion is irreversible and requires explicit user confirmation.

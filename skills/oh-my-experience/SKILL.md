@@ -17,8 +17,10 @@ Read only the reference needed for the user request:
 | User intent | Reference |
 | --- | --- |
 | Need exact CLI commands, flags, JSON behavior, lifecycle commands, or safe command routing | [cli.md](references/cli.md) |
+| Decide what must stay English versus follow user/card language | [language-policy.md](references/language-policy.md) |
 | Install, initialize, configure, hook setup | [setup.md](references/setup.md) |
 | Recall prior lessons for the current task, inspect match quality | [recall.md](references/recall.md) |
+| Check similar active cards before adding or governing cards | [similarity-check.md](references/similarity-check.md) |
 | Scan sessions, run retrospectives, create draft approval pages, refine experiences, confirm library add | [reflect-retrospective.md](references/reflect-retrospective.md) |
 | Review, refine, merge, archive, or de-conflict existing experience cards | [experience-library-review.md](references/experience-library-review.md) |
 | Doctor failures, hook status, stats, eval, dogfood validation | [troubleshoot-eval.md](references/troubleshoot-eval.md) |
