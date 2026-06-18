@@ -25,10 +25,9 @@ git push origin v$(node -p "require('./package.json').version")
 ```
 
 6. GitHub Actions publishes npm through Trusted Publishing.
-7. Deploy docs through Cloudflare Pages. If Git integration is active, the push
-   to `main` deploys docs automatically. The current Pages project is Direct
-   Upload, so run the documented deploy command in
-   `docs/internal/cloudflare-pages.md` after pushing `main`.
+7. GitHub Actions deploys docs to Cloudflare Pages after the push to `main`.
+   Use the manual fallback in `docs/internal/cloudflare-pages.md` only when the
+   Pages deploy workflow is unavailable or not configured.
 
 ## Never do this in the normal path
 

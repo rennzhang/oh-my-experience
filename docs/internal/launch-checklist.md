@@ -90,7 +90,7 @@ Before public launch:
 
 ## Docs deployment
 
-Use Cloudflare Pages Git integration as described in
+Use the GitHub Actions Pages deployment described in
 `docs/internal/cloudflare-pages.md`.
 
 After pushing the release commit:
