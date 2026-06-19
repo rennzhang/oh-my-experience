@@ -441,9 +441,9 @@ Legacy `scope` is compatibility only. It does not define topic or source range.
 Follow `references/language-policy.md`.
 
 - OME framework text, injected instructions, and field labels stay English.
-- User-facing reminder and final used-card disclosure prose follow the user's
-  response language when it is English or Chinese, while keeping the same
-  disclosure semantics.
+- User-facing reminder and final used-card disclosure prose rely on the agent's
+  normal response-language behavior, while keeping the same disclosure
+  semantics.
 - Candidate/card content must be English or Chinese. Default to the dominant
   user/source wording language so future recall matches how the user will ask
   again.

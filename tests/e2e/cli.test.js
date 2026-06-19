@@ -1181,7 +1181,7 @@ test("hook run applies project scope from real cwd payload", () => {
     input: JSON.stringify({ prompt: "project cwd browser", cwd: appDir, session_id: "s1" }),
   }));
   assert.ok(hit.hookSpecificOutput.additionalContext.includes("Project cwd browser card"));
-  assert.ok(hit.hookSpecificOutput.additionalContext.includes("states the number of OME experience cards used"));
+  assert.ok(hit.hookSpecificOutput.additionalContext.includes("state how many cards were used"));
   assert.doesNotMatch(hit.hookSpecificOutput.additionalContext, obsoleteDisclosurePattern);
   assert.ok(hit.hookSpecificOutput.additionalContext.includes(`[Project cwd browser card](<${path.join(dataDir, "experiences", "active", `${cardId}.md`)}>)`));
   const miss = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {

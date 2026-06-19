@@ -200,8 +200,12 @@ lessons，而不是长 card bodies。
 渲染后的 hook context 保持中立：
 
 ```text
-OME matched experience cards. Matched does not mean used: decide per card whether to use it fully, use only relevant parts, or ignore it; apply only cards whose workflow meaning fits the current task.
-Before acting, if any matched card is applicable, state in one short sentence, in the user's response language when it is English or Chinese, what OME reminded you to consider, then proceed normally. You may use all matching cards, choose only some, use only relevant parts, or ignore all matches when none fit the user's real intent. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line in the user's response language when it is English or Chinese that states the number of OME experience cards used and includes only the `Final link if used` values for cards you applied; omit the line if none applied.
+# OME Matched Experience Cards
+
+Matched cards are optional reminders, not required reuse.
+- Choice: You may apply a whole card, use only the useful parts, or ignore any match that does not fit the task.
+- Before acting: If a card helps, say one short sentence about what OME reminded you to consider, then proceed.
+- Final: If any card was used, state how many cards were used and include only the applied `Final link if used` values; omit this line if none.
 1. [high risk][must] Browser validation (browser-validation)
    Summary: ...
    Use if: ...

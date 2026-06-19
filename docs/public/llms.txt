@@ -24,7 +24,7 @@ Oh My Experience is a local-first experience layer for AI coding agents. It turn
 - During retrospectives, matched subject-area cards are overlap signals, not source evidence or final used-card disclosures.
 - Before adding a new card, compare it with active cards and record candidate and adjacent-card actions separately.
 - Hook frames and fixed labels are English; approved card content targets English or Chinese; source evidence may keep its original language.
-- User-visible OME recall reminders and used-card disclosures follow the user's response language when it is English or Chinese.
+- User-visible OME recall reminders and used-card disclosures rely on the agent's normal response-language behavior.
 - Retrospectives create candidates; they do not directly create active cards.
 - Draft approval stays Markdown-first; candidates do not become active without explicit enabling.
 - OME is local-first. Hook runtime does not call an LLM.

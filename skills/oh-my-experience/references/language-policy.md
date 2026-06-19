@@ -4,7 +4,8 @@
 
 OME framework instructions stay English. Card content targets English or
 Chinese according to the card approval context. User-visible OME recall prose
-follows the user's response language only when it is English or Chinese.
+uses the agent's normal response-language behavior; the hook frame does not add
+explicit language instructions.
 
 ## English Framework
 
@@ -47,9 +48,9 @@ notes. Do not translate direct quotes just to make audit records uniform.
 
 ## Agent Output
 
-The injected prompt may be English, but it should tell the agent to write
-user-visible recall output in the user's response language when that language is
-English or Chinese.
+The injected prompt is English framework text, but it does not need a language
+rule for user-visible recall output. Agents normally answer in the user's
+language, and OME should not spend hook context restating that default.
 
 This includes:
 
@@ -59,7 +60,7 @@ This includes:
 
 Keep the disclosure semantics stable: list only cards actually used, and link
 only their `Final link if used` values. Do not force a fixed English wording for
-that user-visible line when the user's supported response language is Chinese.
+that user-visible line.
 
 ## Do Not
 

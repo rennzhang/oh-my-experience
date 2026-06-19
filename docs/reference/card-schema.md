@@ -98,8 +98,8 @@ Card fields use the language chosen when the card is created or approved. OME
 currently supports only English and Chinese for approved card content and
 user-visible recall output. The fixed hook frame around card fields stays
 English, but user-authored card content is not translated in the hot path. The
-prompt frame can ask agents to write user-visible recall reminders and used-card
-disclosure in the user's response language when it is English or Chinese.
+prompt frame keeps recall-disclosure semantics explicit without adding response
+language instructions.
 Direct source evidence may keep its original language in retrospective audit
 records. Cross-language recall should be handled through triggers, aliases, and
 preserved technical tokens, not hook-time translation.

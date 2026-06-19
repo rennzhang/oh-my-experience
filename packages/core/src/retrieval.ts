@@ -359,8 +359,8 @@ function contextBlock(result: MatchResult, index: number, copy: ContextCopy): st
 
 function contextCopy(): ContextCopy {
   return {
-    heading: "OME matched experience cards. Matched does not mean used: decide per card whether to use it fully, use only relevant parts, or ignore it; apply only cards whose workflow meaning fits the current task.",
-    finalReport: "Before acting, if any matched card is applicable, state in one short sentence, in the user's response language when it is English or Chinese, what OME reminded you to consider, then proceed normally. You may use all matching cards, choose only some, use only relevant parts, or ignore all matches when none fit the user's real intent. For OME retrospective or source-scan tasks, matched subject-area cards are not source evidence; record them only as active-card overlap unless you applied a process/governance card. Final report: if you actually used any card, add one final line in the user's response language when it is English or Chinese that states the number of OME experience cards used and includes only the `Final link if used` values for cards you applied; omit the line if none applied.",
+    heading: "# OME Matched Experience Cards\n\nMatched cards are optional reminders, not required reuse.",
+    finalReport: "- Choice: You may apply a whole card, use only the useful parts, or ignore any match that does not fit the task.\n- Before acting: If a card helps, say one short sentence about what OME reminded you to consider, then proceed.\n- Final: If any card was used, state how many cards were used and include only the applied `Final link if used` values; omit this line if none.",
     summary: "Summary",
     scope: "Scope",
     useWhen: "Use if",
