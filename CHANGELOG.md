@@ -6,6 +6,19 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.2.4 - 2026-06-19
+
+### Changed
+
+- Simplified prompt-time recall guidance into a compact Markdown frame that
+  treats matched cards as optional reminders, gives agents explicit choice over
+  whole-card, partial, or ignored matches, and keeps the pre-action reminder
+  focused on what OME surfaced.
+- Removed response-language instructions from the hook frame so disclosure
+  semantics stay explicit without restating the agent's normal language behavior.
+- Moved retrospective/source-scan overlap guidance out of the generic hook
+  frame and kept it in the source-scan and retrospective guidance surfaces.
+
 ## 0.2.3 - 2026-06-18
 
 ### Added
