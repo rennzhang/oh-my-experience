@@ -146,8 +146,13 @@ function checkProviderHook(provider: string, hookFile: string, errors: string[],
 
 function isMachineReadableOmeHookCommand(command: unknown): boolean {
   if (typeof command !== "string") return false;
-  if (!command.includes("ome hook run") && !command.includes("oh-my-experience hook run")) return false;
+  if (!isOmeRuntimeHookCommand(command)) return false;
   return /(?:^|\s)--json(?:\s|$)/.test(command) || /(?:^|\s)--format(?:=|\s+)json(?:\s|$)/.test(command);
+}
+
+function isOmeRuntimeHookCommand(command: string): boolean {
+  const normalized = command.replace(/\\/g, "/");
+  return /(?:^|[\s/"'])(?:ome|oh-my-experience)(?:\.js)?['"]?\s+hook\s+run(?:\s|$)/i.test(normalized);
 }
 
 function checkPackage(errors: string[], warnings: string[]): void {

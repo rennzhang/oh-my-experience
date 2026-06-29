@@ -103,6 +103,7 @@ export function buildQueryPlan(envelope: TaskEnvelope): QueryPlan {
   addVariant(queryVariants, "risks", envelope.risks.join(" "), 0.8);
   addVariant(queryVariants, "intentModes", envelope.intentModes.join(" "), 0.6);
   addVariant(queryVariants, "ruleSignals", envelope.ruleSignals.map((signal) => signal.id).join(" "), 0.65);
+  addVariant(queryVariants, "ruleSignalExpansions", expandRuleSignals(envelope.ruleSignals), 0.75);
   for (const segment of envelope.segments.slice(0, 4)) addVariant(queryVariants, "segment", segment, 0.85);
   const tokens = new Map<string, number>();
   for (const variant of queryVariants) {
@@ -111,6 +112,25 @@ export function buildQueryPlan(envelope: TaskEnvelope): QueryPlan {
     }
   }
   return { envelope, queryVariants, tokens };
+}
+
+function expandRuleSignals(signals: RuleSignal[]): string {
+  const expansions: Record<string, string> = {
+    architecture_quality: [
+      "干净改法",
+      "干净重构",
+      "链路清理",
+      "清理链路",
+      "implementation-chain-cleanup",
+      "engineering-quality",
+      "root-cause-fix",
+      "clean-refactor",
+    ].join(" "),
+  };
+  return unique((signals || [])
+    .filter((signal) => signal.polarity === "positive")
+    .flatMap((signal) => tokenize(expansions[signal.id] || "")))
+    .join(" ");
 }
 
 export function normalize(input: unknown): string {

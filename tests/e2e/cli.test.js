@@ -1008,6 +1008,43 @@ test("hook status recognizes existing OME hook even when command options drift",
   assert.equal(status.matchesExpectedCommand, false);
 });
 
+test("hook status recognizes package-local node OME hook command", () => {
+  const dataDir = path.join(tmpDir("hook-package-local"), "data");
+  const localCodexHome = tmpDir("codex-home-package-local-hook");
+  fs.mkdirSync(localCodexHome, { recursive: true });
+  const existingCommand = `${process.execPath} '${bin}' hook run --json --data-dir '/tmp/previous ome data'`;
+  fs.writeFileSync(path.join(localCodexHome, "hooks.json"), JSON.stringify({
+    hooks: {
+      UserPromptSubmit: [{
+        hooks: [
+          { type: "command", command: existingCommand, timeout: 5 },
+          { type: "command", command: "echo keep-me", timeout: 5 },
+        ],
+      }],
+    },
+  }, null, 2));
+
+  const status = json(run(["hook", "status", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  assert.equal(status.installed, true);
+  assert.equal(status.installedCommand, existingCommand);
+  assert.equal(status.matchesExpectedCommand, false);
+});
+
+test("doctor accepts package-local node OME hook command", () => {
+  const dataDir = tmpDir("doctor-package-local-hook");
+  const localCodexHome = tmpDir("doctor-package-local-codex-home");
+  fs.mkdirSync(localCodexHome, { recursive: true });
+  const installed = json(run(["init", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  assert.equal(installed.hooks[0].installed, true);
+  const hooksPath = path.join(localCodexHome, "hooks.json");
+  const hooksJson = JSON.parse(fs.readFileSync(hooksPath, "utf8"));
+  hooksJson.hooks.UserPromptSubmit[0].hooks[0].command = `${process.execPath} '${bin}' hook run --json --data-dir '${dataDir}'`;
+  fs.writeFileSync(hooksPath, JSON.stringify(hooksJson, null, 2));
+
+  const doctor = json(run(["doctor", "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  assert.equal(doctor.ok, true, doctor.errors.join("\n"));
+});
+
 test("skill lifecycle protects user-owned targets", () => {
   const localCodexHome = tmpDir("skill-codex-home");
   const dataDir = tmpDir("skill-data");

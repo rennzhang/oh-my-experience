@@ -1022,6 +1022,37 @@ test("architecture-gated cards recall for clean implementation-chain cleanup wor
   assert.ok(matches[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "architecture_quality"));
 });
 
+test("short clean-chain wording recalls clean refactor cards", () => {
+  const dataDir = tmpDir("short-clean-chain-recall");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  writeCard(dataDir, {
+    id: "clean-refactor-chain-short",
+    status: "active",
+    title: "干净重构先梳理现有链路",
+    category: "工程质量",
+    summary: "干净重构前先梳理现有实现链路。",
+    rule: "Map the current implementation chain before choosing the cleanup boundary.",
+    triggers: ["干净改法", "干净重构", "哪些链路需要清理"],
+    negativeTriggers: ["只是润色 prompt"],
+    topics: ["engineering-quality", "implementation-chain-cleanup"],
+    requiredSignals: [],
+    blockedSignals: ["explain_only"],
+    recallPolicy: "must",
+    risk: "high",
+    body: "Map the current implementation chain before choosing the cleanup boundary.",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const matches = matchCards(dataDir, "链路干净", { threshold: 40 });
+  const envelope = buildTaskEnvelope("链路干净");
+
+  assert.equal(matches[0]?.card.id, "clean-refactor-chain-short");
+  assert.ok(envelope.ruleSignals.some((item) => item.id === "architecture_quality"));
+});
+
 test("browser validation cards require a UI or browser surface", () => {
   const dataDir = tmpDir("browser-validation-surface-gate");
   initializeDataDir({ dataDir });

@@ -109,12 +109,12 @@ function removeOmeHooks(entries: HookEntry[], command: string): HookEntry[] {
 function isOmeHookCommand(candidate: unknown, currentCommand: string): boolean {
   if (typeof candidate !== "string") return false;
   if (candidate === currentCommand) return true;
-  return (
-    candidate.includes("ome hook run") ||
-    candidate.includes("oh-my-experience hook run") ||
-    candidate.includes("/ome hook run") ||
-    candidate.includes("/oh-my-experience hook run")
-  );
+  return isOmeRuntimeHookCommand(candidate);
+}
+
+function isOmeRuntimeHookCommand(command: string): boolean {
+  const normalized = command.replace(/\\/g, "/");
+  return /(?:^|[\s/"'])(?:ome|oh-my-experience)(?:\.js)?['"]?\s+hook\s+run(?:\s|$)/i.test(normalized);
 }
 
 function optionsDataDir(options: HookInstallOptions = {}): string {
