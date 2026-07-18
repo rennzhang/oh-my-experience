@@ -102,7 +102,12 @@ export function writeCandidates(dataDir: string, runId: string, candidates: Json
   const audit = resolveRetrospectiveAudit(dataDir, runId, options);
   assertUniqueCandidateIds(parsed);
   writeJsonAtomic(path.join(layout(dataDir).retrospectives, runId, "candidates.json"), { runId, audit, candidates: parsed }, dataDir);
-  writeRetrospectiveState(dataDir, runId, "candidates_generated");
+  writeRetrospectiveState(
+    dataDir,
+    runId,
+    "candidates_generated",
+    appliedStateExtra(readRetrospectiveState(dataDir, runId)),
+  );
   refreshRetrospectiveMarkdown(dataDir, runId);
   operationLog(dataDir, "retrospective.candidates.write", { runId, candidates: parsed.length, auditIncomplete: audit.incomplete });
   return parsed;
@@ -299,6 +304,7 @@ function mergeCandidateIntoCard(dataDir: string, candidate: RetrospectiveCandida
     topics: Array.from(new Set([...card.topics, ...candidate.topics])),
     intentModes: mergeIntentModes(card.intentModes, candidate.intentModes),
     requiredSignals: Array.from(new Set([...card.requiredSignals, ...candidate.requiredSignals])),
+    requiredAllSignals: Array.from(new Set([...card.requiredAllSignals, ...candidate.requiredAllSignals])),
     blockedSignals: Array.from(new Set([...card.blockedSignals, ...candidate.blockedSignals])),
     applicability: mergeApplicability(card.applicability, candidate.applicability),
     sources: Array.from(new Set([...card.sources, `retrospective:${runId}`])),
@@ -342,6 +348,7 @@ export function candidateFromLesson(runId: string, lesson: JsonRecord): Retrospe
     topics: toStringArray(recall.topics),
     intentModes: criteria.intent_modes || {},
     requiredSignals: toStringArray(engineHints.positive),
+    requiredAllSignals: toStringArray(engineHints.required_all || engineHints.requiredAll),
     blockedSignals: toStringArray(engineHints.negative),
     applicability: normalizeScope(lesson.scope || {}),
     evidence: Array.isArray(lesson.evidence) ? lesson.evidence : [],

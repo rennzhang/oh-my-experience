@@ -3,6 +3,13 @@ import path from "node:path";
 import { ConfigSchema, type Config } from "./schema.js";
 import { ensureStarterCards } from "./cards.js";
 import {
+  DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS,
+  DEFAULT_HOOK_TIMEOUT_MS,
+  DEFAULT_RETRIEVAL_LIMIT,
+  DEFAULT_RETRIEVAL_THRESHOLD,
+  RETRIEVAL_SCORE_MAX,
+} from "./retrieval-contract.js";
+import {
   backupFile,
   defaultConfigHome,
   defaultDataDir,
@@ -25,13 +32,12 @@ export function createDefaultConfig(dataDir: string): Config {
     dataDir,
     privacy: {
       saveRawPrompt: false,
-      debugRawPromptTtlHours: 24,
     },
     retrieval: {
-      maxCards: 4,
-      minScore: 40,
-      additionalContextMaxChars: 6000,
-      hookTimeoutMs: 4000,
+      maxCards: DEFAULT_RETRIEVAL_LIMIT,
+      minScore: DEFAULT_RETRIEVAL_THRESHOLD,
+      additionalContextMaxChars: DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS,
+      hookTimeoutMs: DEFAULT_HOOK_TIMEOUT_MS,
     },
     hooks: {
       providers: {
@@ -101,7 +107,7 @@ function repairConfig(dataDir: string): void {
   const configPath = layout(dataDir).config;
   const current = readJson(configPath, null);
   if (!current || typeof current !== "object") return;
-  const currentRecord = current as JsonRecord;
+  const currentRecord = normalizePersistedConfig(current as JsonRecord);
   const normalized = ConfigSchema.parse({
     ...currentRecord,
     dataDir: path.resolve(dataDir),
@@ -114,7 +120,8 @@ export function loadConfig(dataDir = defaultDataDir()): Config {
   const resolved = path.resolve(dataDir);
   const config = readJson(layout(resolved).config);
   if (!config) return createDefaultConfig(resolved);
-  return ConfigSchema.parse({ ...config, dataDir: config.dataDir || resolved });
+  const normalized = normalizePersistedConfig(config);
+  return ConfigSchema.parse({ ...normalized, dataDir: normalized.dataDir || resolved });
 }
 
 export function saveConfig(dataDir: string, config: Config | JsonRecord): Config {
@@ -248,13 +255,30 @@ function writeDataDirPointer(dataDir: string, configHome: string, { reset = fals
   const pointerPath = path.join(home, "config.json");
   if (path.resolve(pointerPath) === path.resolve(layout(resolved).config)) return;
   const existing = readJson(pointerPath, null);
-  const pointer = ConfigSchema.parse({
+  const pointer = ConfigSchema.parse(normalizePersistedConfig({
     ...createDefaultConfig(resolved),
     ...(reset ? {} : (existing || {})),
     dataDir: resolved,
     updatedAt: nowIso(),
-  });
+  }));
   writeJsonAtomic(pointerPath, pointer, home);
+}
+
+function normalizePersistedConfig(config: JsonRecord): JsonRecord {
+  const retrieval = config.retrieval;
+  if (!retrieval || typeof retrieval !== "object" || Array.isArray(retrieval)) return config;
+  const minScore = retrieval.minScore;
+  if (typeof minScore !== "number" || !Number.isFinite(minScore) || minScore <= RETRIEVAL_SCORE_MAX) return config;
+  return {
+    ...config,
+    retrieval: {
+      ...retrieval,
+      // Retrieval v1 used an unbounded raw score. That scale cannot be mapped
+      // faithfully to v2's stable 0..100 evidence score, so use the v2 default
+      // instead of turning an existing hook into an accidental reject-all gate.
+      minScore: DEFAULT_RETRIEVAL_THRESHOLD,
+    },
+  };
 }
 
 function setNestedConfig(config: Config, key: string, value: unknown): Config {

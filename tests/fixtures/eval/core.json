@@ -135,7 +135,7 @@
     {
       "id": "business-goal-codex-discussion",
       "difficulty": "hard",
-      "prompt": "我们公司今年的目标是拿下400万用户，老板要求大家先用起来并用好 Codex，认为这是我们的加速器。我想了解这个判断的好处坏处。",
+      "prompt": "一家虚构公司的业务目标是扩大用户规模，负责人建议团队先用好 Codex。我只想了解这个判断的利弊。",
       "expectedCards": [],
       "unexpectedCards": [
         "agent-goal-execution",
@@ -152,7 +152,7 @@
     {
       "id": "agent-goal-execution-start",
       "difficulty": "medium",
-      "prompt": "创建目标开干：把 OME 召回优化做完，所有计划内功能都要完整闭环，自己验证。",
+      "prompt": "请创建目标并开始执行缓存迁移演练，逐项完成、验证并交付。",
       "expectedCards": [
         "agent-goal-execution"
       ],
@@ -216,7 +216,7 @@
     {
       "id": "spool-uuid-history-lookup",
       "difficulty": "medium",
-      "prompt": "用 spool 查 019e90a5-9539-7922-86f1-ea81f9a3b01f，回溯那次历史会话里到底挂了哪些经验。",
+      "prompt": "用 spool 查 00000000-0000-0000-0000-000000000000，回溯该示例会话关联的经验。",
       "expectedCards": [
         "spool-session-context-anchoring"
       ],
@@ -333,7 +333,7 @@
     {
       "id": "architecture-quality-retrieval-engine",
       "difficulty": "medium",
-      "prompt": "召回引擎还是不太行，急需优化，高内聚低耦合，逻辑要干净，不要继续堆兼容包袱。",
+      "prompt": "请重构沙盒索引模块：修复根因，保持高内聚低耦合，不要叠加临时兼容层。",
       "expectedCards": [
         "architecture-root-cause"
       ],
@@ -350,7 +350,7 @@
     {
       "id": "goal-plus-architecture-quality",
       "difficulty": "hard",
-      "prompt": "召回引擎还是不太行实测了一下急需优化不限时间创建目标开始优化，高内聚低耦合。",
+      "prompt": "请创建目标并开始重构沙盒索引模块：修复根因，保持高内聚低耦合，完成实现和验证。",
       "expectedCards": [
         "agent-goal-execution",
         "architecture-root-cause"

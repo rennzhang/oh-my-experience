@@ -1,0 +1,111 @@
+{
+  "name": "pairwise-governance-boundaries",
+  "experiencesFile": "./pairwise.cards.json",
+  "cases": [
+    {
+      "id": "schema-cutover-not-module-refactor",
+      "difficulty": "hard",
+      "prompt": "Complete the canonical schema cutover, remove dual schema readers, and keep one current schema.",
+      "expectedCards": ["canonical-schema-cutover"],
+      "unexpectedCards": ["module-root-cause-refactor"],
+      "tags": ["pairwise", "migration", "en"]
+    },
+    {
+      "id": "module-refactor-not-schema-cutover",
+      "difficulty": "hard",
+      "prompt": "Refactor the parser into a cohesive module boundary and split module responsibilities. No schema migration is involved.",
+      "expectedCards": ["module-root-cause-refactor"],
+      "unexpectedCards": ["canonical-schema-cutover"],
+      "tags": ["pairwise", "architecture", "en"]
+    },
+    {
+      "id": "goal-start-not-final-review",
+      "difficulty": "medium",
+      "prompt": "Create an agent goal and execute the cache migration to completion with verification.",
+      "expectedCards": ["agent-goal-closure"],
+      "unexpectedCards": ["final-delivery-gate"],
+      "tags": ["pairwise", "goal", "en"]
+    },
+    {
+      "id": "final-review-not-goal-start",
+      "difficulty": "medium",
+      "prompt": "Implementation is complete. Run the final delivery review and pre-submit acceptance gate.",
+      "expectedCards": ["final-delivery-gate"],
+      "unexpectedCards": ["agent-goal-closure"],
+      "tags": ["pairwise", "delivery", "en"]
+    },
+    {
+      "id": "frontend-implementation-not-design-only",
+      "difficulty": "hard",
+      "prompt": "Implement the frontend settings page and perform real browser validation with an e2e page check.",
+      "expectedCards": ["frontend-real-path-validation"],
+      "unexpectedCards": ["design-source-alignment"],
+      "tags": ["pairwise", "frontend", "en"]
+    },
+    {
+      "id": "design-only-not-frontend-delivery",
+      "difficulty": "hard",
+      "prompt": "对齐 DESIGN.md 评审 UI/UX 布局；这里只做设计判断，不改代码。",
+      "expectedCards": ["design-source-alignment"],
+      "unexpectedCards": ["frontend-real-path-validation"],
+      "tags": ["pairwise", "design", "mixed"]
+    },
+    {
+      "id": "local-git-scope-not-authorization",
+      "difficulty": "medium",
+      "prompt": "Inspect the task-scoped git diff and stage only task files in the local worktree.",
+      "expectedCards": ["task-scoped-git-worktree"],
+      "unexpectedCards": ["high-risk-authorization"],
+      "tags": ["pairwise", "git", "en"]
+    },
+    {
+      "id": "production-authorization-not-git-scope",
+      "difficulty": "medium",
+      "prompt": "准备清理演示环境的生产镜像数据，执行删除前先确认授权。",
+      "expectedCards": ["high-risk-authorization"],
+      "unexpectedCards": ["task-scoped-git-worktree"],
+      "tags": ["pairwise", "authorization", "zh-CN"]
+    },
+    {
+      "id": "read-only-diff-is-not-worktree-mutation",
+      "difficulty": "hard",
+      "prompt": "This is a read-only git diff review; do not modify the workspace.",
+      "expectedCards": [],
+      "unexpectedCards": ["task-scoped-git-worktree"],
+      "expectNoMatches": true,
+      "tags": ["counterfactual", "git", "negative", "en"]
+    },
+    {
+      "id": "temporary-placeholder-needs-real-service",
+      "difficulty": "medium",
+      "prompt": "placeholder 只是临时接线，最终验收前必须替换为真实服务。",
+      "expectedCards": ["temporary-placeholder-boundary"],
+      "tags": ["counterfactual", "mock", "zh-CN"]
+    },
+    {
+      "id": "unit-test-fixture-is-not-delivery-mock",
+      "difficulty": "hard",
+      "prompt": "Remove the temporary unit-test fixture after the isolated parser test finishes.",
+      "expectedCards": [],
+      "unexpectedCards": ["temporary-placeholder-boundary"],
+      "expectNoMatches": true,
+      "tags": ["counterfactual", "mock", "negative", "en"]
+    },
+    {
+      "id": "generic-triage-not-message-bridge",
+      "difficulty": "hard",
+      "prompt": "支付沙盒报错，先区分工具环境失败和业务规则失败，再定位根因。",
+      "expectedCards": ["generic-failure-triage"],
+      "unexpectedCards": ["message-bridge-validation"],
+      "tags": ["pairwise", "debugging", "zh-CN"]
+    },
+    {
+      "id": "message-bridge-not-generic-triage",
+      "difficulty": "hard",
+      "prompt": "重启通知 bot bridge 后，核对服务状态、日志和真实消息回执。",
+      "expectedCards": ["message-bridge-validation"],
+      "unexpectedCards": ["generic-failure-triage"],
+      "tags": ["pairwise", "bridge", "zh-CN"]
+    }
+  ]
+}

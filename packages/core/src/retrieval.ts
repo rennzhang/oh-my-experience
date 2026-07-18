@@ -4,17 +4,71 @@ import type { ExperienceLibrary } from "./library-stack.js";
 import { buildQueryPlan, buildTaskEnvelope } from "./matcher.js";
 import { projectFamilyKey } from "./project-context.js";
 import { buildScoringCorpus, scoreDocument, type MatchReason, type ScoredCard } from "./retrieval-scoring.js";
+import {
+  DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS,
+  DEFAULT_DIAGNOSTIC_CANDIDATE_LIMIT,
+  DEFAULT_RETRIEVAL_LIMIT,
+  DEFAULT_RETRIEVAL_THRESHOLD,
+  RETRIEVAL_ENGINE_VERSION,
+  RETRIEVAL_SCORER_VERSION,
+} from "./retrieval-contract.js";
+import { getSignalDefinition, isKnownSignalId } from "./signal-registry.js";
 import type { ProjectContext } from "./schema.js";
 import { cardSimilarity, type SimilarCardHint } from "./similarity.js";
 
 export interface MatchResult {
   card: CardIndexEntry;
   score: number;
+  rawScore: number;
+  rankScore: number;
+  priorityScore: number;
+  postSelectionScore: number;
+  evidenceFamilies: string[];
+  strongAnchor: boolean;
   reasons: MatchReason[];
   similarCards?: SimilarCardHint[];
   envelope: ReturnType<typeof buildTaskEnvelope>;
   queryVariants: string[];
   durationMs: number;
+}
+
+export interface RetrievalCandidateDiagnostic {
+  id: string;
+  title: string;
+  libraryScope: "global" | "project";
+  score: number;
+  rawScore: number;
+  rankScore: number;
+  postSelectionScore: number;
+  priorityScore: number;
+  evidenceFamilies: string[];
+  strongAnchor: boolean;
+  eligible: boolean;
+  selected: boolean;
+  rejectionReason: string | null;
+  reasons: MatchReason[];
+}
+
+export interface RetrievalDiagnostics {
+  engineVersion: string;
+  scorerVersion: string;
+  threshold: number;
+  limit: number;
+  inputCardCount: number;
+  applicableCardCount: number;
+  evaluatedCardCount: number;
+  timedOut: boolean;
+  complete: boolean;
+  candidateListTruncated: boolean;
+  abstained: boolean;
+  abstainReason: string | null;
+  selectedCardIds: string[];
+  candidates: RetrievalCandidateDiagnostic[];
+}
+
+export interface DetailedMatchResult {
+  matches: MatchResult[];
+  diagnostics: RetrievalDiagnostics;
 }
 
 export interface MatchOptions {
@@ -52,12 +106,30 @@ interface ContextCopy {
 }
 
 export function matchCards(dataDir: string, prompt: string, options: MatchOptions = {}): MatchResult[] {
+  return matchCardsDetailed(dataDir, prompt, options).matches;
+}
+
+export function matchCardsDetailed(dataDir: string, prompt: string, options: MatchOptions = {}): DetailedMatchResult {
   const index = buildCardIndex(dataDir);
-  return matchCardEntries((index.experiences || []).map((card) => ({ ...card, libraryScope: card.libraryScope || "global" })), prompt, options);
+  return matchCardEntriesDetailed(
+    (index.experiences || []).map((card) => ({ ...card, libraryScope: card.libraryScope || "global" })),
+    prompt,
+    options,
+  );
 }
 
 export function matchCardEntries(cardsInput: CardIndexEntry[], prompt: string, options: MatchOptions = {}): MatchResult[] {
+  return matchCardEntriesDetailed(cardsInput, prompt, options).matches;
+}
+
+export function matchCardEntriesDetailed(
+  cardsInput: CardIndexEntry[],
+  prompt: string,
+  options: MatchOptions = {},
+): DetailedMatchResult {
   const started = Date.now();
+  const threshold = options.threshold ?? DEFAULT_RETRIEVAL_THRESHOLD;
+  const limit = options.limit ?? DEFAULT_RETRIEVAL_LIMIT;
   const envelope = buildTaskEnvelope(prompt);
   const plan = buildQueryPlan(envelope);
   const cards = cardsInput.filter((card) =>
@@ -66,7 +138,7 @@ export function matchCardEntries(cardsInput: CardIndexEntry[], prompt: string, o
     && isApplicable(card, options.projectContext || null)
   );
   const corpus = buildScoringCorpus(cards);
-  const scored: ScoredCard[] = [];
+  const evaluated: ScoredCard[] = [];
   let timedOut = false;
   for (const doc of corpus) {
     if (options.timeoutMs && Date.now() - started > options.timeoutMs) {
@@ -74,23 +146,72 @@ export function matchCardEntries(cardsInput: CardIndexEntry[], prompt: string, o
       break;
     }
     const result = scoreDocument(doc, plan, corpus.length);
-    if (result && result.score >= (options.threshold ?? 4)) scored.push(result);
+    evaluated.push(result);
   }
-  if (timedOut && options.failOpenOnTimeout) return [];
-  scored.sort(compareMatchScore);
-  const matches = diversify(collapseSimilar(scored)).slice(0, options.limit ?? 4);
-  return matches.map((match) => ({
+  const admitted = evaluated.map((result) => applyAdmissionContract(result, threshold));
+  const ranked = applyReciprocalRankFusion(admitted.filter((result) => result.eligible));
+  const collapsed = collapseSimilar(ranked.sort(compareMatchScore));
+  const diversified = diversify(collapsed.results);
+  const selection = timedOut && options.failOpenOnTimeout
+    ? {
+        selected: [],
+        rejected: diversified.results.map((result) => withSelectionRejection(result, "post-selection:timeout-fail-open")),
+      }
+    : dynamicSelection(diversified.results, limit, threshold, diversified.penalizedKeys);
+  const selected = selection.selected;
+  const matches = selected.map((match) => ({
     ...match,
     envelope,
     queryVariants: plan.queryVariants.map((variant) => variant.text),
     durationMs: Date.now() - started,
   }));
+  const selectedKeys = new Set(matches.map((match) => candidateIdentity(match.card)));
+  const candidateStates = mergeCandidateStates(
+    admitted,
+    ranked,
+    collapsed.rejected,
+    diversified.results,
+    selection.rejected,
+    selected,
+  );
+  const candidateRows = [...admitted]
+    .map((candidate) => candidateStates.get(candidateIdentity(candidate.card)) || candidate)
+    .sort(compareDiagnosticCandidate)
+    .slice(0, DEFAULT_DIAGNOSTIC_CANDIDATE_LIMIT)
+    .map((candidate) => candidateDiagnostic(candidate, selectedKeys.has(candidateIdentity(candidate.card))));
+  const abstainReason = matches.length
+    ? null
+    : timedOut && options.failOpenOnTimeout
+      ? "timeout-fail-open"
+      : admitted.some((candidate) => candidate.eligible)
+        ? limit <= 0 ? "selection-limit" : "selection-confidence-gap"
+        : "no-candidate-passed-evidence-contract";
+  return {
+    matches,
+    diagnostics: {
+      engineVersion: RETRIEVAL_ENGINE_VERSION,
+      scorerVersion: RETRIEVAL_SCORER_VERSION,
+      threshold,
+      limit,
+      inputCardCount: cardsInput.length,
+      applicableCardCount: cards.length,
+      evaluatedCardCount: evaluated.length,
+      timedOut,
+      complete: !timedOut && evaluated.length === cards.length,
+      candidateListTruncated: admitted.length > candidateRows.length,
+      abstained: matches.length === 0,
+      abstainReason,
+      selectedCardIds: matches.map((match) => match.card.id),
+      candidates: candidateRows,
+    },
+  };
 }
 
 export function explainMatch(dataDir: string, prompt: string, options: MatchOptions = {}) {
-  const matches = matchCards(dataDir, prompt, options);
   const index = buildCardIndex(dataDir);
-  return explainMatchedCards(prompt, matches, options, {
+  const cards = (index.experiences || []).map((card) => ({ ...card, libraryScope: card.libraryScope || "global" as const }));
+  const detailed = matchCardEntriesDetailed(cards, prompt, options);
+  return explainMatchedCards(prompt, detailed, options, {
     libraries: [{
       scope: "global",
       dataDir,
@@ -100,19 +221,21 @@ export function explainMatch(dataDir: string, prompt: string, options: MatchOpti
       warnings: [],
     }],
     warnings: [],
-  }, index.experiences || []);
+  }, cards);
 }
 
 export function explainMatchFromCards(cards: CardIndexEntry[], prompt: string, options: MatchOptions = {}, metadata: ExplainMetadata = {}) {
-  const matches = matchCardEntries(cards, prompt, options);
-  return explainMatchedCards(prompt, matches, options, metadata, cards);
+  const detailed = matchCardEntriesDetailed(cards, prompt, options);
+  return explainMatchedCards(prompt, detailed, options, metadata, cards);
 }
 
-function explainMatchedCards(prompt: string, matches: MatchResult[], options: MatchOptions, metadata: ExplainMetadata, cards: CardIndexEntry[]) {
+function explainMatchedCards(prompt: string, detailed: DetailedMatchResult, options: MatchOptions, metadata: ExplainMetadata, cards: CardIndexEntry[]) {
+  const { matches, diagnostics } = detailed;
   return {
     ok: true,
-    threshold: options.threshold ?? 4,
-    limit: options.limit ?? 4,
+    threshold: diagnostics.threshold,
+    limit: diagnostics.limit,
+    diagnostics,
     projectContext: options.projectContext || null,
     libraries: (metadata.libraries || []).map((library) => ({
       scope: library.scope,
@@ -132,6 +255,11 @@ function explainMatchedCards(prompt: string, matches: MatchResult[], options: Ma
       title: match.card.title,
       card: match.card,
       score: match.score,
+      rawScore: match.rawScore,
+      rankScore: match.rankScore,
+      postSelectionScore: match.postSelectionScore,
+      evidenceFamilies: match.evidenceFamilies,
+      strongAnchor: match.strongAnchor,
       recallPolicy: match.card.recallPolicy,
       risk: match.card.risk,
       confidence: match.card.confidence,
@@ -146,7 +274,7 @@ function explainMatchedCards(prompt: string, matches: MatchResult[], options: Ma
 }
 
 export function renderAdditionalContext(matches: MatchResult[], options: ContextOptions = {}): string {
-  const maxChars = options.maxChars ?? 6000;
+  const maxChars = options.maxChars ?? DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS;
   if (!matches.length || maxChars <= 0) return "";
   const copy = contextCopy();
   const blocks = matches.map((result, index) => ({
@@ -175,47 +303,190 @@ export function buildContextPlan(matches: MatchResult[], options: ContextOptions
   };
 }
 
-function diversify(results: Array<Omit<MatchResult, "envelope" | "queryVariants" | "durationMs">>): Array<Omit<MatchResult, "envelope" | "queryVariants" | "durationMs">> {
+type SelectionCard = ScoredCard & { similarCards?: SimilarCardHint[] };
+
+function applyAdmissionContract(result: ScoredCard, threshold: number): ScoredCard {
+  if (!result.eligible) return result;
+  if (result.score < threshold) {
+    return { ...result, eligible: false, rejectionReason: `below-threshold:${result.score}<${threshold}` };
+  }
+  if (!result.strongAnchor && result.evidenceFamilies.length < 2) {
+    return { ...result, eligible: false, rejectionReason: "insufficient-independent-evidence" };
+  }
+  return result;
+}
+
+function applyReciprocalRankFusion(results: ScoredCard[]): ScoredCard[] {
+  if (!results.length) return [];
+  const rawRanks = rankPositions(results, (item) => item.rawScore);
+  const evidenceRanks = rankPositions(results, (item) => item.score);
+  return results.map((result) => ({
+    ...result,
+    rankScore: round(1000 * (
+      1 / (60 + (rawRanks.get(candidateIdentity(result.card)) || results.length))
+      + 1 / (60 + (evidenceRanks.get(candidateIdentity(result.card)) || results.length))
+    )),
+  }));
+}
+
+function rankPositions(results: ScoredCard[], value: (item: ScoredCard) => number): Map<string, number> {
+  return new Map([...results]
+    .sort((a, b) => value(b) - value(a) || compareCandidateIdentity(a.card, b.card))
+    .map((item, index) => [candidateIdentity(item.card), index + 1]));
+}
+
+function diversify(results: SelectionCard[]): { results: SelectionCard[]; penalizedKeys: Set<string> } {
   const seenTopics = new Map<string, number>();
-  return results.map((result) => {
+  const penalizedKeys = new Set<string>();
+  const diversified = results.map((result) => {
     const topic = primaryTopic(result.card);
     const count = seenTopics.get(topic) || 0;
     seenTopics.set(topic, count + 1);
-    return count ? { ...result, score: round(result.score * Math.max(0.72, 1 - count * 0.12)) } : result;
-  }).sort((a, b) => b.score - a.score || a.card.id.localeCompare(b.card.id));
+    if (!count) return result;
+    penalizedKeys.add(candidateIdentity(result.card));
+    return { ...result, rankScore: round(result.rankScore * Math.max(0.72, 1 - count * 0.12)) };
+  }).sort(compareMatchScore);
+  return { results: diversified, penalizedKeys };
 }
 
-function collapseSimilar(
-  results: Array<Omit<MatchResult, "envelope" | "queryVariants" | "durationMs">>,
-): Array<Omit<MatchResult, "envelope" | "queryVariants" | "durationMs">> {
-  const selected: Array<Omit<MatchResult, "envelope" | "queryVariants" | "durationMs">> = [];
+function collapseSimilar(results: ScoredCard[]): { results: SelectionCard[]; rejected: ScoredCard[] } {
+  const selected: SelectionCard[] = [];
+  const rejected: ScoredCard[] = [];
   for (const result of results) {
-    const existing = selected.find((candidate) =>
-      sameApplicabilityScope(candidate.card, result.card)
-      && (
-        cardSimilarity(candidate.card, result.card).score >= 64
-        || sameStarterReplacementCluster(candidate.card, result.card)
+    const existingIndex = selected.findIndex((candidate) =>
+      sameLogicalCardId(candidate.card, result.card)
+      || (
+        sameApplicabilityScope(candidate.card, result.card)
+        && (
+          cardSimilarity(candidate.card, result.card).score >= 64
+          || sameStarterReplacementCluster(candidate.card, result.card)
+        )
       )
     );
-    if (!existing) {
+    if (existingIndex === -1) {
       selected.push({ ...result, similarCards: [] });
       continue;
     }
+    const existing = selected[existingIndex];
     const similarity = cardSimilarity(existing.card, result.card);
-    existing.similarCards = [
-      ...(existing.similarCards || []),
-      { id: result.card.id, title: result.card.title, score: similarity.score, reason: similarity.reason },
-    ].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).slice(0, 4);
+    if (shouldPreferProjectRepresentative(existing, result)) {
+      rejected.push(withSelectionRejection(
+        existing,
+        `post-selection:duplicate:${candidateDisplayIdentity(result.card)}`,
+      ));
+      selected[existingIndex] = {
+        ...result,
+        similarCards: [
+          ...(existing.similarCards || []),
+          { id: existing.card.id, title: existing.card.title, score: similarity.score, reason: similarity.reason },
+        ].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).slice(0, 4),
+      };
+    } else {
+      rejected.push(withSelectionRejection(
+        result,
+        `post-selection:duplicate:${candidateDisplayIdentity(existing.card)}`,
+      ));
+      existing.similarCards = [
+        ...(existing.similarCards || []),
+        { id: result.card.id, title: result.card.title, score: similarity.score, reason: similarity.reason },
+      ].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).slice(0, 4);
+    }
   }
-  return selected;
+  return { results: selected.sort(compareMatchScore), rejected };
+}
+
+function shouldPreferProjectRepresentative(existing: SelectionCard, candidate: ScoredCard): boolean {
+  if (sameLogicalCardId(existing.card, candidate.card)
+    && libraryPriority(existing.card) !== libraryPriority(candidate.card)) {
+    return libraryPriority(candidate.card) > libraryPriority(existing.card);
+  }
+  return libraryPriority(candidate.card) > libraryPriority(existing.card)
+    && candidate.score >= existing.score - 8;
+}
+
+function dynamicSelection(
+  results: SelectionCard[],
+  limit: number,
+  threshold: number,
+  diversityPenalizedKeys: Set<string>,
+): { selected: SelectionCard[]; rejected: ScoredCard[] } {
+  const selected: SelectionCard[] = [];
+  const rejected: ScoredCard[] = [];
+  const topScore = results[0]?.score || 0;
+  for (const result of results) {
+    const diversityPenalized = diversityPenalizedKeys.has(candidateIdentity(result.card));
+    if (selected.length >= limit || limit <= 0) {
+      rejected.push(withSelectionRejection(
+        result,
+        diversityPenalized ? "post-selection:limit-after-diversity" : "post-selection:limit",
+      ));
+      continue;
+    }
+    if (result.score < threshold) {
+      rejected.push(withSelectionRejection(result, "post-selection:below-threshold"));
+      continue;
+    }
+    if (!selected.length || result.strongAnchor || result.score >= Math.max(threshold, topScore - 18)) {
+      selected.push({ ...result, postSelectionScore: result.score, rejectionReason: null });
+      continue;
+    }
+    rejected.push(withSelectionRejection(
+      result,
+      diversityPenalized ? "post-selection:confidence-gap-after-diversity" : "post-selection:confidence-gap",
+    ));
+  }
+  return { selected, rejected };
+}
+
+function mergeCandidateStates(base: ScoredCard[], ...stages: ScoredCard[][]): Map<string, ScoredCard> {
+  const merged = new Map(base.map((candidate) => [candidateIdentity(candidate.card), candidate]));
+  for (const stage of stages) {
+    for (const candidate of stage) merged.set(candidateIdentity(candidate.card), candidate);
+  }
+  return merged;
+}
+
+function withSelectionRejection(result: ScoredCard, rejectionReason: string): ScoredCard {
+  return { ...result, rejectionReason };
+}
+
+function candidateDiagnostic(candidate: ScoredCard, selected: boolean): RetrievalCandidateDiagnostic {
+  return {
+    id: candidate.card.id,
+    title: candidate.card.title,
+    libraryScope: candidate.card.libraryScope || "global",
+    score: candidate.score,
+    rawScore: candidate.rawScore,
+    rankScore: candidate.rankScore,
+    postSelectionScore: candidate.postSelectionScore,
+    priorityScore: candidate.priorityScore,
+    evidenceFamilies: candidate.evidenceFamilies,
+    strongAnchor: candidate.strongAnchor,
+    eligible: candidate.eligible,
+    selected,
+    rejectionReason: candidate.rejectionReason,
+    reasons: candidate.reasons,
+  };
+}
+
+function compareDiagnosticCandidate(a: ScoredCard, b: ScoredCard): number {
+  if (a.eligible !== b.eligible) return a.eligible ? -1 : 1;
+  return compareMatchScore(a, b);
 }
 
 function sameStarterReplacementCluster(left: CardIndexEntry, right: CardIndexEntry): boolean {
   if (!isStarterReplacementPair(left, right)) return false;
-  const a = new Set((left.requiredSignals || []).filter(isRuleSignalId));
-  const b = new Set((right.requiredSignals || []).filter(isRuleSignalId));
+  const a = explicitRuleSignals(left);
+  const b = explicitRuleSignals(right);
   if (!a.size || !b.size) return false;
   return Array.from(a).some((signal) => b.has(signal));
+}
+
+function explicitRuleSignals(card: CardIndexEntry): Set<string> {
+  return new Set([
+    ...(card.requiredSignals || []),
+    ...(card.requiredAllSignals || []),
+  ].filter(isKnownSignalId));
 }
 
 function isStarterReplacementPair(left: CardIndexEntry, right: CardIndexEntry): boolean {
@@ -226,17 +497,32 @@ function isStarterCard(card: CardIndexEntry): boolean {
   return String(card.id || "").startsWith("starter-");
 }
 
-function isRuleSignalId(value: string): boolean {
-  return /^[a-z][a-z0-9_]*_[a-z0-9_]+$/.test(String(value || ""));
-}
-
-function compareMatchScore(
-  a: Omit<MatchResult, "envelope" | "queryVariants" | "durationMs">,
-  b: Omit<MatchResult, "envelope" | "queryVariants" | "durationMs">,
-): number {
+function compareMatchScore(a: ScoredCard, b: ScoredCard): number {
+  const rankDelta = b.rankScore - a.rankScore;
+  if (Math.abs(rankDelta) > 0.001) return rankDelta;
   const scoreDelta = b.score - a.score;
   if (Math.abs(scoreDelta) > 0.01) return scoreDelta;
-  return libraryPriority(b.card) - libraryPriority(a.card) || a.card.id.localeCompare(b.card.id);
+  const rawDelta = b.rawScore - a.rawScore;
+  if (Math.abs(rawDelta) > 0.001) return rawDelta;
+  return b.priorityScore - a.priorityScore
+    || libraryPriority(b.card) - libraryPriority(a.card)
+    || compareCandidateIdentity(a.card, b.card);
+}
+
+function candidateIdentity(card: CardIndexEntry): string {
+  return `${card.libraryScope || "global"}\u0000${card.id}`;
+}
+
+function candidateDisplayIdentity(card: CardIndexEntry): string {
+  return `${card.libraryScope || "global"}:${card.id}`;
+}
+
+function compareCandidateIdentity(left: CardIndexEntry, right: CardIndexEntry): number {
+  return candidateIdentity(left).localeCompare(candidateIdentity(right));
+}
+
+function sameLogicalCardId(left: CardIndexEntry, right: CardIndexEntry): boolean {
+  return left.id === right.id;
 }
 
 function libraryPriority(card: CardIndexEntry): number {
@@ -305,27 +591,7 @@ function formatReason(reasonItem: MatchReason | string | undefined): string {
 }
 
 function signalReasonLabel(signal: string): string {
-  const labels: Record<string, string> = {
-    goal_execute: "task looks like a real goal-execution start",
-    ui_surface: "task has a real UI or browser-visible surface",
-    worktree_diff_operation: "task involves real worktree, diff, stage, or commit scope",
-    historical_session_lookup: "task asks to look up historical session evidence",
-    provider_adapter_boundary: "task touches provider hook or runtime adapter boundaries",
-    package_install_validation: "task needs package or clean-install validation",
-    delivery_gate: "task is at delivery, review, or acceptance gate",
-    source_truth_chain: "task needs requirements, design, acceptance, and code source alignment",
-    failure_triage: "task needs failure triage across environment, tools, config, and business logic",
-    temporary_mock_boundary: "task involves mock, fake data, placeholder, fallback, or temporary implementation boundary",
-    external_model_review: "task asks for external or multi-model review",
-    rule_governance: "task changes agent rules or rule layering",
-    bridge_runtime_validation: "task validates bridge, bot, message service, or watchdog runtime state",
-    design_source_alignment: "task needs UI/UX alignment with the design source of truth",
-    information_design: "task needs attention hierarchy or lower mental load",
-    architecture_quality: "task asks for cohesive architecture, clean logic, or a root-cause fix",
-    high_risk_action: "task involves irreversible or high-risk action",
-    ome_review_surface: "task is about OME draft approval flow or experience-library governance",
-  };
-  return labels[signal] || "matched by an internal recall hint";
+  return getSignalDefinition(signal)?.reason || "matched by an internal recall hint";
 }
 
 function primaryContextReason(reasons: MatchReason[]): MatchReason | undefined {

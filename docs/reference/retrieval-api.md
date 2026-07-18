@@ -13,7 +13,7 @@ status: active
   "prompt": "Fix UI and validate in browser",
   "provider": "codex",
   "cwd": "/path/to/project",
-  "limit": 8,
+  "limit": 4,
   "budget": {
     "maxChars": 6000
   }
@@ -33,13 +33,19 @@ status: active
   "constraints": [],
   "files": [],
   "commands": [],
-  "intentModes": [],
+  "intentModes": ["execute"],
   "ruleSignals": [
+    {
+      "id": "explicit_execute",
+      "polarity": "positive",
+      "weight": 8,
+      "reason": "explicit execution wording"
+    },
     {
       "id": "ui_surface",
       "polarity": "positive",
-      "weight": 14,
-      "reason": "UI, browser, or frontend validation wording"
+      "weight": 8,
+      "reason": "UI, frontend, or browser surface wording"
     }
   ],
   "keywords": ["UI", "browser", "validate"],
@@ -56,7 +62,12 @@ status: active
   "rank": 1,
   "id": "browser-validation",
   "title": "Browser Validation",
-  "score": 12.4,
+  "score": 82,
+  "rawScore": 12.4,
+  "rankScore": 32.1,
+  "postSelectionScore": 82,
+  "evidenceFamilies": ["triggers", "signals"],
+  "strongAnchor": true,
   "recallPolicy": "must",
   "risk": "high",
   "confidence": "high",
@@ -65,8 +76,8 @@ status: active
     "libraryScope": "project"
   },
   "reasons": [
-    { "field": "triggers", "term": "browser validation", "weight": 5 },
-    { "field": "topics", "term": "frontend", "weight": 2 }
+    { "field": "triggers", "term": "browser validation", "weight": 52, "kind": "phrase-exact" },
+    { "field": "ruleSignals", "term": "ui_surface", "weight": 48, "kind": "UI, frontend, or browser surface wording" }
   ],
   "similarCards": []
 }
@@ -84,6 +95,40 @@ ome match "Fix UI and validate in browser" --explain --json
 ```json
 {
   "ok": true,
+  "threshold": 40,
+  "limit": 4,
+  "diagnostics": {
+    "engineVersion": "sparse-v2",
+    "scorerVersion": "bm25f-evidence-v2",
+    "threshold": 40,
+    "limit": 4,
+    "inputCardCount": 1,
+    "applicableCardCount": 1,
+    "evaluatedCardCount": 1,
+    "timedOut": false,
+    "complete": true,
+    "candidateListTruncated": false,
+    "abstained": false,
+    "abstainReason": null,
+    "selectedCardIds": ["browser-validation"],
+    "candidates": [
+      {
+        "id": "browser-validation",
+        "libraryScope": "project",
+        "score": 82,
+        "rawScore": 12.4,
+        "rankScore": 32.1,
+        "postSelectionScore": 82,
+        "priorityScore": 7,
+        "evidenceFamilies": ["triggers", "signals"],
+        "strongAnchor": true,
+        "eligible": true,
+        "selected": true,
+        "rejectionReason": null,
+        "reasons": []
+      }
+    ]
+  },
   "queryVariants": ["Fix UI and validate in browser", "ui test browser validate"],
   "projectContext": {
     "projectKey": "github.com/example/app",
@@ -98,12 +143,17 @@ ome match "Fix UI and validate in browser" --explain --json
     {
       "rank": 1,
       "id": "browser-validation",
-      "score": 12.4,
+      "score": 82,
+      "rawScore": 12.4,
+      "rankScore": 32.1,
+      "postSelectionScore": 82,
+      "evidenceFamilies": ["triggers", "signals"],
+      "strongAnchor": true,
       "card": {
         "libraryScope": "project"
       },
       "reasons": [
-        { "field": "ruleSignals", "term": "ui_surface", "weight": 14 }
+        { "field": "ruleSignals", "term": "ui_surface", "weight": 48, "kind": "UI, frontend, or browser surface wording" }
       ],
       "similarCards": [
         {
@@ -127,11 +177,29 @@ uses `ome experience show CARD_ID --scope project --section rule`.
 The renderer can mention them as omitted related cards, but it should not inject
 duplicate full lessons.
 
-`ruleSignals` are internal recall hints derived from the prompt. Positive
-engine hints boost cards when the prompt strongly resembles the right workflow;
-negative engine hints suppress common false positives. They are heuristic
-signals, not the final usage standard. Hook context renders natural-language
-criteria and match reasons instead of exposing hint ids.
+Score fields have separate contracts:
+
+- `score` is the corpus-size-stable `0-100` evidence score used for the
+  configured threshold;
+- `rawScore` is the BM25F sparse value used only as a ranking channel;
+- `rankScore` is the deterministic reciprocal-rank-fusion result;
+- `postSelectionScore` is the evidence score after the selection pipeline;
+- `priorityScore` appears in candidate diagnostics as a non-relevance
+  tie-breaker derived from card metadata.
+
+`diagnostics` makes rejection and abstention inspectable without logging a raw
+prompt. It reports the retrieval versions, counts, completeness, selected ids,
+and a bounded candidate list. `candidateListTruncated` explicitly says whether
+that list omitted rows while `evaluatedCardCount` retains the total. Rejected candidates retain `rejectionReason` and
+positive/negative reasons. When no candidate clears the evidence contract,
+`abstained` is true and `matches` is empty; the engine does not fill the limit
+with weak cards.
+
+`ruleSignals` are registered internal recall hints derived from the prompt.
+Positive engine hints provide evidence or routing gates; negative hints suppress
+only their declared targets. They are heuristic signals, not the final usage
+standard. Hook context renders natural-language criteria and match reasons
+instead of exposing hint ids.
 
 `additionalContext` uses a fixed English instruction frame and contains only
 compact index information. Card rule bodies are not injected. Matched cards are

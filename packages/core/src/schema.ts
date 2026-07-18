@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { INTENT_MODES } from "./intent-rules.js";
+import {
+  DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS,
+  DEFAULT_HOOK_TIMEOUT_MS,
+  DEFAULT_RETRIEVAL_LIMIT,
+  DEFAULT_RETRIEVAL_THRESHOLD,
+} from "./retrieval-contract.js";
 
 export const CardStatusSchema = z.enum(["draft", "active", "archived"]);
 export const RecallPolicySchema = z.enum(["must", "should", "summary", "off"]);
@@ -13,6 +19,8 @@ export const SourceCoverageSchema = z.enum(["all-accessible", "bounded", "user-p
 export const SourceAdapterSchema = z.enum(["codex-sessions", "spool", "manual", "ome-starter", "unknown"]);
 export const AgentOriginSchema = z.enum(["codex", "claude", "gemini", "opencode", "unknown"]);
 export const SourceRefTypeSchema = z.enum(["session", "turn", "file", "retrospective", "starter", "manual"]);
+
+export const HOOK_TELEMETRY_SCHEMA_VERSION = 2;
 
 export const ProjectContextSchema = z.object({
   cwd: z.string().nullable().default(null),
@@ -41,13 +49,12 @@ export const ConfigSchema = z.object({
   dataDir: z.string().min(1),
   privacy: z.object({
     saveRawPrompt: z.boolean().default(false),
-    debugRawPromptTtlHours: z.number().int().positive().default(24),
   }),
   retrieval: z.object({
-    maxCards: z.number().int().positive().default(4),
-    minScore: z.number().nonnegative().default(40),
-    additionalContextMaxChars: z.number().int().positive().default(6000),
-    hookTimeoutMs: z.number().int().positive().default(4000),
+    maxCards: z.number().int().positive().default(DEFAULT_RETRIEVAL_LIMIT),
+    minScore: z.number().min(0).max(100).default(DEFAULT_RETRIEVAL_THRESHOLD),
+    additionalContextMaxChars: z.number().int().positive().default(DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS),
+    hookTimeoutMs: z.number().int().positive().default(DEFAULT_HOOK_TIMEOUT_MS),
   }).default({}),
   hooks: z.object({
     providers: z.object({
@@ -106,6 +113,7 @@ export const ExperienceCardSchema = z.object({
   applicability: ApplicabilitySchema,
   intentModes: IntentModeGateSchema,
   requiredSignals: z.array(z.string()).default([]),
+  requiredAllSignals: z.array(z.string()).default([]),
   blockedSignals: z.array(z.string()).default([]),
   language: z.enum(["auto", "en", "zh", "mixed"]).default("auto"),
   recallPolicy: RecallPolicySchema.default("should"),
@@ -134,6 +142,7 @@ export const RetrospectiveCandidateSchema = z.object({
   applicability: ApplicabilitySchema,
   intentModes: IntentModeGateSchema,
   requiredSignals: z.array(z.string()).default([]),
+  requiredAllSignals: z.array(z.string()).default([]),
   blockedSignals: z.array(z.string()).default([]),
   evidence: z.array(z.string()).default([]),
   origin: OriginSchema,
@@ -201,41 +210,129 @@ export const SessionIndexRecordSchema = z.object({
   materialized: z.boolean().default(false),
 });
 
+const HookMatchReasonSchema = z.union([
+  z.string(),
+  z.object({
+    field: z.string(),
+    term: z.string(),
+    weight: z.number(),
+    kind: z.string(),
+  }),
+]);
+
+const HookScoredCardSchema = z.object({
+  id: z.string(),
+  libraryScope: z.enum(["global", "project"]).default("global"),
+  score: z.number().optional(),
+  rawScore: z.number().nullable().default(null),
+  rankScore: z.number().nullable().default(null),
+  postSelectionScore: z.number().nullable().default(null),
+  priorityScore: z.number().nullable().default(null),
+  evidenceFamilies: z.array(z.string()).default([]),
+  strongAnchor: z.boolean().default(false),
+  eligible: z.boolean().default(false),
+  selected: z.boolean().default(false),
+  rejectionReason: z.string().nullable().default(null),
+  reasons: z.array(HookMatchReasonSchema).default([]),
+});
+
+const HookCandidateStageSchema = z.object({
+  available: z.boolean().default(false),
+  complete: z.boolean().default(false),
+  count: z.number().int().nonnegative().nullable().default(null),
+  truncated: z.boolean().default(false),
+  unavailableReason: z.string().nullable().default(null),
+  cards: z.array(HookScoredCardSchema).default([]),
+}).default({});
+
+const HookSelectionStageSchema = z.object({
+  selectedCardIds: z.array(z.string()).default([]),
+  cards: z.array(HookScoredCardSchema).default([]),
+}).default({});
+
 export const HookEventSchema = z.object({
   id: z.string().min(1),
+  kind: z.literal("hook").default("hook"),
+  schemaVersion: z.number().int().positive().default(1),
+  engineVersion: z.string().default("legacy-unknown"),
+  scorerVersion: z.string().default("legacy-unknown"),
+  libraryFingerprint: z.string().nullable().default(null),
+  cardSetFingerprint: z.string().nullable().default(null),
+  globalCardSetFingerprint: z.string().nullable().default(null),
+  configFingerprint: z.string().nullable().default(null),
   provider: z.string().default("unknown"),
   event: z.string().default("prompt.submit"),
   sessionId: z.string().nullable().default(null),
   turnId: z.string().nullable().default(null),
   promptHash: z.string(),
+  rawPrompt: z.string().optional(),
   taskEnvelope: z.record(z.unknown()),
   projectContext: z.record(z.unknown()).default({}),
+  libraries: z.array(z.record(z.unknown())).default([]),
   queryVariants: z.array(z.string()).default([]),
-  matchedCards: z.array(z.object({
-    id: z.string(),
-    score: z.number(),
-    reasons: z.array(z.union([
-      z.string(),
-      z.object({
-        field: z.string(),
-        term: z.string(),
-        weight: z.number(),
-        kind: z.string(),
-      }),
-    ])),
-  })).default([]),
-  injected: z.boolean(),
+  candidateStage: HookCandidateStageSchema,
+  selectionStage: HookSelectionStageSchema,
+  matchedCards: z.array(HookScoredCardSchema).default([]),
+  matched: z.boolean().default(false),
+  renderedCardIds: z.array(z.string()).default([]),
+  rendered: z.boolean().default(false),
+  contextTruncated: z.boolean().default(false),
+  deliveryStatus: z.enum(["unknown"]).default("unknown"),
+  // Deprecated compatibility alias. It means context was rendered, not that a
+  // host or model consumed it.
+  injected: z.boolean().default(false),
   durationMs: z.number(),
   budgetUsedChars: z.number().default(0),
   error: z.string().nullable().default(null),
   createdAt: z.string(),
 });
 
+const StatsMetricViewSchema = z.object({
+  eventCount: z.number().int().nonnegative(),
+  matchedEventCount: z.number().int().nonnegative(),
+  renderedEventCount: z.number().int().nonnegative(),
+  matchRate: z.number(),
+  renderRate: z.number(),
+  noHitRate: z.number(),
+  cardRecallCount: z.record(z.number()),
+  cardRenderedCount: z.record(z.number()),
+}).default({
+  eventCount: 0,
+  matchedEventCount: 0,
+  renderedEventCount: 0,
+  matchRate: 0,
+  renderRate: 0,
+  noHitRate: 0,
+  cardRecallCount: {},
+  cardRenderedCount: {},
+});
+
 export const StatsReportSchema = z.object({
   generatedAt: z.string(),
+  view: z.literal("current-snapshot").default("current-snapshot"),
+  currentSnapshot: z.object({
+    schemaVersion: z.number().int().positive(),
+    engineVersion: z.string(),
+    scorerVersion: z.string(),
+    globalCardSetFingerprint: z.string(),
+    configFingerprint: z.string(),
+    activeGlobalCardCount: z.number().int().nonnegative(),
+  }).default({
+    schemaVersion: 1,
+    engineVersion: "legacy-unknown",
+    scorerVersion: "legacy-unknown",
+    globalCardSetFingerprint: "",
+    configFingerprint: "",
+    activeGlobalCardCount: 0,
+  }),
+  current: StatsMetricViewSchema,
+  cumulative: StatsMetricViewSchema,
+  excludedEventCount: z.number().int().nonnegative().default(0),
   coverageRate: z.number(),
   injectionRate: z.number(),
+  renderRate: z.number().default(0),
   cardRecallCount: z.record(z.number()),
+  cardRenderedCount: z.record(z.number()).default({}),
   noHitRate: z.number(),
   staleCards: z.array(z.string()),
   maintenanceActions: z.array(z.string()),

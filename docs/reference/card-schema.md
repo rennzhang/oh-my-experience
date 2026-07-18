@@ -120,9 +120,11 @@ appear in the lesson.
 - `criteria.use_when`: short workflow-entry phrases. Good entries are close to what a
   user would say when the lesson should apply, such as `run git status before
   commit` or `validate UI in browser`.
-- `criteria.ignore_when`: common near misses. Use them for documentation examples,
-  explain-only prompts, business uses of overloaded words, or tasks where the
-  lesson is explicitly noise.
+- `criteria.ignore_when`: common near misses. Use them for documentation
+  examples, explain-only prompts, business uses of overloaded words, or tasks
+  where the lesson is explicitly noise. Containing an exact normalized phrase
+  is a hard exclusion; fuzzy overlap is negative evidence rather than an absolute
+  match.
 - `recall.triggers`: the compact trigger list used by the matcher.
 - `recall.topics`: broad taxonomy such as `git`, `frontend`, or `runtime`.
   Topics help recall, but should not be the only reason a precise card matches.
@@ -131,44 +133,68 @@ appear in the lesson.
 - `scope.project_key`: the project identity used for project matching, such as
   a repository key.
 - `scope.module_path`: optional path inside the project, such as `apps/web`.
-- `engine_hints.positive`: internal recall hints for task shapes OME can
-  detect reliably. Routing hints such as `ui_surface`, `goal_execute`, or
-  `worktree_diff_operation` are strict gates as well as boosts: if the prompt
-  does not contain that task shape, generic words such as "real" or
+- `engine_hints.positive`: registered internal recall hints for task shapes OME
+  can detect reliably. It is the required-any group: when several ids are
+  listed, at least one positive signal must be present. Routing hints such as
+  `ui_surface`, `goal_execute`, or
+  `worktree_diff_operation` are gates as well as positive evidence: if the
+  prompt does not contain that task shape, generic words such as "real" or
   "validation" cannot recall the card.
+- `engine_hints.required_all`: optional strict conjunction. Every registered
+  signal in this list must be present. Use it only when all listed task shapes
+  are genuinely necessary; overusing it causes false negatives.
 - `engine_hints.negative`: internal recall hints that suppress common false
-  positives.
+  positives. A negative signal only suppresses the positive targets declared
+  by its registry definition.
 
 Engine hints are not the source of truth for human or model judgment. They are
 heuristics. Hook context shows natural-language usage criteria and natural
 match reasons, not internal hint ids.
 
-Common signals:
+Signal ids come from the shared registry rather than a scorer-local whitelist.
+Each registry definition declares polarity, routing behavior, matching
+patterns, negative targets, and ownership metadata:
 
-| Signal | Use |
-|---|---|
-| `goal_execute` | User is starting an agent goal, `/goal`, or full-closure execution. |
-| `goal_example_discussion` | Goal wording appears only inside docs, examples, or explanations. |
-| `business_goal_discussion` | Goal means a business or life objective, not agent execution. |
-| `explain_only` | User asks for an explanation only. |
-| `git_operation` | Real Git, diff, stage, commit, push, or worktree operation. |
-| `worktree_diff_operation` | Dirty worktree, diff, stage, or commit-scope operation. |
-| `historical_session_lookup` | Spool/session UUID lookup or historical conversation evidence. |
-| `provider_adapter_boundary` | Provider hook/runtime boundary work. |
-| `package_install_validation` | Tarball, package, or clean install validation. |
-| `ui_surface` | Real UI, browser, viewport, or frontend validation surface. |
-| `ui_surface_noise` | UI wording is explicitly described as noise. |
-| `delivery_gate` | Delivery, final review, pre-submit, or acceptance gate work. |
-| `source_truth_chain` | Requirement, design, acceptance, and implementation source-of-truth alignment. |
-| `failure_triage` | Debugging needs environment/tool/config vs business failure separation. |
-| `temporary_mock_boundary` | Mock, fake data, placeholder, fallback, or temporary implementation boundary. |
-| `external_model_review` | External or multi-model review with source anchors and decision boundary. |
-| `rule_governance` | Agent rule, AGENTS, CLAUDE, or rule-layer governance. |
-| `bridge_runtime_validation` | Bridge, bot, message service, watchdog, or runtime status validation. |
-| `design_source_alignment` | UI/UX or product design work that must align with DESIGN.md or a design source. |
-| `information_design` | Attention hierarchy, concept slimming, or low mental-load information design. |
-| `architecture_quality` | Cohesive modules, low coupling, clean logic, or root-cause implementation work. |
-| `high_risk_action` | Irreversible or high-risk operation that requires explicit authorization. |
+- `source: generic` identifies a task shape suitable for the open-source core;
+- `source: pack` and a non-empty `pack` identify a bundled domain or product
+  pack.
+
+This metadata keeps product-specific language out of the generic contract while
+keeping built-in extensions organized. The registry is compiled into the
+package; there is no runtime third-party signal registration API. Card files
+store only the signal ids. Unknown ids should be reported by card validation
+instead of being silently treated as working routing hints.
+
+Bundled signal examples:
+
+| Signal | Source | Pack | Use |
+|---|---|---|---|
+| `ui_surface` | generic | - | Real UI, browser, viewport, or frontend validation surface. |
+| `ui_surface_noise` | generic | - | UI wording is explicitly described as noise; targets `ui_surface`. |
+| `worktree_diff_operation` | generic | - | Dirty worktree, diff, stage, or commit-scope operation. |
+| `provider_adapter_boundary` | generic | - | Provider hook/runtime boundary work. |
+| `dispatch_runtime_development` | pack | `ai-dispatch` | Development of ai-dispatch provider, routing, resume, or stream runtime; ordinary dispatch use is excluded. |
+| `control_plane_worker_divergence` | pack | `agent-ops` | Capacity, lease, or queue state diverges from live worker evidence. |
+| `control_plane_divergence_ruled_out` | pack | `agent-ops` | An apparent capacity, lease, or worker mismatch was explicitly disproved; suppresses divergence routing. |
+| `runtime_reference_context` | generic | - | Runtime wording appears only in docs, fixtures, simulations, UI copy, hypotheticals, or prohibitions; suppresses runtime-development and divergence routing. |
+| `dispatch_tool_use_context` | pack | `ai-dispatch` | ai-dispatch is invoked as a tool to work on another target; suppresses runtime-development routing. |
+| `external_model_review` | generic | - | External or multi-model review with source anchors and decision boundary. |
+| `goal_execute` | pack | `agent-goal` | Agent goal or full-closure execution. |
+| `goal_example_discussion` | pack | `agent-goal` | Goal wording only inside docs, examples, or explanations. |
+| `ome_review_surface` | pack | `ome` | OME draft approval or experience-library governance. |
+| `historical_session_lookup` | pack | `spool` | Historical session or conversation evidence lookup. |
+
+The registry is the authoritative list. The examples above are illustrative,
+not a second whitelist that consumers should copy.
+
+Persisted frontmatter uses these groups:
+
+```yaml
+engine_hints:
+  positive: [ui_surface, design_source_alignment] # at least one
+  required_all: [explicit_execute, real_validation] # every item
+  negative: [ui_surface_noise]
+```
 
 Examples:
 

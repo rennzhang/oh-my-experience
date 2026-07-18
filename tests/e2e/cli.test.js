@@ -76,8 +76,9 @@ function currentCandidate(fixture) {
       ignore_when: fixture.negativeTriggers || [],
     },
     engine_hints: {
-      positive: fixture.triggers || [],
-      negative: fixture.negativeTriggers || [],
+      positive: fixture.requiredSignals || [],
+      required_all: fixture.requiredAllSignals || [],
+      negative: fixture.blockedSignals || [],
     },
     recall: {
       policy: fixture.recallPolicy || "should",
@@ -1233,6 +1234,24 @@ test("hook log does not persist raw prompt by default", () => {
   json(run(["hook", "run", "--data-dir", dataDir, "--json"], { input: JSON.stringify({ prompt: "private raw prompt abc" }) }));
   const log = fs.readFileSync(path.join(dataDir, "events.jsonl"), "utf8");
   assert.equal(log.includes("private raw prompt abc"), false);
+});
+
+test("hook log persists raw prompt when explicitly enabled", () => {
+  const dataDir = tmpDir("hook-raw-prompt-enabled");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  json(run(["config", "set", "privacy.saveRawPrompt", "true", "--data-dir", dataDir, "--json"]));
+  const prompt = "explicit raw prompt\nwith a second line";
+
+  json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
+    input: JSON.stringify({ prompt, session_id: "raw-prompt-e2e" }),
+  }));
+
+  const events = fs.readFileSync(path.join(dataDir, "events.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  const event = events.find((item) => item.sessionId === "raw-prompt-e2e");
+  assert.equal(event.rawPrompt, prompt);
 });
 
 test("hook logs project library warnings without injecting them", () => {

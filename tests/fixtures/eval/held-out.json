@@ -1,0 +1,50 @@
+{
+  "name": "held-out-generic-business",
+  "experiencesFile": "./held-out.cards.json",
+  "cases": [
+    {
+      "id": "cross-language-invoice-export",
+      "difficulty": "medium",
+      "prompt": "财务需要导出本月发票台账，给运营下载逗号分隔文件，不是只看页面汇总。",
+      "expectedCards": ["invoice-csv-export"],
+      "tags": ["business", "cross-language", "zh-CN"]
+    },
+    {
+      "id": "english-inventory-paraphrase",
+      "difficulty": "medium",
+      "prompt": "Notify purchasing when an item's on-hand quantity drops under the restock floor so the buyer can replenish it.",
+      "expectedCards": ["inventory-reorder-alert"],
+      "tags": ["business", "alias", "en"]
+    },
+    {
+      "id": "long-noisy-refund-workflow",
+      "difficulty": "hard",
+      "prompt": "We are revisiting the customer portal, monthly reports, team permissions, invoice totals, supplier notes, room bookings, and inventory dashboards. Most of that is background. The actual change is to keep an approval trail for customer refunds, including the requester, approver, decision reason, amount, and timestamp.",
+      "expectedCards": ["refund-approval-audit"],
+      "tags": ["business", "long-noise", "en"]
+    },
+    {
+      "id": "mixed-language-payroll",
+      "difficulty": "hard",
+      "prompt": "发薪前 lock time entries after payroll cutoff，已审批记录不能被普通编辑覆盖，但要保留纠错流程。",
+      "expectedCards": ["payroll-cutoff-lock"],
+      "tags": ["business", "mixed"]
+    },
+    {
+      "id": "near-miss-invoice-dashboard",
+      "difficulty": "hard",
+      "prompt": "只在财务 dashboard 展示 invoice totals，不要导出，也不提供下载文件。",
+      "expectedCards": [],
+      "expectNoMatches": true,
+      "tags": ["business", "negative", "mixed"]
+    },
+    {
+      "id": "ordinary-business-no-hit",
+      "difficulty": "medium",
+      "prompt": "Summarize the quarterly revenue forecast for the board and explain the assumptions behind next year's growth target.",
+      "expectedCards": [],
+      "expectNoMatches": true,
+      "tags": ["business", "negative", "en"]
+    }
+  ]
+}

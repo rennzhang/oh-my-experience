@@ -48,6 +48,11 @@ Default path:
 }
 ```
 
+`privacy.saveRawPrompt` controls whether hook events include the submitted
+prompt as a plaintext `rawPrompt` field. It is disabled by default. When it is
+enabled, the raw prompt is written to the same global `events.jsonl` record as
+the retrieval telemetry.
+
 `sessions.store` controls the retention posture for scanned source sessions:
 
 - `pointer`: prefer source references and lightweight indexes.

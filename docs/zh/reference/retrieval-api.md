@@ -13,7 +13,7 @@ status: active
   "prompt": "Fix UI and validate in browser",
   "provider": "codex",
   "cwd": "/path/to/project",
-  "limit": 8,
+  "limit": 4,
   "budget": {
     "maxChars": 6000
   }
@@ -33,13 +33,19 @@ status: active
   "constraints": [],
   "files": [],
   "commands": [],
-  "intentModes": [],
+  "intentModes": ["execute"],
   "ruleSignals": [
+    {
+      "id": "explicit_execute",
+      "polarity": "positive",
+      "weight": 8,
+      "reason": "explicit execution wording"
+    },
     {
       "id": "ui_surface",
       "polarity": "positive",
-      "weight": 14,
-      "reason": "UI, browser, or frontend validation wording"
+      "weight": 8,
+      "reason": "UI, frontend, or browser surface wording"
     }
   ],
   "keywords": ["UI", "browser", "validate"],
@@ -56,7 +62,12 @@ status: active
   "rank": 1,
   "id": "browser-validation",
   "title": "Browser Validation",
-  "score": 12.4,
+  "score": 82,
+  "rawScore": 12.4,
+  "rankScore": 32.1,
+  "postSelectionScore": 82,
+  "evidenceFamilies": ["triggers", "signals"],
+  "strongAnchor": true,
   "recallPolicy": "must",
   "risk": "high",
   "confidence": "high",
@@ -65,8 +76,8 @@ status: active
     "libraryScope": "project"
   },
   "reasons": [
-    { "field": "triggers", "term": "browser validation", "weight": 5 },
-    { "field": "topics", "term": "frontend", "weight": 2 }
+    { "field": "triggers", "term": "browser validation", "weight": 52, "kind": "phrase-exact" },
+    { "field": "ruleSignals", "term": "ui_surface", "weight": 48, "kind": "UI, frontend, or browser surface wording" }
   ],
   "similarCards": []
 }
@@ -83,6 +94,40 @@ ome match "Fix UI and validate in browser" --explain --json
 ```json
 {
   "ok": true,
+  "threshold": 40,
+  "limit": 4,
+  "diagnostics": {
+    "engineVersion": "sparse-v2",
+    "scorerVersion": "bm25f-evidence-v2",
+    "threshold": 40,
+    "limit": 4,
+    "inputCardCount": 1,
+    "applicableCardCount": 1,
+    "evaluatedCardCount": 1,
+    "timedOut": false,
+    "complete": true,
+    "candidateListTruncated": false,
+    "abstained": false,
+    "abstainReason": null,
+    "selectedCardIds": ["browser-validation"],
+    "candidates": [
+      {
+        "id": "browser-validation",
+        "libraryScope": "project",
+        "score": 82,
+        "rawScore": 12.4,
+        "rankScore": 32.1,
+        "postSelectionScore": 82,
+        "priorityScore": 7,
+        "evidenceFamilies": ["triggers", "signals"],
+        "strongAnchor": true,
+        "eligible": true,
+        "selected": true,
+        "rejectionReason": null,
+        "reasons": []
+      }
+    ]
+  },
   "queryVariants": ["Fix UI and validate in browser", "ui test browser validate"],
   "projectContext": {
     "projectKey": "github.com/example/app",
@@ -97,12 +142,17 @@ ome match "Fix UI and validate in browser" --explain --json
     {
       "rank": 1,
       "id": "browser-validation",
-      "score": 12.4,
+      "score": 82,
+      "rawScore": 12.4,
+      "rankScore": 32.1,
+      "postSelectionScore": 82,
+      "evidenceFamilies": ["triggers", "signals"],
+      "strongAnchor": true,
       "card": {
         "libraryScope": "project"
       },
       "reasons": [
-        { "field": "ruleSignals", "term": "ui_surface", "weight": 14 }
+        { "field": "ruleSignals", "term": "ui_surface", "weight": 48, "kind": "UI, frontend, or browser surface wording" }
       ],
       "similarCards": [
         {
@@ -124,7 +174,24 @@ ome match "Fix UI and validate in browser" --explain --json
 
 `similarCards` 列出因为近似重复而从 ranked output 中省略的卡片。Renderer 可以提到这些 omitted related cards，但不应注入重复的完整经验。
 
-`ruleSignals` 是从 prompt 派生出来的内部召回提示。正向 engine hint 会在 prompt 强烈像目标工作流时加权；负向 engine hint 用于压住常见误召回。它们是启发式，不是最终使用标准。Hook 上下文展示自然语言使用标准和自然语言命中原因，不暴露 hint id。
+不同 score 字段有不同契约：
+
+- `score` 是不随 corpus 大小漂移的 `0-100` evidence score，用于 configured threshold；
+- `rawScore` 是只用于 ranking channel 的 BM25F sparse value；
+- `rankScore` 是 deterministic reciprocal-rank-fusion 结果；
+- `postSelectionScore` 是 selection pipeline 之后的 evidence score；
+- `priorityScore` 出现在 candidate diagnostics 中，只作为来自 card metadata 的
+  non-relevance tie-breaker。
+
+`diagnostics` 让 rejection 和 abstention 可解释，同时不记录 raw prompt。它包含 retrieval
+versions、counts、completeness、selected ids 和有上限的 candidate list。
+`candidateListTruncated` 明确说明列表是否省略候选行，`evaluatedCardCount` 保留总数。Rejected
+candidates 保留 `rejectionReason` 和正负 reasons。没有 candidate 越过 evidence
+contract 时，`abstained` 为 true、`matches` 为空；引擎不会用弱卡填满 limit。
+
+`ruleSignals` 是从 prompt 派生出来的 registered 内部召回提示。正向 engine hint 提供
+evidence 或 routing gate；负向 hint 只压制其声明的 targets。它们是启发式，不是最终
+使用标准。Hook 上下文展示自然语言使用标准和自然语言命中原因，不暴露 hint id。
 
 `additionalContext` 的框架提示固定使用英文，且只包含紧凑索引信息。卡片规则正文不会
 被注入。命中卡片只是候选，不代表 Agent 已经采用。框架会要求 Agent 逐条判断：可以

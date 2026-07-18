@@ -17,6 +17,7 @@ import {
   explainMatch,
   generateStats,
   getCard,
+  getSignalDefinition,
   initializeDataDir,
   initializeProjectLibrary,
   layout,
@@ -99,8 +100,9 @@ function candidateFromFixture(runId, fixture) {
       ...(fixture.criteria || {}),
     },
     engine_hints: {
-      positive: fixture.requiredSignals || fixture.triggers || [],
-      negative: fixture.blockedSignals || fixture.negativeTriggers || [],
+      positive: fixture.requiredSignals || [],
+      required_all: fixture.requiredAllSignals || [],
+      negative: fixture.blockedSignals || [],
       ...(fixture.engine_hints || {}),
     },
     recall: {
@@ -219,7 +221,7 @@ test("generic checks do not imply review or runtime", () => {
 });
 
 test("matcher keeps source names separate from execution commands", () => {
-  const envelope = buildTaskEnvelope("用 spool 查 019e90a5-9539-7922-86f1-ea81f9a3b01f，研究 github x 论文里的召回引擎设计。");
+  const envelope = buildTaskEnvelope("用 spool 查 00000000-0000-0000-0000-000000000000，研究 github x 论文里的召回引擎设计。");
 
   assert.deepEqual(envelope.commands, []);
   assert.ok(envelope.surfaces.includes("spool"));
@@ -516,6 +518,47 @@ test("retrospective apply can resume later decisions without duplicating earlier
   addDecision(dataDir, runId, { candidateId: second.id, action: "approve" });
   const resumed = applyRetrospective(dataDir, runId);
   assert.deepEqual(resumed.drafts.map((card) => card.title), ["Second lesson"]);
+  assert.equal(listCards(dataDir).filter((card) => card.status === "draft").length, 2);
+});
+
+test("retrospective candidate refinement preserves applied ids and does not replay old drafts", () => {
+  const dataDir = tmpDir("candidate-refinement-after-apply");
+  initializeDataDir({ dataDir });
+  const runId = "run-refinement-after-apply";
+  fs.mkdirSync(path.join(layout(dataDir).retrospectives, runId), { recursive: true });
+  const first = candidateFromFixture(runId, {
+    title: "Applied lesson",
+    summary: "Already reviewed and applied.",
+    rule: "Do not replay this draft.",
+    triggers: ["applied lesson"],
+    topics: ["review"],
+    evidence: ["fixture"],
+  });
+  const second = candidateFromFixture(runId, {
+    title: "Refined lesson",
+    summary: "Added after user feedback.",
+    rule: "Apply only the new candidate.",
+    triggers: ["refined lesson"],
+    topics: ["review"],
+    evidence: ["fixture"],
+  });
+
+  writeTestCandidates(dataDir, runId, [first]);
+  addDecision(dataDir, runId, { candidateId: first.id, action: "approve" });
+  const initial = applyRetrospective(dataDir, runId);
+  assert.deepEqual(initial.drafts.map((card) => card.title), ["Applied lesson"]);
+
+  writeTestCandidates(dataDir, runId, [first, second]);
+  const stateAfterRefinement = JSON.parse(fs.readFileSync(path.join(layout(dataDir).retrospectives, runId, "state.json"), "utf8"));
+  assert.deepEqual(stateAfterRefinement.applied.map((item) => item.candidateId), [first.id]);
+  const preview = previewApplyRetrospective(dataDir, runId);
+  assert.deepEqual(preview.drafts, []);
+  assert.ok(preview.skipped.some((item) => item.candidateId === first.id && item.reason === "already applied"));
+  assert.ok(preview.skipped.some((item) => item.candidateId === second.id && item.reason === "no decision"));
+
+  addDecision(dataDir, runId, { candidateId: second.id, action: "approve" });
+  const refined = applyRetrospective(dataDir, runId);
+  assert.deepEqual(refined.drafts.map((card) => card.title), ["Refined lesson"]);
   assert.equal(listCards(dataDir).filter((card) => card.status === "draft").length, 2);
 });
 
@@ -986,10 +1029,10 @@ test("starter architecture card recalls for cohesive root-cause implementation w
   const dataDir = tmpDir("starter-architecture-quality-gate");
   initializeDataDir({ dataDir });
 
-  const match = matchCards(dataDir, "召回引擎还是不太行，急需优化，高内聚低耦合，逻辑要干净，不要继续堆兼容包袱。", { threshold: 40 });
+  const match = matchCards(dataDir, "请重构沙盒索引模块：修复根因，保持高内聚低耦合，不要叠加临时兼容层。", { threshold: 40 });
   assert.equal(match[0]?.card.id, "starter-code-kiss-root-cause");
   assert.ok(match[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "architecture_quality"));
-  assert.match(renderAdditionalContext(match), /cohesive architecture, clean logic, or a root-cause fix/);
+  assert.match(renderAdditionalContext(match), new RegExp(getSignalDefinition("architecture_quality").reason));
 });
 
 test("architecture-gated cards recall for clean implementation-chain cleanup wording", () => {
@@ -1146,10 +1189,10 @@ test("Spool handoff cards require historical-session lookup intent", () => {
 
   const optionalScan = matchCards(dataDir, "Spool 是可选扫描来源，不是当前召回前置条件。", { threshold: 4 });
   assert.equal(optionalScan.some((item) => item.card.id === "spool-session-context-anchoring"), false);
-  const historicalLookup = matchCards(dataDir, "用 spool 查 019e90a5-9539-7922-86f1-ea81f9a3b01f 的历史会话证据。", { threshold: 4 });
+  const historicalLookup = matchCards(dataDir, "用 spool 查 00000000-0000-0000-0000-000000000000 的历史会话证据。", { threshold: 4 });
   assert.equal(historicalLookup[0]?.card.id, "spool-session-context-anchoring");
   assert.ok(historicalLookup[0]?.reasons.some((item) => item.field === "ruleSignals" && item.term === "historical_session_lookup"));
-  assert.match(renderAdditionalContext(historicalLookup), /Matched by: task asks to look up historical session evidence/);
+  assert.match(renderAdditionalContext(historicalLookup), new RegExp(getSignalDefinition("historical_session_lookup").reason));
 });
 
 test("global hooks filter project-specific cards by scope", () => {

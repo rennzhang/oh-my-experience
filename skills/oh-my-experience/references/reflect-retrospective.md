@@ -530,7 +530,7 @@ experience draft approval page.
 Example:
 
 ```markdown
-Experience draft approval: [open](../../../../ren-vault/AI/OME/retrospectives/2026-06-13T04-39-32-344Z-manual/experience-review.md)
+Experience draft approval: [open](../../../../Oh-My-Experience/retrospectives/2026-06-13T04-39-32-344Z-manual/experience-review.md)
 Retrospective id: 2026-06-13T04-39-32-344Z-manual
 ```
 

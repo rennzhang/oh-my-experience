@@ -6,6 +6,35 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.3.0 - 2026-07-18
+
+### Added
+
+- Added retrieval telemetry v2 with engine, scorer, card-set, configuration,
+  candidate, selection, and rendered-card evidence for comparable observations.
+- Added deterministic signal definitions, all-of signal contracts, held-out and
+  pairwise evaluation suites, and stricter trigger-contract validation.
+- Added optional plaintext raw-prompt event logging through
+  `privacy.saveRawPrompt`; it remains disabled by default.
+
+### Changed
+
+- Reworked recall scoring and selection around explicit evidence families,
+  stable retrieval contracts, duplicate collapse, diversity, and abstention.
+- Made stats distinguish the current comparable snapshot from cumulative
+  historical events instead of mixing incompatible telemetry generations.
+- Made the built-in coding-principles starter lesson describe a neutral
+  engineering standard rather than an assumed user preference.
+
+### Fixed
+
+- Preserved project-card precedence when global and project libraries contain
+  the same logical card, while keeping telemetry identities unambiguous.
+- Made evaluation failures return a failing CLI exit code and expanded
+  diagnostics for rejected candidates and incomplete telemetry.
+- Updated the dependency lock and documentation build stack so the audited
+  dependency tree has no known vulnerabilities at release time.
+
 ## 0.2.4 - 2026-06-19
 
 ### Changed

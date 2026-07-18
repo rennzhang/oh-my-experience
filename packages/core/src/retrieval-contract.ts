@@ -1,0 +1,11 @@
+export const RETRIEVAL_ENGINE_VERSION = "sparse-v2";
+export const RETRIEVAL_SCORER_VERSION = "bm25f-evidence-v2";
+
+export const DEFAULT_RETRIEVAL_LIMIT = 4;
+export const DEFAULT_RETRIEVAL_THRESHOLD = 40;
+export const DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS = 6000;
+export const DEFAULT_HOOK_TIMEOUT_MS = 4000;
+export const DEFAULT_DIAGNOSTIC_CANDIDATE_LIMIT = 32;
+
+export const RETRIEVAL_SCORE_MIN = 0;
+export const RETRIEVAL_SCORE_MAX = 100;

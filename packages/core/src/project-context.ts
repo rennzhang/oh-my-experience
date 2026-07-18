@@ -71,6 +71,7 @@ function readGitRemote(root: string): string | null {
     const value = execFileSync("git", ["-C", root, "config", "--get", "remote.origin.url"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
+      timeout: 1000,
     }).trim();
     return value || null;
   } catch {

@@ -3,7 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { inspectCards, listCards, rebuildCardIndex, type CardIndex } from "./cards.js";
 import { ConfigSchema, type Config } from "./schema.js";
+import { validateSignalIds } from "./signal-registry.js";
 import { defaultDataDir, layout, readJson } from "./storage.js";
+import { validateTriggerSignalContract, type TriggerSignalContractViolation } from "./trigger-signal-contract.js";
 
 type DoctorOptions = { codexHome?: string; claudeHome?: string };
 type HookEntry = { hooks?: Array<{ command?: string }> };
@@ -35,7 +37,8 @@ export function runDoctor(dataDir: string, { codexHome = process.env.CODEX_HOME 
       dataDir,
       experiences: cardInspection.cards.length,
       invalidCards: cardInspection.issues.length,
-      layers: ["storage", "schema", "index", "hook", "config", "package"],
+      triggerContractViolations: cardInspection.triggerContractViolations,
+      layers: ["storage", "schema", "trigger-contract", "index", "hook", "config", "package"],
     },
   };
 }
@@ -60,6 +63,7 @@ function checkWritable(dir: string, label: string, errors: string[]): void {
 
 function checkCards(dataDir: string, errors: string[], warnings: string[]) {
   const seen = new Set<string>();
+  let triggerContractViolations = 0;
   const inspection = inspectCards(dataDir);
   for (const issue of inspection.issues) {
     const message = `card schema invalid: ${path.relative(dataDir, issue.path)}: ${issue.message}`;
@@ -72,8 +76,37 @@ function checkCards(dataDir: string, errors: string[], warnings: string[]) {
     if (!card.triggers.length) errors.push(`card has no triggers: ${card.id}`);
     if (!card.topics.length) warnings.push(`card has no topics: ${card.id}`);
     if (card.status === "active" && card.recallPolicy === "off") warnings.push(`active card recall is off: ${card.id}`);
+    const signalValidation = validateSignalIds([
+      ...card.requiredSignals,
+      ...card.requiredAllSignals,
+      ...card.blockedSignals,
+    ]);
+    if (!signalValidation.ok) {
+      const message = `card references unknown signal ids: ${card.id}: ${signalValidation.unknown.join(", ")}`;
+      if (card.status === "archived") warnings.push(message);
+      else errors.push(message);
+      continue;
+    }
+    const triggerContract = validateTriggerSignalContract(card);
+    triggerContractViolations += triggerContract.violations.length;
+    for (const violation of triggerContract.violations) {
+      const message = formatTriggerContractViolation(card.status, violation);
+      if (card.status === "archived") warnings.push(message);
+      else errors.push(message);
+    }
   }
-  return inspection;
+  return {
+    ...inspection,
+    triggerContractViolations,
+  };
+}
+
+function formatTriggerContractViolation(status: string, violation: TriggerSignalContractViolation): string {
+  return [
+    `${status} card trigger signal contract invalid: ${violation.cardId} trigger[${violation.triggerIndex}]`,
+    `${violation.code}: ${violation.message}`,
+    `Action: ${violation.action}`,
+  ].join(": ");
 }
 
 function checkIndex(dataDir: string, errors: string[]): void {

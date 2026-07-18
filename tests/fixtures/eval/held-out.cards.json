@@ -1,0 +1,130 @@
+{
+  "experiences": [
+    {
+      "id": "invoice-csv-export",
+      "title": "Export the invoice ledger as CSV",
+      "category": "finance operations",
+      "summary": "Use when an operator needs a downloadable comma-separated invoice ledger, not merely an on-screen total.",
+      "criteria": {
+        "use_when": ["invoice ledger export", "download invoice CSV", "发票台账导出"],
+        "ignore_when": ["invoice dashboard only", "do not export", "不要导出"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": ["invoice ledger export", "download invoice CSV", "发票台账导出"],
+        "aliases": {
+          "zh-CN": ["下载逗号分隔文件", "导出本月发票台账"]
+        },
+        "topics": ["billing", "export"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Generate a downloadable CSV from the filtered invoice ledger and preserve stable column ordering."
+    },
+    {
+      "id": "inventory-reorder-alert",
+      "title": "Alert purchasing when stock reaches its reorder floor",
+      "category": "inventory operations",
+      "summary": "Use when on-hand inventory falls below the replenishment threshold and purchasing needs a notification.",
+      "criteria": {
+        "use_when": ["low stock alert", "reorder threshold", "库存不足补货提醒"],
+        "ignore_when": ["annual inventory report"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": ["low stock alert", "reorder threshold", "库存不足补货提醒"],
+        "aliases": {
+          "en": ["on-hand quantity drops under the restock floor", "notify purchasing to replenish"]
+        },
+        "topics": ["inventory", "notification"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Compare available quantity with the configured reorder floor and notify purchasing once per threshold crossing."
+    },
+    {
+      "id": "refund-approval-audit",
+      "title": "Keep an approval trail for customer refunds",
+      "category": "customer operations",
+      "summary": "Use when refund decisions require an auditable record of requester, approver, reason, and time.",
+      "criteria": {
+        "use_when": ["refund approval trail", "refund decision audit", "退款审批留痕"],
+        "ignore_when": ["refund policy copywriting"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": ["refund approval trail", "keep an approval trail for customer refunds", "退款审批留痕"],
+        "aliases": {
+          "zh-CN": ["记录退款申请人和审批人"]
+        },
+        "topics": ["refund", "audit"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Persist who requested and approved each refund, the reason, amount, and decision timestamp."
+    },
+    {
+      "id": "meeting-room-capacity",
+      "title": "Prevent meeting room bookings above capacity",
+      "category": "workplace operations",
+      "summary": "Use when a booking must reject attendee counts above a room's safe capacity.",
+      "criteria": {
+        "use_when": ["meeting room capacity", "booking attendee limit", "会议室容量"],
+        "ignore_when": ["video meeting participants"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": ["meeting room capacity", "booking attendee limit", "会议室容量"],
+        "topics": ["booking", "capacity"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Reject a room booking when attendee count exceeds the selected room's configured capacity."
+    },
+    {
+      "id": "supplier-contract-renewal",
+      "title": "Remind owners before supplier contracts expire",
+      "category": "procurement operations",
+      "summary": "Use when contract owners need an advance renewal reminder for expiring supplier agreements.",
+      "criteria": {
+        "use_when": ["supplier contract renewal", "agreement expiry reminder", "供应商合同续签提醒"],
+        "ignore_when": ["new supplier onboarding"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": ["supplier contract renewal", "agreement expiry reminder", "供应商合同续签提醒"],
+        "topics": ["supplier", "contract"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Notify the assigned owner before a supplier agreement reaches its renewal deadline."
+    },
+    {
+      "id": "payroll-cutoff-lock",
+      "title": "Lock approved time entries after payroll cutoff",
+      "category": "people operations",
+      "summary": "Use when approved time entries must stop changing once payroll processing begins.",
+      "criteria": {
+        "use_when": ["payroll cutoff lock", "lock approved time entries", "发薪截止后锁定工时"],
+        "ignore_when": ["draft time entry"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "medium",
+        "triggers": ["payroll cutoff lock", "lock approved time entries", "发薪截止后锁定工时"],
+        "aliases": {
+          "mixed": ["发薪前 lock time entries after payroll cutoff"]
+        },
+        "topics": ["payroll", "time-entry"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Make approved time entries immutable after payroll cutoff while preserving an explicit correction workflow."
+    }
+  ]
+}

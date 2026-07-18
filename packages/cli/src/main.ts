@@ -9,6 +9,8 @@ import {
   compareRecallReports,
   compactSessionIndex,
   createRetrospectiveRun,
+  DEFAULT_RETRIEVAL_LIMIT,
+  DEFAULT_RETRIEVAL_THRESHOLD,
   defaultDataDir,
   detectProjectContext,
   evaluateRecallSuite,
@@ -1541,19 +1543,21 @@ async function evalCommand(dataDir: string, subcommand: string | undefined, args
       const before = String(args.flags.compare);
       const after = args.positionals[2] || args.flags.next;
       if (!after) throw new Error("usage: ome eval recall --compare <before-report.json> <after-report.json>");
-      return print(compareRecallReports(path.resolve(before), path.resolve(after)), args);
+      const report = compareRecallReports(path.resolve(before), path.resolve(after));
+      if (!report.ok) process.exitCode = 1;
+      return print(report, args);
     }
     const suite = args.flags.suite || args.flags.file || args.positionals[2];
     if (!suite) throw new Error("usage: ome eval recall --suite <file>");
     const report = evaluateRecallSuite(dataDir, path.resolve(suite), {
-      limit: Number(args.flags.limit || 8),
-      threshold: Number(args.flags.threshold || 40),
+      limit: Number(args.flags.limit || DEFAULT_RETRIEVAL_LIMIT),
+      threshold: Number(args.flags.threshold || DEFAULT_RETRIEVAL_THRESHOLD),
       persist: Boolean(args.flags.persist),
       experiencesFile: args.flags.experiences || args.flags["experiences-file"],
       useCurrentLibrary: Boolean(args.flags["use-current-library"]),
     });
     const checked = applyRecallThresholds(report, args);
-    if (!checked.ok && checked.thresholds?.failed.length) process.exitCode = 1;
+    if (!checked.ok) process.exitCode = 1;
     return print(checked, args);
   }
   throw new Error("usage: ome eval recall --suite <file>");
@@ -1568,10 +1572,12 @@ async function hookCommand(dataDir: string, subcommand: string | undefined, args
     claudeHome: args.flags["claude-home"] ? path.resolve(args.flags["claude-home"]) : undefined,
     dataDir,
   };
-  const adapter = provider === "claude"
-    ? { status: claudeHookStatus }
-    : { status: codexHookStatus };
-  if (subcommand === "status") return print(adapter.status(options as any), args);
+  if (subcommand === "status") {
+    const statusAdapter = provider === "claude"
+      ? { status: claudeHookStatus }
+      : { status: codexHookStatus };
+    return print(statusAdapter.status(options as any), args);
+  }
   throw new Error("usage: ome hook run|status");
 }
 

@@ -104,46 +104,66 @@ Hook 上下文不会注入完整规则，只注入轻量候选索引，并要求
 召回字段应该描述“什么情况下这条经验真的有用”，而不是只记录经验里出现过哪些名词。
 
 - `criteria.use_when`：短的工作流入口短语。好的条目应该接近用户真正需要这条经验时会说的话，例如 `commit 前检查 git status` 或 `浏览器验证 UI`。
-- `criteria.ignore_when`：常见误触发场景。适合写文档示例、仅解释、业务含义里的同名词，或用户明确说这类词只是噪声的情况。
+- `criteria.ignore_when`：常见误触发场景。适合写文档示例、仅解释、业务含义里的
+  同名词，或用户明确说这类词只是噪声的情况。Prompt 包含完整 normalized phrase 时是 hard
+  exclusion；模糊重合只作为 negative evidence。
 - `recall.triggers`：matcher 使用的紧凑触发锚点。
 - `recall.topics`：宽泛分类，例如 `git`、`frontend`、`runtime`。Topics 可以辅助召回，但不应该成为精确卡片命中的唯一理由。
 - `scope.level`：卡片适用级别，可选 `global`、`project`、`project-family`。
 - `scope.project_key`：项目匹配用的项目标识，例如仓库 key。
 - `scope.module_path`：项目内可选路径，例如 `apps/web`。
-- `engine_hints.positive`：内部召回提示，只写 OME 能稳定识别的任务形态。
+- `engine_hints.positive`：已注册的内部召回提示，只写 OME 能稳定识别的任务形态。
+  这是 required-any group：列出多个 id 时，至少需要一个 positive signal。
   `ui_surface`、`goal_execute`、`worktree_diff_operation` 这类路由 hint
-  既是强加权，也是严格门槛：prompt 没有这个任务形态时，不能靠“真实”“验证”
+  既是正向 evidence，也是 gate：prompt 没有这个任务形态时，不能靠“真实”“验证”
   这类泛词召回卡片。
-- `engine_hints.negative`：内部召回提示。用于压住常见误召回。
+- `engine_hints.required_all`：可选的严格 conjunction。列表里的每个 registered signal
+  都必须存在。只有所有任务形态都确实必要时才使用，过度使用会制造 false negative。
+- `engine_hints.negative`：内部召回提示。用于压住常见误召回；负向 signal 只压制其
+  registry definition 明确声明的正向 targets。
 
 Engine hints 不是给人或模型判断的真相，只是启发式。Hook 上下文展示自然语言使用标准和自然语言命中原因，不展示内部 hint id。
 
-常见 signals：
+Signal id 来自共享 registry，不再来自 scorer 内部 whitelist。每条 registry definition
+声明 polarity、routing behavior、matching patterns、negative targets 和 ownership
+metadata：
 
-| Signal | 用途 |
-|---|---|
-| `goal_execute` | 用户正在启动 Agent 目标、`/goal` 或完整闭环执行。 |
-| `goal_example_discussion` | goal 相关词只出现在文档、案例或解释里。 |
-| `business_goal_discussion` | goal 指业务、人生或项目目标，不是 Agent 执行协议。 |
-| `explain_only` | 用户只要求解释。 |
-| `git_operation` | 真实 Git、diff、stage、commit、push 或 worktree 操作。 |
-| `worktree_diff_operation` | 脏工作区、diff、stage 或提交范围操作。 |
-| `historical_session_lookup` | Spool/session UUID 查询或历史会话证据回溯。 |
-| `provider_adapter_boundary` | provider hook/runtime 边界工作。 |
-| `package_install_validation` | tarball、package 或 clean install 验证。 |
-| `ui_surface` | 真实 UI、浏览器、视口或前端验证场景。 |
-| `ui_surface_noise` | 用户明确说 UI 相关词只是噪声。 |
-| `delivery_gate` | 交付、final review、提交前或验收 gate 工作。 |
-| `source_truth_chain` | 需求、设计、验收和实现真源链对齐。 |
-| `failure_triage` | 排障时区分环境、工具、配置与业务失败。 |
-| `temporary_mock_boundary` | mock、fake data、placeholder、fallback 或临时实现边界。 |
-| `external_model_review` | 带真源锚点和裁决边界的外部/多模型审查。 |
-| `rule_governance` | AGENTS、CLAUDE、rules 或规则分层治理。 |
-| `bridge_runtime_validation` | bridge、bot、消息服务、watchdog 或运行状态验收。 |
-| `design_source_alignment` | UI/UX 或产品设计工作需要对齐 DESIGN.md 或设计真源。 |
-| `information_design` | 注意力分层、概念瘦身或低心智负担信息设计。 |
-| `architecture_quality` | 高内聚、低耦合、逻辑干净或根因修复类实现工作。 |
-| `high_risk_action` | 需要明确授权的不可逆或高风险操作。 |
+- `source: generic` 表示适合开源 core 的通用任务形态；
+- `source: pack` 和非空 `pack` 表示 bundled 领域或产品包。
+
+这样可以把产品专用话术留在 pack，同时保持开源 contract 通用。Registry 编译进
+package，当前没有 runtime 第三方 signal registration API。卡片文件只保存 signal ids；
+未知 id 应由 card validation 报告，不能静默当作有效 routing hint。
+
+内置 signals 示例：
+
+| Signal | Source | Pack | 用途 |
+|---|---|---|---|
+| `ui_surface` | generic | - | 真实 UI、浏览器、视口或前端验证场景。 |
+| `ui_surface_noise` | generic | - | UI wording 是噪声；只针对 `ui_surface`。 |
+| `worktree_diff_operation` | generic | - | 脏 worktree、diff、stage 或提交范围操作。 |
+| `provider_adapter_boundary` | generic | - | provider hook/runtime 边界工作。 |
+| `dispatch_runtime_development` | pack | `ai-dispatch` | 开发 ai-dispatch 的 provider、路由、resume 或 stream runtime；普通派发不触发。 |
+| `control_plane_worker_divergence` | pack | `agent-ops` | 控制面容量、租约或排队状态与真实 worker 证据分裂。 |
+| `control_plane_divergence_ruled_out` | pack | `agent-ops` | 容量、租约或 worker 分裂已被明确排除；抑制分裂类召回。 |
+| `runtime_reference_context` | generic | - | Runtime 词只出现在文档、fixture、模拟、UI 文案、假设或禁止语境中；抑制 runtime 开发与分裂类召回。 |
+| `dispatch_tool_use_context` | pack | `ai-dispatch` | ai-dispatch 只是被当作工具调用去处理其他目标；抑制 runtime 开发召回。 |
+| `external_model_review` | generic | - | 带真源锚点和裁决边界的外部/多模型审查。 |
+| `goal_execute` | pack | `agent-goal` | Agent goal 或完整闭环执行。 |
+| `goal_example_discussion` | pack | `agent-goal` | goal wording 只在文档、案例或解释中出现。 |
+| `ome_review_surface` | pack | `ome` | OME draft approval 或经验库治理。 |
+| `historical_session_lookup` | pack | `spool` | 历史 session 或 conversation evidence 查询。 |
+
+Registry 才是 authoritative list；上表只是示例，consumer 不应复制成第二个 whitelist。
+
+持久化 frontmatter 使用这些 groups：
+
+```yaml
+engine_hints:
+  positive: [ui_surface, design_source_alignment] # 至少一个
+  required_all: [explicit_execute, real_validation] # 每一项都必须有
+  negative: [ui_surface_noise]
+```
 
 例子：
 

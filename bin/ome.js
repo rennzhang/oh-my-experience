@@ -9,9 +9,16 @@ runCli(process.argv.slice(2)).catch((error) => {
     || process.argv.includes("--format=json")
     || (formatIndex !== -1 && process.argv[formatIndex + 1] === "json");
   if (wantsJson) {
+    const structured = error && typeof error === "object"
+      ? {
+          ...(typeof error.code === "string" ? { code: error.code } : {}),
+          ...(error.details !== undefined ? { details: error.details } : {}),
+        }
+      : {};
     console.log(JSON.stringify({
       ok: false,
       error: {
+        ...structured,
         message,
       },
     }, null, 2));

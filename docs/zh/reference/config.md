@@ -48,6 +48,10 @@ status: active
 }
 ```
 
+`privacy.saveRawPrompt` 控制 hook 事件是否把提交的 prompt 以明文
+`rawPrompt` 字段写入日志。它默认关闭；开启后，原始 prompt 会和召回遥测
+一起写入全局 `events.jsonl` 的同一条记录。
+
 `sessions.store` 控制已扫描来源 session 的保留姿态：
 
 - `pointer`：优先保留来源引用和轻量索引。

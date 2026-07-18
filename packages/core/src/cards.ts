@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { ExperienceCardSchema, SourceRefSchema, type CardStatus, type ExperienceCard, type RetrospectiveCandidate } from "./schema.js";
+import { validateSignalIds } from "./signal-registry.js";
+import { TriggerSignalContractError, validateTriggerSignalContract } from "./trigger-signal-contract.js";
 import {
   backupFile,
   layout,
@@ -27,6 +29,7 @@ export interface CardIndexEntry {
   applicability: ExperienceCard["applicability"];
   intentModes: ExperienceCard["intentModes"];
   requiredSignals: string[];
+  requiredAllSignals: string[];
   blockedSignals: string[];
   aliases: Record<string, string[]>;
   language: string;
@@ -90,6 +93,7 @@ export function serializeCard(card: ExperienceCard): string {
     }),
     engine_hints: compactObject({
       ...(parsed.requiredSignals.length ? { positive: [...parsed.requiredSignals] } : {}),
+      ...(parsed.requiredAllSignals.length ? { required_all: [...parsed.requiredAllSignals] } : {}),
       ...(parsed.blockedSignals.length ? { negative: [...parsed.blockedSignals] } : {}),
     }),
     recall: compactObject({
@@ -135,6 +139,7 @@ export function parseCardMarkdown(text: string): ExperienceCard {
     applicability: normalizeApplicabilityInput(scope),
     intentModes: criteria.intent_modes,
     requiredSignals: toArray(engineHints.positive),
+    requiredAllSignals: toArray(engineHints.required_all || engineHints.requiredAll),
     blockedSignals: toArray(engineHints.negative),
     language: data.language || "auto",
     recallPolicy: recall.policy || "should",
@@ -257,6 +262,7 @@ function parseLegacyCardFile(filePath: string, fallbackStatus: CardStatus): Expe
     applicability: normalizeApplicabilityInput(data.scope || data.applicability),
     intentModes: data.intentModes || criteria.intent_modes,
     requiredSignals: firstArray(engineHints.positive, data.requiredSignals, data.required_signals),
+    requiredAllSignals: firstArray(engineHints.required_all, engineHints.requiredAll, data.requiredAllSignals, data.required_all_signals),
     blockedSignals: firstArray(engineHints.negative, data.blockedSignals, data.blocked_signals),
     language: data.language || "auto",
     recallPolicy: data.recall_policy || data.recallPolicy || recall.policy || "should",
@@ -330,6 +336,7 @@ export function createDraftFromCandidate(dataDir: string, candidate: Retrospecti
     applicability: candidate.applicability,
     intentModes: candidate.intentModes,
     requiredSignals: candidate.requiredSignals,
+    requiredAllSignals: candidate.requiredAllSignals,
     blockedSignals: candidate.blockedSignals,
     recallPolicy: candidate.recallPolicy,
     risk: candidate.risk,
@@ -387,7 +394,7 @@ export function removeStarterCards(dataDir: string): { ok: true; removed: string
 function starterCardDefinitions(): ExperienceCard[] {
   const now = nowIso();
   const base: Pick<ExperienceCard,
-    "status" | "language" | "confidence" | "staleAfter" | "sources" | "origin" | "sourceRefs" | "intentModes" | "requiredSignals" | "blockedSignals" | "createdAt" | "updatedAt"
+    "status" | "language" | "confidence" | "staleAfter" | "sources" | "origin" | "sourceRefs" | "intentModes" | "requiredSignals" | "requiredAllSignals" | "blockedSignals" | "createdAt" | "updatedAt"
   > = {
     status: "active" as const,
     language: "en" as const,
@@ -405,6 +412,7 @@ function starterCardDefinitions(): ExperienceCard[] {
     sourceRefs: [{ type: "starter" as const, ref: "ome-starter" }],
     intentModes: { include: [], exclude: [] },
     requiredSignals: [],
+    requiredAllSignals: [],
     blockedSignals: [],
     createdAt: now,
     updatedAt: now,
@@ -430,7 +438,13 @@ function starterCardDefinitions(): ExperienceCard[] {
         "",
         "Ignore this card when goal wording appears only in docs, examples, explanations, OKRs, or business-goal discussion.",
       ].join("\n"),
-      triggers: ["/goal", "create a goal", "start now", "use goal", "finish end to end", "verify it yourself"],
+      triggers: [
+        "/goal",
+        "create a goal and start now",
+        "use goal and start execution",
+        "goal and finish end to end",
+        "goal and verify it yourself",
+      ],
       negativeTriggers: ["goal docs example", "explain goal", "discuss goal", "business goal", "OKR"],
       aliases: {},
       topics: ["goal", "execution", "delivery", "validation"],
@@ -447,7 +461,7 @@ function starterCardDefinitions(): ExperienceCard[] {
       id: "starter-delivery-real-entry-validation",
       title: "Validate through the real user entry",
       category: "Delivery Validation",
-      summary: "Delivery is not proven by internal calls; the user expects validation through the same entry they will use.",
+      summary: "Delivery is not proven by internal calls; validate through the same entry used in practice.",
       rule: "Do not call internal functions and claim the product works. Exercise the same entry the user will use, check visible output, confirm side effects, and keep fixtures isolated from the user's real data.",
       triggers: ["verify this end to end", "test the CLI setup", "is this actually usable", "validate user flow"],
       negativeTriggers: ["unit-only helper change", "static copy edit"],
@@ -463,17 +477,15 @@ function starterCardDefinitions(): ExperienceCard[] {
       id: "starter-code-kiss-root-cause",
       title: "Prefer KISS and root-cause fixes",
       category: "Coding Principles",
-      summary: "The user prefers removing stale branches and fixing the real cause over adding compatibility clutter or fallback layers.",
+      summary: "Clean maintenance favors removing stale branches and fixing root causes over adding compatibility clutter or fallback layers.",
       rule: "Keep modules cohesive, remove stale branches, and fix the reason an issue exists instead of adding another fallback. Before release, delete dirty compatibility paths rather than preserving two truths.",
       triggers: [
-        "refactor this cleanly",
-        "avoid compatibility clutter",
-        "make the architecture maintainable",
-        "fix the root cause",
-        "高内聚低耦合",
-        "根因修复",
-        "逻辑干净",
-        "不要历史包袱",
+        "clean up the current implementation chain",
+        "refactor the current implementation chain and remove compatibility clutter",
+        "refactor into a cohesive module boundary",
+        "fix the root cause with a clean final-state implementation",
+        "清理现有实现链路",
+        "把当前实现链路重构成干净最终态",
       ],
       negativeTriggers: ["temporary local experiment", "throwaway script"],
       aliases: {},
@@ -494,6 +506,16 @@ export function promoteDraft(dataDir: string, id: string): ExperienceCard {
     if (!fs.existsSync(source)) throw new Error(`draft card not found: ${id}`);
     if (fs.existsSync(target)) throw new Error(`active card already exists: ${id}`);
     const card = readCardFile(source);
+    const signalValidation = validateSignalIds([
+      ...card.requiredSignals,
+      ...card.requiredAllSignals,
+      ...card.blockedSignals,
+    ]);
+    if (!signalValidation.ok) {
+      throw new Error(`draft card references unknown signal ids: ${signalValidation.unknown.join(", ")}`);
+    }
+    const triggerContract = validateTriggerSignalContract(card);
+    if (!triggerContract.ok) throw new TriggerSignalContractError(triggerContract);
     const next = ExperienceCardSchema.parse({ ...card, status: "active", updatedAt: nowIso() });
     const rendered = ExperienceCardSchema.parse({ ...next, body: renderCardBody(next) });
     writeTextAtomic(target, serializeCard(rendered), dataDir);
@@ -541,6 +563,7 @@ export function buildCardIndex(dataDir: string): CardIndex {
     applicability: card.applicability,
     intentModes: card.intentModes,
     requiredSignals: card.requiredSignals,
+    requiredAllSignals: card.requiredAllSignals,
     blockedSignals: card.blockedSignals,
     aliases: card.aliases,
     language: card.language,
@@ -565,7 +588,7 @@ function findCardPath(dataDir: string, id: string): string | undefined {
 function pickCardPatch(patch: Record<string, any> = {}): Record<string, any> {
   const allowed: Record<string, any> = {};
   if (Object.hasOwn(patch, "scope")) allowed.applicability = normalizeApplicabilityInput(patch.scope);
-  for (const key of ["title", "category", "summary", "rule", "triggers", "negativeTriggers", "aliases", "topics", "intentModes", "requiredSignals", "blockedSignals", "language", "recallPolicy", "risk", "confidence", "archivedReason"]) {
+  for (const key of ["title", "category", "summary", "rule", "triggers", "negativeTriggers", "aliases", "topics", "intentModes", "requiredSignals", "requiredAllSignals", "blockedSignals", "language", "recallPolicy", "risk", "confidence", "archivedReason"]) {
     if (Object.hasOwn(patch, key)) allowed[key] = patch[key];
   }
   return allowed;

@@ -1,0 +1,244 @@
+{
+  "experiences": [
+    {
+      "id": "canonical-schema-cutover",
+      "title": "Cut over to one canonical schema",
+      "category": "migration governance",
+      "summary": "Use when a completed migration should remove dual readers and leave one current schema, not for an unrelated module refactor.",
+      "criteria": {
+        "use_when": ["canonical schema cutover", "remove dual schema readers", "one current schema"],
+        "ignore_when": ["split module responsibilities", "algorithm cleanup without schema migration"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["canonical schema cutover", "remove dual schema readers", "one current schema"],
+        "topics": ["schema migration", "single source of truth"]
+      },
+      "scope": { "level": "global" },
+      "rule": "After migration, remove compatibility readers and keep one canonical schema as the runtime truth."
+    },
+    {
+      "id": "module-root-cause-refactor",
+      "title": "Refactor module responsibilities at the root cause",
+      "category": "implementation quality",
+      "summary": "Use for a cohesive responsibility refactor that fixes the implementation cause without implying a schema cutover.",
+      "criteria": {
+        "use_when": ["root cause module refactor", "split module responsibilities", "cohesive module boundary"],
+        "ignore_when": ["canonical schema cutover", "remove dual schema readers"]
+      },
+      "engine_hints": {
+        "positive": ["architecture_quality"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "high",
+        "triggers": ["root cause module refactor", "split module responsibilities", "cohesive module boundary"],
+        "topics": ["architecture", "root cause", "module boundary"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Refactor responsibilities at the real boundary and fix the root cause without inventing migration work."
+    },
+    {
+      "id": "agent-goal-closure",
+      "title": "Execute an agent goal to closure",
+      "category": "execution protocol",
+      "summary": "Use when an agent goal is explicitly started and should be implemented and verified to completion.",
+      "criteria": {
+        "use_when": ["create an agent goal", "execute goal to completion"],
+        "ignore_when": ["final delivery review after implementation"]
+      },
+      "engine_hints": {
+        "positive": ["goal_execute"],
+        "negative": ["goal_example_discussion", "business_goal_discussion"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["create an agent goal", "execute goal to completion"],
+        "topics": ["agent goal", "execution", "closure"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Treat an explicit agent goal as an execution protocol and continue through implementation and verification."
+    },
+    {
+      "id": "final-delivery-gate",
+      "title": "Run the final delivery gate",
+      "category": "delivery validation",
+      "summary": "Use after implementation for a final review, acceptance verdict, or pre-submit gate, not when merely starting a goal.",
+      "criteria": {
+        "use_when": ["final delivery review", "pre-submit acceptance gate", "ready or not ready verdict"],
+        "ignore_when": ["create an agent goal"]
+      },
+      "engine_hints": {
+        "positive": ["delivery_gate"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["final delivery review", "pre-submit acceptance gate", "ready or not ready verdict"],
+        "topics": ["delivery", "acceptance", "review"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Separate implementation completion from delivery readiness and issue an evidence-backed final verdict."
+    },
+    {
+      "id": "frontend-real-path-validation",
+      "title": "Validate an implemented frontend through the real path",
+      "category": "frontend delivery",
+      "summary": "Use for an implemented visible frontend change that requires real browser and end-to-end validation.",
+      "criteria": {
+        "use_when": ["implemented frontend change", "real browser validation", "end-to-end page check"],
+        "ignore_when": ["design judgment only", "static design review"]
+      },
+      "engine_hints": {
+        "required_all": ["ui_surface", "real_validation"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["implemented frontend change", "real browser validation", "end-to-end page check"],
+        "topics": ["frontend", "browser", "delivery"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Exercise the implemented page through the real browser path and verify visible behavior and side effects."
+    },
+    {
+      "id": "design-source-alignment",
+      "title": "Align product design with its design source",
+      "category": "product design",
+      "summary": "Use for a UI or UX design judgment against DESIGN.md or a supplied design source, before implementation validation.",
+      "criteria": {
+        "use_when": ["align with DESIGN.md", "design source alignment", "UI UX layout judgment"],
+        "ignore_when": ["implement and validate the frontend"]
+      },
+      "engine_hints": {
+        "positive": ["design_source_alignment"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "high",
+        "triggers": ["align with DESIGN.md", "design source alignment", "UI UX layout judgment"],
+        "topics": ["design", "UI UX", "source alignment"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Evaluate the product design against the explicit design source before adding implementation assumptions."
+    },
+    {
+      "id": "task-scoped-git-worktree",
+      "title": "Keep Git worktree changes scoped to the task",
+      "category": "git safety",
+      "summary": "Use for a real local diff, stage, or commit-scope operation, not for a read-only diff review.",
+      "criteria": {
+        "use_when": ["task-scoped git diff", "stage only task files", "local worktree operation"],
+        "ignore_when": ["read-only git diff review", "GitHub pull request as reference"]
+      },
+      "engine_hints": {
+        "positive": ["worktree_diff_operation"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["task-scoped git diff", "stage only task files", "local worktree operation"],
+        "topics": ["git", "worktree", "scope"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Inspect the worktree and stage only the files that belong to the current task."
+    },
+    {
+      "id": "high-risk-authorization",
+      "title": "Require authorization for an irreversible action",
+      "category": "operation safety",
+      "summary": "Use when an irreversible production or deletion action still requires explicit authorization.",
+      "criteria": {
+        "use_when": ["删除前确认授权", "生产操作先审批", "不可逆动作确认"],
+        "ignore_when": ["local diff without an external action", "authorization already granted"]
+      },
+      "engine_hints": {
+        "positive": ["high_risk_action"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["删除前确认授权", "生产操作先审批", "不可逆动作确认"],
+        "topics": ["authorization", "production", "irreversible action"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Do not perform an irreversible action until the user has explicitly authorized that exact scope."
+    },
+    {
+      "id": "temporary-placeholder-boundary",
+      "title": "Keep a temporary placeholder out of final delivery",
+      "category": "implementation boundary",
+      "summary": "Use when a placeholder or mock is only temporary wiring and must be replaced by the real service before acceptance.",
+      "criteria": {
+        "use_when": ["placeholder 临时接线", "替换为真实服务", "mock 不能作为最终验收"],
+        "ignore_when": ["temporary unit-test fixture", "test-only fake object"]
+      },
+      "engine_hints": {
+        "positive": ["temporary_mock_boundary"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["placeholder 临时接线", "替换为真实服务", "mock 不能作为最终验收"],
+        "topics": ["mock", "placeholder", "real path"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Mark temporary wiring explicitly and replace it with the real service before final acceptance."
+    },
+    {
+      "id": "generic-failure-triage",
+      "title": "Separate environment failure from business failure",
+      "category": "debugging",
+      "summary": "Use for generic debugging where tool or environment failure must be separated from a business-rule failure.",
+      "criteria": {
+        "use_when": ["区分环境失败和业务失败", "工具报错还是业务异常"],
+        "ignore_when": ["message bridge delivery validation"]
+      },
+      "engine_hints": {
+        "positive": ["failure_triage"]
+      },
+      "recall": {
+        "policy": "should",
+        "risk": "medium",
+        "confidence": "high",
+        "triggers": ["区分环境失败和业务失败", "工具报错还是业务异常"],
+        "topics": ["debugging", "environment", "business failure"]
+      },
+      "scope": { "level": "global" },
+      "rule": "Prove whether the failure belongs to the environment, tooling, or business behavior before changing the implementation."
+    },
+    {
+      "id": "message-bridge-validation",
+      "title": "Validate message bridge state and delivery",
+      "category": "runtime validation",
+      "summary": "Use after operating a message bridge or bot when runtime state, logs, and real delivery must agree.",
+      "criteria": {
+        "use_when": ["bot bridge 状态验证", "消息服务真实回执", "watchdog 重启验收"],
+        "ignore_when": ["generic runtime debugging without a message service"]
+      },
+      "engine_hints": {
+        "positive": ["bridge_runtime_validation"]
+      },
+      "recall": {
+        "policy": "must",
+        "risk": "high",
+        "confidence": "high",
+        "triggers": ["bot bridge 状态验证", "消息服务真实回执", "watchdog 重启验收"],
+        "topics": ["bridge", "bot", "message delivery"]
+      },
+      "scope": { "level": "global" },
+      "rule": "After a bridge operation, verify process state, logs, and an actual message delivery result in the same window."
+    }
+  ]
+}
