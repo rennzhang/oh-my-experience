@@ -19,6 +19,7 @@ title: 指南
 - [安装配置](setup.md)：数据目录、Hooks、skill 安装和卸载细节。
 - [Codex](codex.md)：为 Codex 配置 prompt-time 召回。
 - [Claude](claude.md)：为 Claude 配置 prompt-time 召回。
+- [Cursor](cursor.md)：为 Cursor 配置 prompt-time 召回。
 
 ## 建设经验库
 

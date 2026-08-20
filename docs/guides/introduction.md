@@ -82,7 +82,7 @@ real work -> reflect scan -> draft approval -> refine -> confirm library add
 
 - A local Markdown library of approved experience cards.
 - Optional project libraries at `<project-root>/.oh-my-experience/`.
-- Codex and Claude hooks for prompt-time recall.
+- Codex, Claude, and Cursor hooks for prompt-time recall.
 - Project-aware matching from one local hook.
 - Explicit ignore criteria for noisy words such as "goal", "review", and "release".
 - Explainable recall: matched cards, scores, reasons, and rendered context.

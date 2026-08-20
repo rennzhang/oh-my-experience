@@ -81,10 +81,11 @@ ome doctor                                                # 确认迁移成功
 ```bash
 ome hook status --provider codex     # 查看当前 hook 状态
 ome init --provider claude            # 追加 Claude hook 和 skill
-ome init --provider all               # 两个 Agent 都装
+ome init --provider cursor            # 追加 Cursor hook 和 skill
+ome init --provider all               # 安装 Codex、Claude 和 Cursor
 ```
 
-交互式 `ome init` 会让你选择 `codex`、`claude`、`all` 或 `none`。Codex 是当前验证
+交互式 `ome init` 会让你选择 `codex`、`claude`、`cursor`、`all` 或 `none`。Codex 是当前验证
 最充分的路径，但 OME 是基于 hook 的召回层，不是 Codex 专用工具。向导会在写入前展示
 写入路径。对每个选中的 Agent，OME 都会安装 prompt-time hook 和内置 skill。
 

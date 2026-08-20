@@ -86,10 +86,11 @@ the repository should carry its own cards.
 ```bash
 ome hook status --provider codex     # Check current hook state
 ome init --provider claude            # Add Claude hook and skill
-ome init --provider all               # Install both agents
+ome init --provider cursor            # Add Cursor hook and skill
+ome init --provider all               # Install Codex, Claude, and Cursor
 ```
 
-Interactive `ome init` lets you choose `codex`, `claude`, `all`, or `none`.
+Interactive `ome init` lets you choose `codex`, `claude`, `cursor`, `all`, or `none`.
 Codex is the best-tested path today, but OME is a hook-based recall layer, not
 a Codex-only tool. For each selected agent, OME installs the prompt-time hook
 and bundled skill. The wizard shows paths before writing.

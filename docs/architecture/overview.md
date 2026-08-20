@@ -15,6 +15,8 @@ packages/adapters/agents/codex
                          Codex hook setup/status adapter
 packages/adapters/agents/claude
                          Claude hook setup/status adapter
+packages/adapters/agents/cursor
+                         Cursor hook setup/status adapter
 packages/adapters/sources/codex-sessions
                          Codex local session scan
 packages/adapters/sources/spool

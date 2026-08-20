@@ -22,7 +22,7 @@
 </p>
 
 Oh My Experience is a local-first experience layer for AI coding agents. It
-turns real Codex and Claude corrections into reviewed experience cards, then
+turns real Codex, Claude, and Cursor corrections into reviewed experience cards, then
 can recall a relevant approved lesson at prompt time before the agent repeats
 the same kind of mistake.
 
@@ -71,7 +71,7 @@ card; how the agent uses that reminder stays part of the workflow.
 
 - Local-first recall: no network calls on the prompt-time path.
 - Draft approval before recall: `candidate -> draft -> active -> archived`.
-- Codex and Claude hooks using the same local runtime.
+- Codex, Claude, and Cursor hooks using the same local runtime.
 - Native Codex/Claude user-only evidence indexing for deep retrospectives.
 - Global libraries plus optional project libraries at `.oh-my-experience/`.
 - Explainable matching with scores, reasons, and compact injected context.

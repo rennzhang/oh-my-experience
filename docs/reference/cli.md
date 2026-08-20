@@ -38,6 +38,7 @@ ome init --interactive
 ome init --yes
 ome init --provider claude
 ome init --provider all
+ome init --provider cursor
 ome init --no-hook
 ome init --reset-config
 ```
@@ -222,7 +223,7 @@ PATH. Invalid active or draft cards are errors. Invalid archived cards are
 reported as governance warnings because archived cards are history and never
 enter runtime recall.
 
-`ome hook run` is the runtime entrypoint used by installed Codex and Claude
+`ome hook run` is the runtime entrypoint used by installed Codex, Claude, and Cursor
 hooks. It is kept public so installed hooks can execute it, but normal setup
 should happen through `ome init`.
 

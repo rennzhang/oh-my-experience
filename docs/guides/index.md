@@ -20,6 +20,7 @@ corrections into approved cards.
 - [Setup](setup.md): data directory, hooks, skill install, and uninstall details.
 - [Codex](codex.md): configure prompt-time recall for Codex.
 - [Claude](claude.md): configure prompt-time recall for Claude.
+- [Cursor](cursor.md): configure prompt-time recall for Cursor.
 
 ## Build the library
 

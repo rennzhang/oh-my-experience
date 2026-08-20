@@ -75,6 +75,7 @@ const englishSidebar: DefaultTheme.Sidebar = {
         { text: "Setup", link: "/guides/setup" },
         { text: "Codex", link: "/guides/codex" },
         { text: "Claude", link: "/guides/claude" },
+        { text: "Cursor", link: "/guides/cursor" },
       ],
     },
     {
@@ -133,6 +134,7 @@ const englishSidebar: DefaultTheme.Sidebar = {
         { text: "Setup", link: "/guides/setup" },
         { text: "Codex", link: "/guides/codex" },
         { text: "Claude", link: "/guides/claude" },
+        { text: "Cursor", link: "/guides/cursor" },
         { text: "Evaluation", link: "/guides/evaluation" },
       ],
     },
@@ -164,6 +166,7 @@ const chineseSidebar: DefaultTheme.Sidebar = {
         { text: "安装配置", link: "/zh/guides/setup" },
         { text: "Codex", link: "/zh/guides/codex" },
         { text: "Claude", link: "/zh/guides/claude" },
+        { text: "Cursor", link: "/zh/guides/cursor" },
       ],
     },
     {
@@ -222,6 +225,7 @@ const chineseSidebar: DefaultTheme.Sidebar = {
         { text: "安装配置", link: "/zh/guides/setup" },
         { text: "Codex", link: "/zh/guides/codex" },
         { text: "Claude", link: "/zh/guides/claude" },
+        { text: "Cursor", link: "/zh/guides/cursor" },
         { text: "评估", link: "/zh/guides/evaluation" },
       ],
     },

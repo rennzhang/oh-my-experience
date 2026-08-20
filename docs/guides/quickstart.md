@@ -18,7 +18,7 @@ npx oh-my-experience@latest init
 This runs the latest published OME CLI through npm, creates your local
 experience library, and lets you choose which supported agents to connect. For
 each selected agent, OME installs the prompt-time hook and bundled skill. Codex
-is the best-tested path today; Claude uses the same hook runtime. It is safe to
+is the best-tested path today; Claude and Cursor use the same hook runtime. It is safe to
 rerun.
 
 To install the command globally instead:

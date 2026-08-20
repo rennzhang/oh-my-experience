@@ -23,6 +23,7 @@ ome init --interactive
 ome init --yes
 ome init --provider claude
 ome init --provider all
+ome init --provider cursor
 ome init --no-hook
 ome init --reset-config
 ```
@@ -34,7 +35,7 @@ Rules:
 - CI, pipes, and agent runners skip interaction and use flags/defaults.
 - `--no-hook` initializes or updates the library only; it does not install an agent hook or OME skill.
 - `--reset-config` restores runtime config without deleting experiences, source indexes, or reflect runs.
-- Claude hook setup uses `ome init --provider claude` or `ome init --provider all`; do not ask users to remember a separate hook install command.
+- Claude hook setup uses `ome init --provider claude`; Cursor uses `ome init --provider cursor`; `ome init --provider all` installs Codex, Claude, and Cursor. Do not ask users to remember a separate hook install command.
 
 Inspect or change `dataDir`:
 

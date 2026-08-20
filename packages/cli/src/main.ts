@@ -58,6 +58,7 @@ import { defaultConfigHome } from "../../core/src/storage.js";
 import { scanCodexSessions } from "../../adapters/sources/codex-sessions/src/importer.js";
 import { hookPlan as codexHookPlan, hookStatus as codexHookStatus, installHook as installCodexHook, uninstallHook as uninstallCodexHook } from "../../adapters/agents/codex/src/hook-install.js";
 import { claudeHookPlan, claudeHookStatus, installClaudeHook, uninstallClaudeHook } from "../../adapters/agents/claude/src/hook-install.js";
+import { cursorHookPlan, cursorHookStatus, installCursorHook, uninstallCursorHook } from "../../adapters/agents/cursor/src/hook-install.js";
 import { checkSpool, scanSpoolSessions } from "../../adapters/sources/spool/src/spool.js";
 import { runHook } from "../../hook-runtime/src/run.js";
 
@@ -67,6 +68,9 @@ const RETROSPECTIVE_GUIDE_REF = "skills/oh-my-experience/references/reflect-retr
 const EXPERIENCE_REVIEW_FILE = "experience-review.md";
 const SPOOL_CLI_PACKAGE = "@spool-lab/cli";
 const SPOOL_GITHUB_URL = "https://github.com/spool-lab/spool";
+
+const HOOK_PROVIDERS = ["codex", "claude", "cursor"] as const;
+type HookProvider = typeof HOOK_PROVIDERS[number];
 
 const KNOWN_COMMANDS = [
   "experience",
@@ -166,6 +170,7 @@ function doctorCommand(dataDir: string, args: ParsedArgs) {
   const options = {
     codexHome: args.flags["codex-home"] ? path.resolve(args.flags["codex-home"]) : process.env.CODEX_HOME,
     claudeHome: args.flags["claude-home"] ? path.resolve(args.flags["claude-home"]) : undefined,
+    cursorHome: args.flags["cursor-home"] ? path.resolve(args.flags["cursor-home"]) : process.env.CURSOR_HOME,
   };
   if (!args.flags["repair-index"]) return print(withLocalDiagnostics(runDoctor(dataDir, options), args), args);
   const repairedIndex = repairIndex(dataDir);
@@ -230,6 +235,7 @@ function inspectAgentSkillsHealth(args: ParsedArgs, dataDir: string) {
     provider,
     codexHome: codexHome(args),
     claudeHome: claudeHome(args),
+    cursorHome: cursorHome(args),
     dryRun: true,
   })));
 }
@@ -242,7 +248,7 @@ function skillProvidersForHealth(args: ParsedArgs, dataDir: string): string[] {
     const enabled = Object.entries(asRecord(config.hooks?.providers))
       .filter(([, value]) => asRecord(value).enabled)
       .map(([provider]) => provider)
-      .filter((provider) => provider === "codex" || provider === "claude");
+      .filter((provider): provider is HookProvider => (HOOK_PROVIDERS as readonly string[]).includes(provider));
     return enabled.length ? enabled : ["codex"];
   } catch {
     return ["codex"];
@@ -352,7 +358,7 @@ function runInitSetup(dataDir: string, args: ParsedArgs) {
 function initNextStep(hooks: unknown) {
   return hasInstalledRecallHook(hooks)
     ? "Send a real task to your agent; the installed hook will recall relevant active experiences automatically."
-    : "Library is ready. Connect an agent later with `ome init --provider codex`, `ome init --provider claude`, or `ome init --provider all` to enable prompt-time recall.";
+    : "Library is ready. Connect an agent later with `ome init --provider codex`, `ome init --provider claude`, `ome init --provider cursor`, or `ome init --provider all` to enable prompt-time recall.";
 }
 
 function hasInstalledRecallHook(hooks: unknown) {
@@ -371,6 +377,7 @@ function validateInitFlags(args: ParsedArgs) {
     "bin",
     "claude-home",
     "codex-home",
+    "cursor-home",
     "data-dir",
     "dataDir",
     "dry-run",
@@ -455,9 +462,9 @@ function initHookChoice(args: ParsedArgs) {
   if (args.flags["no-hook"]) return "none";
   const providers = selectedProviders(args);
   if (!providers.length) return "none";
-  if (providers.includes("codex") && providers.includes("claude")) return "all";
-  if (providers.includes("claude")) return "claude";
-  return "codex";
+  if (providers.length === HOOK_PROVIDERS.length) return "all";
+  if (providers.length === 1) return providers[0];
+  return providers.join(",");
 }
 
 function cloneArgs(args: ParsedArgs): ParsedArgs {
@@ -525,6 +532,7 @@ function normalizeHookChoice(value: string) {
   const normalized = value.trim().toLowerCase();
   if (!normalized || normalized === "codex") return "codex";
   if (["claude", "cloud"].includes(normalized)) return "claude";
+  if (normalized === "cursor") return "cursor";
   if (["all", "both", "codex+claude", "codex,claude"].includes(normalized)) return "all";
   if (["none", "skip", "no", "off"].includes(normalized)) return "none";
   return "";
@@ -685,9 +693,8 @@ async function waitForAnyKey(copy: InitCopy, enabled: boolean) {
 
 function formatHookChoice(value: string, copy: InitCopy) {
   if (value === "none") return copy.disabled;
-  if (value === "claude") return "Claude";
-  if (value === "all") return "Codex + Claude";
-  return "Codex";
+  if (value === "all") return HOOK_PROVIDERS.map((provider) => providerName(provider)).join(" + ");
+  return value.split(",").map((item) => providerName(item.trim())).join(" + ");
 }
 
 function formatHookPlanTarget(record: Record<string, any>) {
@@ -820,9 +827,9 @@ function initCopy() {
     dataDirDescription: "Stores experiences, retrospectives, indexes, and events in a local OME directory. You can move it later with config preview/set.",
     pathPlaceholder: "Default path:",
     agentStepPrompt: "Which agents should OME connect?",
-    agentStepDescription: "OME recalls experience through prompt-time hooks. Codex is the best-tested path today; Claude uses the same hook runtime. Choose codex, claude, all, or none.",
-    agentChoiceHelp: "Choices: codex, claude, all, none. Press Enter for codex.",
-    invalidAgentChoice: "Enter codex, claude, all, or none.",
+    agentStepDescription: "OME recalls experience through prompt-time hooks. Codex is the best-tested path today; Claude and Cursor use the same hook runtime. Choose codex, claude, cursor, all, or none.",
+    agentChoiceHelp: "Choices: codex, claude, cursor, all, none. Press Enter for codex.",
+    invalidAgentChoice: "Enter codex, claude, cursor, all, or none.",
     confirmPrompt: "Continue?",
     confirmDescription: "OME will save this library path, install the selected recall hooks and skills, and add built-in starter lessons.",
     cancelled: "Cancelled. Nothing was written.",
@@ -837,7 +844,7 @@ function initCopy() {
     nextSteps: "Next task:",
     recommendations: "Suggestions:",
     starterPromptIntro: "Starter lessons are active. Send this to your selected agent so the hook can recall relevant experience automatically.",
-    noHookNextStep: "Starter lessons are active, but no agent is connected yet. Run `ome init --provider codex`, `ome init --provider claude`, or `ome init --provider all` when you want prompt-time recall.",
+    noHookNextStep: "Starter lessons are active, but no agent is connected yet. Run `ome init --provider codex`, `ome init --provider claude`, `ome init --provider cursor`, or `ome init --provider all` when you want prompt-time recall.",
     copyPromptHint: "Copy this task into your selected agent:",
     copyPromptStart: "```text",
     copyPromptEnd: "```",
@@ -904,16 +911,14 @@ function strongInline(value: string) {
 function planInitHooks(dataDir: string, args: ParsedArgs, dryRun: boolean) {
   if (args.flags["no-hook"]) return { ok: true, skipped: true, reason: "--no-hook" };
   return selectedProviders(args).map((provider) => {
-    const adapter = provider === "claude" ? claudeHookPlan : codexHookPlan;
-    return adapter({ ...hookInstallOptions(dataDir, args), dryRun } as any);
+    return hookAdapter(provider).plan({ ...hookInstallOptions(dataDir, args), dryRun } as any);
   });
 }
 
 function installInitHooks(dataDir: string, args: ParsedArgs) {
   if (args.flags["no-hook"]) return { ok: true, skipped: true, reason: "--no-hook" };
   return selectedProviders(args).map((provider) => {
-    const adapter = provider === "claude" ? installClaudeHook : installCodexHook;
-    const result: any = adapter(hookInstallOptions(dataDir, args) as any);
+    const result: any = hookAdapter(provider).install(hookInstallOptions(dataDir, args) as any);
     if (result.installed) recordHookConfig(dataDir, provider, true);
     return result;
   });
@@ -923,8 +928,13 @@ function selectedProviders(args: ParsedArgs): string[] {
   const raw = String(args.flags.provider || args.flags.providers || "codex");
   const values = raw.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
   if (!values.length || values.some((item) => ["none", "skip", "no", "off"].includes(item))) return [];
-  if (values.some((item) => ["all", "both"].includes(item))) return ["codex", "claude"];
-  return Array.from(new Set(values.map((item) => ["claude", "cloud"].includes(item) ? "claude" : "codex")));
+  if (values.some((item) => ["all", "both"].includes(item))) return [...HOOK_PROVIDERS];
+  const mapped = values.map((item) => item === "cloud" ? "claude" : item);
+  const unknown = mapped.filter((item) => !(HOOK_PROVIDERS as readonly string[]).includes(item));
+  if (unknown.length) {
+    throw new Error(`unsupported hook provider: ${unknown.join(", ")}; use ${HOOK_PROVIDERS.join(", ")}, or all`);
+  }
+  return Array.from(new Set(mapped));
 }
 
 function hookInstallOptions(dataDir: string, args: ParsedArgs) {
@@ -932,9 +942,23 @@ function hookInstallOptions(dataDir: string, args: ParsedArgs) {
     dryRun: Boolean(args.flags["dry-run"]),
     codexHome: codexHome(args),
     claudeHome: args.flags["claude-home"] ? path.resolve(args.flags["claude-home"]) : undefined,
+    cursorHome: args.flags["cursor-home"] ? path.resolve(args.flags["cursor-home"]) : undefined,
     bin: args.flags.bin || "ome",
     dataDir,
   };
+}
+
+function hookAdapter(provider: string) {
+  if (provider === "claude") {
+    return { plan: claudeHookPlan, install: installClaudeHook, uninstall: uninstallClaudeHook, status: claudeHookStatus };
+  }
+  if (provider === "cursor") {
+    return { plan: cursorHookPlan, install: installCursorHook, uninstall: uninstallCursorHook, status: cursorHookStatus };
+  }
+  if (provider === "codex") {
+    return { plan: codexHookPlan, install: installCodexHook, uninstall: uninstallCodexHook, status: codexHookStatus };
+  }
+  throw new Error(`unsupported hook provider: ${provider}; use ${HOOK_PROVIDERS.join(", ")}, or all`);
 }
 
 const OME_SKILL_NAME = "oh-my-experience";
@@ -944,6 +968,7 @@ type SkillOptions = {
   provider?: string;
   codexHome?: string;
   claudeHome?: string;
+  cursorHome?: string;
   dryRun?: boolean;
   force?: boolean;
 };
@@ -954,15 +979,14 @@ function planInitSkills(args: ParsedArgs, dryRun: boolean) {
     provider,
     codexHome: codexHome(args),
     claudeHome: claudeHome(args),
+    cursorHome: cursorHome(args),
     dryRun,
   }));
 }
 
 function planSkill(options: SkillOptions = {}) {
-  const provider = options.provider === "claude" ? "claude" : "codex";
-  const root = provider === "claude"
-    ? (options.claudeHome || path.join(os.homedir(), ".claude"))
-    : (options.codexHome || codexHome({ flags: {}, positionals: [] }));
+  const provider = (HOOK_PROVIDERS as readonly string[]).includes(String(options.provider)) ? String(options.provider) : "codex";
+  const root = skillRoot(provider, options);
   const target = path.join(root, "skills", OME_SKILL_NAME);
   const source = path.join(packageRoot(), "skills", OME_SKILL_NAME);
   const existing = inspectSkillTarget(target);
@@ -987,6 +1011,7 @@ function installInitSkills(args: ParsedArgs) {
     provider,
     codexHome: codexHome(args),
     claudeHome: claudeHome(args),
+    cursorHome: cursorHome(args),
     dryRun: false,
     force: Boolean(args.flags.force),
   }));
@@ -1050,6 +1075,16 @@ function codexHome(args: ParsedArgs) {
 
 function claudeHome(args: ParsedArgs) {
   return args.flags["claude-home"] ? path.resolve(args.flags["claude-home"]) : path.join(os.homedir(), ".claude");
+}
+
+function cursorHome(args: ParsedArgs) {
+  return args.flags["cursor-home"] ? path.resolve(args.flags["cursor-home"]) : process.env.CURSOR_HOME || path.join(os.homedir(), ".cursor");
+}
+
+function skillRoot(provider: string, options: SkillOptions = {}) {
+  if (provider === "claude") return options.claudeHome || path.join(os.homedir(), ".claude");
+  if (provider === "cursor") return options.cursorHome || cursorHome({ flags: {}, positionals: [] });
+  return options.codexHome || codexHome({ flags: {}, positionals: [] });
 }
 
 function configPointerPath() {
@@ -1565,18 +1600,16 @@ async function evalCommand(dataDir: string, subcommand: string | undefined, args
 
 async function hookCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
   if (subcommand === "run") return print(await runHook({ dataDir }), args);
-  const provider = args.flags.provider || "codex";
+  const provider = String(args.flags.provider || "codex").toLowerCase();
   const options = {
     dryRun: Boolean(args.flags["dry-run"]),
     codexHome: args.flags["codex-home"] ? path.resolve(args.flags["codex-home"]) : process.env.CODEX_HOME,
     claudeHome: args.flags["claude-home"] ? path.resolve(args.flags["claude-home"]) : undefined,
+    cursorHome: args.flags["cursor-home"] ? path.resolve(args.flags["cursor-home"]) : process.env.CURSOR_HOME,
     dataDir,
   };
   if (subcommand === "status") {
-    const statusAdapter = provider === "claude"
-      ? { status: claudeHookStatus }
-      : { status: codexHookStatus };
-    return print(statusAdapter.status(options as any), args);
+    return print(hookAdapter(provider).status(options as any), args);
   }
   throw new Error("usage: ome hook run|status");
 }
@@ -1589,8 +1622,7 @@ function uninstallCommand(dataDir: string, args: ParsedArgs) {
   const hooks = args.flags["keep-hooks"]
     ? []
     : providers.map((provider) => {
-      const adapter = provider === "claude" ? uninstallClaudeHook : uninstallCodexHook;
-      const result: any = adapter(hookInstallOptions(dataDir, args) as any);
+      const result: any = hookAdapter(provider).uninstall(hookInstallOptions(dataDir, args) as any);
       if (result.uninstalled) recordHookConfig(dataDir, provider, false);
       return result;
     });
@@ -1600,6 +1632,7 @@ function uninstallCommand(dataDir: string, args: ParsedArgs) {
       provider,
       codexHome: codexHome(args),
       claudeHome: claudeHome(args),
+      cursorHome: cursorHome(args),
       dryRun: Boolean(args.flags["dry-run"]),
       force: Boolean(args.flags.force),
     }));
@@ -1643,7 +1676,10 @@ function parseApplicability(args: ParsedArgs) {
 function recordHookConfig(dataDir: string, provider: string, enabled: boolean): void {
   const config = loadConfig(dataDir);
   const next = structuredClone(config);
-  const providerKey = provider === "claude" ? "claude" : "codex";
+  if (!(HOOK_PROVIDERS as readonly string[]).includes(provider)) {
+    throw new Error(`unsupported hook provider: ${provider}; use ${HOOK_PROVIDERS.join(", ")}, or all`);
+  }
+  const providerKey = provider as HookProvider;
   next.hooks.providers[providerKey] = { enabled };
   saveConfig(dataDir, next);
 }
@@ -1727,7 +1763,7 @@ function renderInitResult(record: Record<string, any>): string {
       lines.push("  After the first recall, move to the first-card or full retrospective flow; extracted experiences go to draft approval and are not enabled automatically.");
     } else {
       lines.push("  Library is ready, but prompt-time recall is not connected to an agent yet.");
-      lines.push("  Run `ome init --provider codex`, `ome init --provider claude`, or `ome init --provider all` when you want automatic recall.");
+      lines.push("  Run `ome init --provider codex`, `ome init --provider claude`, `ome init --provider cursor`, or `ome init --provider all` when you want automatic recall.");
     }
     if (hooks.some((hook) => asRecord(hook).provider === "codex" && asRecord(hook).installed)) {
       lines.push("  Codex App may ask you to trust the new UserPromptSubmit hook.");
@@ -2099,6 +2135,7 @@ function providerName(value: unknown): string {
   const provider = String(value || "hook").toLowerCase();
   if (provider === "codex") return "Codex";
   if (provider === "claude") return "Claude";
+  if (provider === "cursor") return "Cursor";
   return String(value || "hook");
 }
 
@@ -2189,8 +2226,8 @@ Common path:
   ome uninstall                    remove selected recall hooks and skills, keep library by default
 
 Core commands:
-  ome init [--interactive] [--yes|-y] [--data-dir <path>] [--provider codex|claude|all] [--no-hook] [--reset-config]
-  ome uninstall [--provider codex|claude|all] [--delete-library --yes]
+  ome init [--interactive] [--yes|-y] [--data-dir <path>] [--provider codex|claude|cursor|all] [--no-hook] [--reset-config]
+  ome uninstall [--provider codex|claude|cursor|all] [--delete-library --yes]
   ome version | ome -v
   ome config get|preview|set
   ome source status|user-index build|user-index search|user-index show|scan codex|scan spool|clean|connect spool

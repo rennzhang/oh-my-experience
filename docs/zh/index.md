@@ -21,7 +21,7 @@ features:
     details: Hook 把 prompt 拆成 task envelope 做 BM25-like 匹配，命中了才注入，没命中就什么都不加。
   - title: 不过审不进库
     details: 经验卡走 candidate → draft → active → archived。AI 生成的候选你先审核，只有批准的 active 卡才被召回。
-  - title: 一套库，Codex 和 Claude 共享
+  - title: 一套库，Codex、Claude 和 Cursor 共享
     details: 同一套经验卡、同一个召回引擎，给各自安装 hook 和 skill 即可。
   - title: 本地运行，隐私默认
     details: 全在本机。Hook 不调 LLM、不存原始 prompt，默认只存 prompt hash。

@@ -40,8 +40,8 @@ on a real task.
 - `ome init --reset-config` restores runtime config defaults without deleting cards, sessions, retrospective runs, or other experience assets.
 - `ome init --no-hook` initializes or updates the library only. It does not install agent hooks or bundled skills.
 - Keep setup simple: data directory, supported agent choice, confirmation, then one completion view with the first task and optional suggestions.
-- Interactive `ome init` asks users which supported agents to connect (`codex`, `claude`, `all`, or `none`). Codex can remain the default because it is the best-tested path, but the product must not describe OME as Codex-only.
-- For each selected agent, install both the prompt-time hook and the bundled OME skill. `codex` writes `~/.codex/hooks.json` plus `~/.codex/skills/oh-my-experience`; `claude` writes `~/.claude/settings.json` plus `~/.claude/skills/oh-my-experience`.
+- Interactive `ome init` asks users which supported agents to connect (`codex`, `claude`, `cursor`, `all`, or `none`). Codex can remain the default because it is the best-tested path, but the product must not describe OME as Codex-only.
+- For each selected agent, install both the prompt-time hook and the bundled OME skill. `codex` writes `~/.codex/hooks.json` plus `~/.codex/skills/oh-my-experience`; `claude` writes `~/.claude/settings.json` plus `~/.claude/skills/oh-my-experience`; `cursor` writes `~/.cursor/hooks.json` plus `~/.cursor/skills/oh-my-experience`.
 - Spool belongs in the same setup flow, not as a post-completion step. If Spool CLI is detected, ask whether to enable it as a source before confirmation. If Spool CLI is not detected, show a short install-later note in the completion view and do not prompt to install it.
 - Never install Spool during first setup. `ome init -y`, JSON, dry-run, and other non-interactive setup paths must not prompt for or install Spool.
 - Do not expose removed language or project-level install options.
@@ -72,6 +72,8 @@ ome init --provider codex --dry-run
 ome hook status --provider codex
 ome init --provider claude --dry-run
 ome hook status --provider claude
+ome init --provider cursor --dry-run
+ome hook status --provider cursor
 ```
 
 Only after explicit user confirmation:
@@ -79,6 +81,7 @@ Only after explicit user confirmation:
 ```bash
 ome init --provider codex
 ome init --provider claude
+ome init --provider cursor
 ```
 
 Use dry-run when exploring:
@@ -86,6 +89,7 @@ Use dry-run when exploring:
 ```bash
 ome init --provider codex --dry-run
 ome init --provider claude --dry-run
+ome init --provider cursor --dry-run
 ```
 
 Codex App may still require the user to trust the hook after installation.
@@ -95,6 +99,7 @@ Uninstall only when explicitly requested:
 ```bash
 ome uninstall --provider codex
 ome uninstall --provider claude
+ome uninstall --provider cursor
 ```
 
 ## Advanced Scheduling

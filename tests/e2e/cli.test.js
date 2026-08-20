@@ -10,6 +10,8 @@ const bin = path.join(root, "bin", "ome.js");
 const configHome = fs.mkdtempSync(path.join(os.tmpdir(), "ome-e2e-config-home-"));
 const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "ome-e2e-codex-home-"));
 
+const cursorHome = fs.mkdtempSync(path.join(os.tmpdir(), "ome-e2e-cursor-home-"));
+
 function tmpDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `ome-e2e-${name}-`));
 }
@@ -31,7 +33,7 @@ function similarityCheckFixture(candidate = "fixture candidate") {
 function run(args, options = {}) {
   const result = spawnSync(process.execPath, [bin, ...args], {
     cwd: options.cwd || root,
-    env: { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome, ...(options.env || {}) },
+    env: { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome, CURSOR_HOME: cursorHome, ...(options.env || {}) },
     input: options.input,
     encoding: "utf8",
   });
@@ -667,7 +669,7 @@ test("interactive init exposes first-run choices without migration prompts", () 
   assert.match(result.stdout, /Enter accepts path defaults · confirmation requires y\/n · Ctrl\+C cancels/);
   assert.match(result.stdout, /Which agents should OME connect/);
   assert.match(result.stdout, /Codex is the best-tested path today/);
-  assert.match(result.stdout, /Choices: codex, claude, all, none/);
+  assert.match(result.stdout, /Choices: codex, claude, cursor, all, none/);
   assert.match(result.stdout, /Setup summary/);
   assert.match(result.stdout, /Recall is ready for your next agent task/);
   assert.match(result.stdout, /Send this to your selected agent so the hook can recall relevant experience automatically/);
@@ -1140,27 +1142,104 @@ test("init installs claude hook through the same runtime command", () => {
   assert.equal(doctor.checked.agentSkills[0].inSync, true);
 });
 
-test("init provider all installs hooks and skills for Codex and Claude", () => {
+test("init provider all installs hooks and skills for Codex, Claude, and Cursor", () => {
   const dataDir = tmpDir("all-provider-skills");
-  const codexHome = tmpDir("all-provider-codex-home");
+  const localCodexHome = tmpDir("all-provider-codex-home");
   const claudeHome = tmpDir("all-provider-claude-home");
+  const localCursorHome = tmpDir("all-provider-cursor-home");
 
-  const installed = json(run(["init", "--provider", "all", "--data-dir", dataDir, "--codex-home", codexHome, "--claude-home", claudeHome, "--json"]));
-  assert.deepEqual(installed.hooks.map((hook) => hook.provider), ["codex", "claude"]);
-  assert.deepEqual(installed.skills.map((skill) => skill.provider), ["codex", "claude"]);
-  assert.equal(fs.existsSync(path.join(codexHome, "skills", "oh-my-experience", "SKILL.md")), true);
+  const installed = json(run(["init", "--provider", "all", "--data-dir", dataDir, "--codex-home", localCodexHome, "--claude-home", claudeHome, "--cursor-home", localCursorHome, "--json"]));
+  assert.deepEqual(installed.hooks.map((hook) => hook.provider), ["codex", "claude", "cursor"]);
+  assert.deepEqual(installed.skills.map((skill) => skill.provider), ["codex", "claude", "cursor"]);
+  assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience", "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(claudeHome, "skills", "oh-my-experience", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(localCursorHome, "skills", "oh-my-experience", "SKILL.md")), true);
 
-  const doctor = json(run(["doctor", "--data-dir", dataDir, "--codex-home", codexHome, "--claude-home", claudeHome, "--json"]));
+  const doctor = json(run(["doctor", "--data-dir", dataDir, "--codex-home", localCodexHome, "--claude-home", claudeHome, "--cursor-home", localCursorHome, "--json"]));
   assert.equal(doctor.ok, true, doctor.errors.join("\n"));
-  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.provider), ["codex", "claude"]);
-  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.inSync), [true, true]);
+  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.provider), ["codex", "claude", "cursor"]);
+  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.inSync), [true, true, true]);
 
-  const removed = json(run(["uninstall", "--provider", "all", "--data-dir", dataDir, "--codex-home", codexHome, "--claude-home", claudeHome, "--json"]));
-  assert.deepEqual(removed.skills.map((skill) => skill.provider), ["codex", "claude"]);
-  assert.deepEqual(removed.skills.map((skill) => skill.uninstalled), [true, true]);
-  assert.equal(fs.existsSync(path.join(codexHome, "skills", "oh-my-experience")), false);
+  const removed = json(run(["uninstall", "--provider", "all", "--data-dir", dataDir, "--codex-home", localCodexHome, "--claude-home", claudeHome, "--cursor-home", localCursorHome, "--json"]));
+  assert.deepEqual(removed.skills.map((skill) => skill.provider), ["codex", "claude", "cursor"]);
+  assert.deepEqual(removed.skills.map((skill) => skill.uninstalled), [true, true, true]);
+  assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience")), false);
   assert.equal(fs.existsSync(path.join(claudeHome, "skills", "oh-my-experience")), false);
+  assert.equal(fs.existsSync(path.join(localCursorHome, "skills", "oh-my-experience")), false);
+});
+
+test("unknown hook provider fails closed instead of installing Codex", () => {
+  const dataDir = tmpDir("unknown-provider");
+  const localCodexHome = tmpDir("unknown-provider-codex-home");
+  const result = run(["init", "--provider", "copilot", "--data-dir", dataDir, "--codex-home", localCodexHome, "--json"]);
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stderr}\n${result.stdout}`, /unsupported hook provider: copilot/);
+  assert.equal(fs.existsSync(path.join(localCodexHome, "hooks.json")), false);
+});
+
+test("init installs cursor hook through the same runtime command", () => {
+  const dataDir = tmpDir("cursor-hook");
+  const localCursorHome = tmpDir("cursor-home");
+  const localCodexHome = tmpDir("cursor-skill-home");
+  fs.mkdirSync(localCursorHome, { recursive: true });
+  fs.writeFileSync(path.join(localCursorHome, "hooks.json"), JSON.stringify({
+    version: 1,
+    hooks: {
+      beforeSubmitPrompt: [
+        { command: "ome hook run --data-dir /tmp/old-cursor-ome", timeout: 5 },
+        { command: "echo keep-me", timeout: 5 },
+      ],
+      stop: [
+        { command: "echo keep-stop", timeout: 5 },
+      ],
+    },
+  }, null, 2));
+  const installed = json(run(["init", "--provider", "cursor", "--cursor-home", localCursorHome, "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  assert.equal(installed.hooks[0].provider, "cursor");
+  assert.equal(installed.hooks[0].installed, true);
+  assert.equal(installed.hooks[0].installTarget, "global");
+  assert.equal(installed.skills[0].provider, "cursor");
+  assert.equal(installed.skills[0].installed, true);
+  assert.equal(fs.existsSync(path.join(localCursorHome, "skills", "oh-my-experience", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(localCursorHome, "skills", "oh-my-experience", ".ome-skill.json")), true);
+  assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience")), false);
+  const hooksJson = JSON.parse(fs.readFileSync(path.join(localCursorHome, "hooks.json"), "utf8"));
+  const commands = (hooksJson.hooks.beforeSubmitPrompt || []).map((hook) => hook.command);
+  assert.equal(commands.filter((command) => command.includes("ome hook run")).length, 1);
+  assert.equal(commands.includes("echo keep-me"), true);
+  assert.equal(hooksJson.hooks.stop[0].command, "echo keep-stop");
+  assert.match(commands.find((command) => command.includes("ome hook run")), /--json/);
+  const status = json(run(["hook", "status", "--provider", "cursor", "--cursor-home", localCursorHome, "--data-dir", dataDir, "--json"]));
+  assert.equal(status.installed, true);
+  const doctor = json(run(["doctor", "--data-dir", dataDir, "--cursor-home", localCursorHome, "--codex-home", localCodexHome, "--json"]));
+  assert.equal(doctor.ok, true, doctor.errors.join("\n"));
+  assert.equal(doctor.checked.agentSkills[0].provider, "cursor");
+  assert.equal(doctor.checked.agentSkills[0].inSync, true);
+
+  json(run(["uninstall", "--provider", "cursor", "--cursor-home", localCursorHome, "--codex-home", localCodexHome, "--data-dir", dataDir, "--json"]));
+  const remaining = JSON.parse(fs.readFileSync(path.join(localCursorHome, "hooks.json"), "utf8"));
+  const remainingCommands = (remaining.hooks.beforeSubmitPrompt || []).map((hook) => hook.command);
+  assert.equal(remainingCommands.some((command) => command.includes("ome hook run")), false);
+  assert.equal(remainingCommands.includes("echo keep-me"), true);
+  assert.equal(remaining.hooks.stop[0].command, "echo keep-stop");
+});
+
+test("doctor warns when Cursor and Claude both have OME prompt-time hooks", () => {
+  const dataDir = tmpDir("cursor-claude-duplicate");
+  const localCursorHome = tmpDir("cursor-claude-duplicate-cursor-home");
+  const claudeHome = tmpDir("cursor-claude-duplicate-claude-home");
+  json(run(["init", "--provider", "cursor", "--cursor-home", localCursorHome, "--claude-home", claudeHome, "--data-dir", dataDir, "--json"]));
+  fs.mkdirSync(claudeHome, { recursive: true });
+  fs.writeFileSync(path.join(claudeHome, "settings.json"), JSON.stringify({
+    hooks: {
+      UserPromptSubmit: [{
+        hooks: [{ type: "command", command: "ome hook run --json --data-dir /tmp/claude-ome", timeout: 5 }],
+      }],
+    },
+  }, null, 2));
+  const doctor = json(run(["doctor", "--data-dir", dataDir, "--cursor-home", localCursorHome, "--claude-home", claudeHome, "--json"]));
+  assert.equal(doctor.ok, true, doctor.errors.join("\n"));
+  assert.match(doctor.warnings.join("\n"), /Cursor and Claude both have OME prompt-time hooks/);
 });
 
 test("hook no-hit succeeds without additionalContext", () => {
@@ -1226,6 +1305,56 @@ test("hook run applies project scope from real cwd payload", () => {
     input: JSON.stringify({ prompt: "project cwd browser", cwd: otherDir, session_id: "s2" }),
   }));
   assert.deepEqual(miss, {});
+});
+
+test("hook run uses Cursor workspace_roots and records provider cursor", () => {
+  const dataDir = tmpDir("hook-cursor-workspace-roots");
+  const projectDir = tmpDir("cursor-project-context");
+  const appDir = path.join(projectDir, "app");
+  const unrelatedCwd = tmpDir("cursor-unrelated-cwd");
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.writeFileSync(path.join(projectDir, "package.json"), JSON.stringify({ name: "@eval/cursor-project" }), "utf8");
+  json(run(["init", "--data-dir", dataDir, "--no-hook", "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
+  const candidate = json(run([
+    "reflect", "add", retrospective.runId,
+    "--title", "Project cwd browser card",
+    "--category", "测试验收",
+    "--summary", "Project-specific UI validation was missed.",
+    "--rule", "Recall only inside the app module.",
+    "--triggers", "project cwd browser",
+    "--topics", "ui",
+    "--scope-level", "project",
+    "--project-key", "@eval/cursor-project",
+    "--module-path", "app",
+    "--allow-incomplete-audit",
+    "--incomplete-audit-reason", "cursor workspace fixture",
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+  const candidateId = candidate.candidates[0].id;
+  json(run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--data-dir", dataDir, "--json"]));
+  const applied = json(run(["reflect", "apply", retrospective.runId, "--data-dir", dataDir, "--json"]));
+  const cardId = applied.drafts[0].id;
+  json(run(["experience", "enable", cardId, "--data-dir", dataDir, "--json"]));
+  const hit = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
+    cwd: unrelatedCwd,
+    input: JSON.stringify({
+      prompt: "project cwd browser",
+      hook_event_name: "beforeSubmitPrompt",
+      cursor_version: "3.16.29",
+      conversation_id: "c-cursor",
+      generation_id: "g-cursor",
+      session_id: "s-cursor",
+      workspace_roots: [appDir],
+    }),
+  }));
+  assert.ok(hit.hookSpecificOutput.additionalContext.includes("Project cwd browser card"));
+  const events = fs.readFileSync(path.join(dataDir, "events.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  const hookEvent = events.filter((event) => event.kind === "hook").at(-1);
+  assert.equal(hookEvent.provider, "cursor");
+  assert.equal(hookEvent.sessionId, "s-cursor");
+  assert.equal(hookEvent.turnId, "g-cursor");
 });
 
 test("hook log does not persist raw prompt by default", () => {

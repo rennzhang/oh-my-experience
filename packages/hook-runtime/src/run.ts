@@ -262,9 +262,9 @@ export function normalizeHookPayload(payload: HookPayload = {}) {
     provider,
     event: eventName === "Stop" ? "agent.stop" : "prompt.submit",
     prompt: payload.prompt || payload.userPrompt || payload.input || payload.user_prompt || "",
-    sessionId: payload.session_id || payload.sessionId || payload.session?.id || null,
-    turnId: payload.turn_id || payload.turnId || payload.turn?.id || null,
-    cwd: payload.cwd || payload.working_directory || null,
+    sessionId: payload.session_id || payload.sessionId || payload.conversation_id || payload.session?.id || null,
+    turnId: payload.turn_id || payload.turnId || payload.generation_id || payload.turn?.id || null,
+    cwd: payload.cwd || payload.working_directory || firstWorkspaceRoot(payload) || null,
   };
 }
 
@@ -292,9 +292,21 @@ function successOutput(additionalContext: string) {
 }
 
 function inferProvider(payload: HookPayload): string {
-  if (payload.transcript_path || payload.hook_event_name) return "claude";
+  if (payload.cursor_version || Array.isArray(payload.workspace_roots) || payload.hook_event_name === "beforeSubmitPrompt" || payload.hookEventName === "beforeSubmitPrompt") {
+    return "cursor";
+  }
+  if (payload.transcript_path || payload.hook_event_name === "UserPromptSubmit" || payload.hookEventName === "UserPromptSubmit") {
+    return "claude";
+  }
   if (payload.session_id || payload.turn_id) return "codex";
   return "unknown";
+}
+
+function firstWorkspaceRoot(payload: HookPayload): string | null {
+  const roots = payload.workspace_roots || payload.workspaceRoots;
+  if (!Array.isArray(roots)) return null;
+  const match = roots.find((root) => typeof root === "string" && root.trim());
+  return typeof match === "string" ? match : null;
 }
 
 function readStdin(): Promise<string> {

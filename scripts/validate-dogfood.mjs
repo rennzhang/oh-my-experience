@@ -9,7 +9,8 @@ const runRoot = path.join(root, "tmp", `dogfood-validation-${stamp()}`);
 const configHome = path.join(runRoot, "config-home");
 const codexHome = path.join(runRoot, "codex-home");
 const claudeHome = path.join(runRoot, "claude-home");
-const env = { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome };
+const cursorHome = path.join(runRoot, "cursor-home");
+const env = { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome, CURSOR_HOME: cursorHome };
 const steps = [];
 
 fs.mkdirSync(runRoot, { recursive: true });
@@ -26,6 +27,18 @@ jsonStep("codex-hook-run", "node", ["bin/ome.js", "hook", "run", "--data-dir", h
 });
 jsonStep("claude-hook-run", "node", ["bin/ome.js", "hook", "run", "--data-dir", hookDataDir, "--json"], {
   input: JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: hookPrompt, transcript_path: path.join(runRoot, "claude-transcript.jsonl"), cwd: root }),
+  validate: assertHookInjected("browser-validation", hookDataDir),
+});
+jsonStep("cursor-hook-run", "node", ["bin/ome.js", "hook", "run", "--data-dir", hookDataDir, "--json"], {
+  input: JSON.stringify({
+    hook_event_name: "beforeSubmitPrompt",
+    prompt: hookPrompt,
+    cursor_version: "3.16.29",
+    conversation_id: "dogfood-cursor",
+    generation_id: "1",
+    session_id: "dogfood-cursor",
+    workspace_roots: [root],
+  }),
   validate: assertHookInjected("browser-validation", hookDataDir),
 });
 step("pack-dry-run", "npm", ["pack", "--dry-run", "--silent"]);
@@ -45,7 +58,7 @@ step("bun-binary", "npm", ["run", "build:binary:bun"]);
 step("binary-init", path.join(root, "build", "ome"), ["init", "--data-dir", path.join(runRoot, "binary-data"), "--no-hook", "--json"]);
 step("binary-doctor", path.join(root, "build", "ome"), ["doctor", "--data-dir", path.join(runRoot, "binary-data"), "--json"]);
 
-const report = { ok: true, runRoot, configHome, codexHome, claudeHome, steps };
+const report = { ok: true, runRoot, configHome, codexHome, claudeHome, cursorHome, steps };
 fs.writeFileSync(path.join(runRoot, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
 console.log(JSON.stringify(report, null, 2));
 

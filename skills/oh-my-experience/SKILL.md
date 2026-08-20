@@ -1,7 +1,7 @@
 ---
 name: oh-my-experience
 description: >-
-  Use this skill when Codex needs to work with Oh My Experience for AI coding-agent execution lessons: set up a local OME library, install or inspect Codex hooks, recall active experience cards before medium or complex work, scan coding sessions for experience drafts, create or inspect draft approval pages, review and govern an existing experience library, run recall evaluation, or troubleshoot OME data directories, hooks, stats, Spool source scans, and doctor failures.
+  Use this skill when an AI coding agent needs to work with Oh My Experience for execution lessons: set up a local OME library, install or inspect Codex, Claude, or Cursor hooks, recall active experience cards before medium or complex work, scan coding sessions for experience drafts, create or inspect draft approval pages, review and govern an existing experience library, run recall evaluation, or troubleshoot OME data directories, hooks, stats, Spool source scans, and doctor failures.
 ---
 
 # Oh My Experience
@@ -50,7 +50,7 @@ setup -> recall -> retrospective -> draft -> active -> eval -> maintenance
 - Keep the lifecycle explicit: `candidate -> draft -> active -> archived`.
 - Never create or edit active cards directly; create retrospective runs with `ome reflect start`, manage existing runs with `ome reflect ...`, then use `ome experience enable`.
 - Use `--scope project` only when the user wants cards written to the current project's `.oh-my-experience/` library.
-- Never install or overwrite real Codex hooks unless the user explicitly confirms.
+- Never install or overwrite real Codex, Claude, or Cursor hooks unless the user explicitly confirms.
 - Never store raw prompt text in events unless the user explicitly opts into that behavior.
 - Keep Spool optional. If Spool is unavailable, Codex session scanning and local recall still need to work.
 - Keep scheduling outside the built-in skill workflow. Periodic retrospectives are an advanced docs pattern and require explicit user approval for the chosen host.

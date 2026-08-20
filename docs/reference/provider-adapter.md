@@ -7,7 +7,7 @@ status: active
 
 ## Purpose
 
-Provider adapters isolate Codex and Claude hook differences from the core
+Provider adapters isolate Codex, Claude, and Cursor hook differences from the core
 retrieval engine.
 
 ## Target Interface
@@ -40,6 +40,6 @@ interface ProviderAdapter {
 
 ## Current Shape
 
-Codex and Claude both use the shared hook runtime and inject additional context
+Codex, Claude, and Cursor use the shared hook runtime and inject additional context
 through provider-specific hook output. Adapter code lives under
 `packages/adapters/agents/<provider>/` and owns install/status/uninstall.

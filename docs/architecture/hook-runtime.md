@@ -7,7 +7,7 @@ status: active
 
 ## Goal
 
-Support Codex and Claude prompt-time recall through one provider-neutral runtime.
+Support Codex, Claude, and Cursor prompt-time recall through one provider-neutral runtime.
 
 The shared flow:
 
@@ -41,6 +41,18 @@ Install path:
 
 ```bash
 ome init --provider claude
+```
+
+## Cursor Adapter
+
+Cursor `beforeSubmitPrompt` maps to `prompt.submit`. Native install writes
+`~/.cursor/hooks.json`. The runtime uses `workspace_roots` for project context
+because user-level Cursor hooks run from `~/.cursor`.
+
+Install path:
+
+```bash
+ome init --provider cursor
 ```
 
 At prompt time, the shared runtime detects the current working directory,

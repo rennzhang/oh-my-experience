@@ -21,7 +21,7 @@
   <a href="docs/zh/index.md">中文文档</a>
 </p>
 
-Oh My Experience 是一个本地优先的 AI 编码经验召回层。它把真实 Codex 和 Claude
+Oh My Experience 是一个本地优先的 AI 编码经验召回层。它把真实 Codex、Claude 和 Cursor
 会话里的纠正、返工和交付教训整理成经过审核的经验卡；下一次类似任务出现时，在
 prompt 阶段把最相关的提醒给到 Agent。
 

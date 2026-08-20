@@ -8,7 +8,7 @@ status: active
 
 ## 目标
 
-用一套 provider-neutral 运行时支持 Codex 和 Claude 的提示词阶段召回。
+用一套 provider-neutral 运行时支持 Codex、Claude 和 Cursor 的提示词阶段召回。
 
 共享流程：
 
@@ -42,6 +42,18 @@ Claude `UserPromptSubmit` 映射为 `prompt.submit`，并返回包含
 
 ```bash
 ome init --provider claude
+```
+
+## Cursor Adapter
+
+Cursor `beforeSubmitPrompt` 映射为 `prompt.submit`。原生安装写入
+`~/.cursor/hooks.json`。运行时使用 `workspace_roots` 作为项目上下文，因为用户级
+Cursor hook 从 `~/.cursor` 执行。
+
+安装命令：
+
+```bash
+ome init --provider cursor
 ```
 
 提示词进入 hook 时，共享运行时会检测当前工作目录，推导 project context，然后在

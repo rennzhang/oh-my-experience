@@ -17,7 +17,7 @@ export const DEFAULT_CATEGORY = "未分类";
 export const ApplicabilityLevelSchema = z.enum(["global", "project", "project-family"]);
 export const SourceCoverageSchema = z.enum(["all-accessible", "bounded", "user-provided", "manual", "unknown"]);
 export const SourceAdapterSchema = z.enum(["codex-sessions", "spool", "manual", "ome-starter", "unknown"]);
-export const AgentOriginSchema = z.enum(["codex", "claude", "gemini", "opencode", "unknown"]);
+export const AgentOriginSchema = z.enum(["codex", "claude", "cursor", "gemini", "opencode", "unknown"]);
 export const SourceRefTypeSchema = z.enum(["session", "turn", "file", "retrospective", "starter", "manual"]);
 
 export const HOOK_TELEMETRY_SCHEMA_VERSION = 2;
@@ -62,6 +62,9 @@ export const ConfigSchema = z.object({
         enabled: z.boolean().default(false),
       }).default({}),
       claude: z.object({
+        enabled: z.boolean().default(false),
+      }).default({}),
+      cursor: z.object({
         enabled: z.boolean().default(false),
       }).default({}),
     }).default({}),

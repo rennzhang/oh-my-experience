@@ -6,6 +6,23 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## 0.4.0 - 2026-08-20
+
+### Added
+
+- Added a native Cursor provider adapter: `ome init --provider cursor` writes
+  `~/.cursor/hooks.json` `beforeSubmitPrompt` and installs the bundled skill to
+  `~/.cursor/skills/oh-my-experience`.
+- Cursor hook payloads now normalize `workspace_roots`, `generation_id`, and
+  host identity so global Cursor hooks keep project-aware recall.
+
+### Changed
+
+- `ome init --provider all` now installs Codex, Claude, and Cursor.
+- Unknown hook providers fail closed instead of silently installing Codex.
+- `ome doctor` checks Cursor native hooks and warns when Cursor and Claude both
+  have OME prompt-time hooks, because Cursor may run both.
+
 ## 0.3.0 - 2026-07-18
 
 ### Added

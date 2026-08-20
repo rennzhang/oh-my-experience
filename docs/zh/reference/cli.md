@@ -31,6 +31,7 @@ ome init --interactive
 ome init --yes
 ome init --provider claude
 ome init --provider all
+ome init --provider cursor
 ome init --no-hook
 ome init --reset-config
 ```
@@ -184,7 +185,7 @@ which -a ome
 
 `ome doctor` 检查 dataDir 可写性、配置 schema、卡片生命周期完整性、active 索引一致性、reflect 状态、hook 状态、事件 JSONL、包运行时要求，以及 PATH 中冲突的 `ome` 二进制。无效 active 或 draft 卡是错误；无效 archived 卡只作为治理 warning 暴露，因为 archived 只是历史，不会进入运行时召回。
 
-`ome hook run` 是已安装 Codex 和 Claude hook 使用的 runtime 入口。它保留为公开命令是为了让 hook 能执行；普通设置应通过 `ome init` 完成。
+`ome hook run` 是已安装 Codex、Claude 和 Cursor hook 使用的 runtime 入口。它保留为公开命令是为了让 hook 能执行；普通设置应通过 `ome init` 完成。
 
 ## 配置
 

@@ -7,10 +7,15 @@ import { validateSignalIds } from "./signal-registry.js";
 import { defaultDataDir, layout, readJson } from "./storage.js";
 import { validateTriggerSignalContract, type TriggerSignalContractViolation } from "./trigger-signal-contract.js";
 
-type DoctorOptions = { codexHome?: string; claudeHome?: string };
-type HookEntry = { hooks?: Array<{ command?: string }> };
+type DoctorOptions = { codexHome?: string; claudeHome?: string; cursorHome?: string };
+type HookFileFormat = "nested-user-prompt-submit" | "flat-before-submit-prompt";
+type HookEntry = { hooks?: Array<{ command?: string }>; command?: string };
 
-export function runDoctor(dataDir: string, { codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex"), claudeHome = path.join(os.homedir(), ".claude") }: DoctorOptions = {}) {
+export function runDoctor(dataDir: string, {
+  codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex"),
+  claudeHome = path.join(os.homedir(), ".claude"),
+  cursorHome = process.env.CURSOR_HOME || path.join(os.homedir(), ".cursor"),
+}: DoctorOptions = {}) {
   const errors: string[] = [];
   const warnings: string[] = [];
   const l = layout(dataDir);
@@ -27,7 +32,7 @@ export function runDoctor(dataDir: string, { codexHome = process.env.CODEX_HOME 
   checkIndex(dataDir, errors);
   checkJsonl(l.events, "events", warnings);
   const config = checkConfig(dataDir, errors, warnings);
-  checkHook(config, { codexHome, claudeHome }, errors, warnings);
+  checkHook(config, { codexHome, claudeHome, cursorHome }, errors, warnings);
   checkPackage(errors, warnings);
   return {
     ok: errors.length === 0,
@@ -154,27 +159,46 @@ function checkConfig(dataDir: string, errors: string[], warnings: string[]): Con
   return config;
 }
 
-function checkHook(config: Config | null, { codexHome, claudeHome }: Required<DoctorOptions>, errors: string[], warnings: string[]): void {
+function checkHook(config: Config | null, { codexHome, claudeHome, cursorHome }: Required<DoctorOptions>, errors: string[], warnings: string[]): void {
   const codexEnabled = config?.hooks?.providers?.codex?.enabled;
   if (codexEnabled) {
-    checkProviderHook("Codex", path.join(codexHome, "hooks.json"), errors, warnings);
+    checkProviderHook("Codex", path.join(codexHome, "hooks.json"), "nested-user-prompt-submit", errors);
   }
   if (config?.hooks?.providers?.claude?.enabled) {
-    checkProviderHook("Claude", path.join(claudeHome, "settings.json"), errors, warnings);
+    checkProviderHook("Claude", path.join(claudeHome, "settings.json"), "nested-user-prompt-submit", errors);
   }
+  if (config?.hooks?.providers?.cursor?.enabled) {
+    checkProviderHook("Cursor", path.join(cursorHome, "hooks.json"), "flat-before-submit-prompt", errors);
+  }
+  checkDuplicateCursorClaudeHooks(cursorHome, claudeHome, warnings);
 }
 
-function checkProviderHook(provider: string, hookFile: string, errors: string[], warnings: string[]): void {
+function checkProviderHook(provider: string, hookFile: string, format: HookFileFormat, errors: string[]): void {
   if (!fs.existsSync(hookFile)) {
     errors.push(`${provider} hook enabled but hook config not found: ${hookFile}`);
     return;
   }
-  const hooks = readJson<{ hooks?: { UserPromptSubmit?: HookEntry[] } } | null>(hookFile, null);
-  const entries: HookEntry[] = Array.isArray(hooks?.hooks?.UserPromptSubmit) ? hooks.hooks.UserPromptSubmit : [];
-  const installed = Boolean(entries.some((entry: HookEntry) =>
-    (entry.hooks || []).some((hook: { command?: string }) => isMachineReadableOmeHookCommand(hook.command)),
-  ));
+  const installed = readOmeHookCommands(hookFile, format).some((command) => isMachineReadableOmeHookCommand(command));
   if (!installed) errors.push(`${provider} hook enabled but machine-readable ome hook command missing: ${hookFile}`);
+}
+
+function checkDuplicateCursorClaudeHooks(cursorHome: string, claudeHome: string, warnings: string[]): void {
+  const cursorHas = readOmeHookCommands(path.join(cursorHome, "hooks.json"), "flat-before-submit-prompt").some((command) => isMachineReadableOmeHookCommand(command));
+  const claudeHas = readOmeHookCommands(path.join(claudeHome, "settings.json"), "nested-user-prompt-submit").some((command) => isMachineReadableOmeHookCommand(command));
+  if (cursorHas && claudeHas) {
+    warnings.push("Cursor and Claude both have OME prompt-time hooks. Cursor may run both and inject duplicate recall context. Keep the Cursor native hook as the Cursor path, or remove one of them.");
+  }
+}
+
+function readOmeHookCommands(hookFile: string, format: HookFileFormat): string[] {
+  if (!fs.existsSync(hookFile)) return [];
+  const hooks = readJson<{ hooks?: { UserPromptSubmit?: HookEntry[]; beforeSubmitPrompt?: HookEntry[] } } | null>(hookFile, null);
+  if (format === "flat-before-submit-prompt") {
+    const entries: HookEntry[] = Array.isArray(hooks?.hooks?.beforeSubmitPrompt) ? hooks.hooks.beforeSubmitPrompt : [];
+    return entries.map((entry) => entry.command).filter((command): command is string => typeof command === "string");
+  }
+  const entries: HookEntry[] = Array.isArray(hooks?.hooks?.UserPromptSubmit) ? hooks.hooks.UserPromptSubmit : [];
+  return entries.flatMap((entry) => (entry.hooks || []).map((hook) => hook.command)).filter((command): command is string => typeof command === "string");
 }
 
 function isMachineReadableOmeHookCommand(command: unknown): boolean {

@@ -76,7 +76,7 @@ OME 不是事实记忆库，不替代 `AGENTS.md` / `CLAUDE.md`，也不是 skil
 
 - 一个本地 Markdown 经验库。
 - 可选的项目经验库：`<project-root>/.oh-my-experience/`。
-- Codex 和 Claude 的 prompt-time recall hook。
+- Codex、Claude 和 Cursor 的 prompt-time recall hook。
 - 能理解项目上下文的本地匹配。
 - 针对 “goal”、“review”、“release” 这类高噪词的明确忽略标准。
 - 可解释召回：命中了哪些卡、为什么命中、最终注入了什么。

@@ -43,6 +43,7 @@ export function createDefaultConfig(dataDir: string): Config {
       providers: {
         codex: { enabled: false },
         claude: { enabled: false },
+        cursor: { enabled: false },
       },
     },
     codex: {

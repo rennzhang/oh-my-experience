@@ -21,7 +21,7 @@ features:
     details: Hook decomposes prompts into task envelopes with deterministic BM25-like matching. Cards inject only when triggered — otherwise nothing.
   - title: Nothing enters without draft approval
     details: Cards follow candidate → draft → active → archived. AI-generated drafts wait for your approval first. Only active cards are recalled.
-  - title: One library, Codex and Claude
+  - title: One library, Codex, Claude, and Cursor
     details: Same cards, same retrieval engine, shared across providers. Install each agent hook and skill once.
   - title: Local-first, private by default
     details: Everything on your machine. No cloud, no accounts. The hook path calls no LLM, stores no raw prompts.

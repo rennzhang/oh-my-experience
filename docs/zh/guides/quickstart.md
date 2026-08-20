@@ -16,7 +16,7 @@ npx oh-my-experience@latest init
 
 这会通过 npm 运行最新发布版 OME CLI，创建本地经验库，并让你选择要连接哪些 Agent。
 对每个选中的 Agent，OME 会安装 prompt-time hook 和内置 skill。Codex 是当前验证最
-充分的路径；Claude 使用同一套 hook runtime。它可以重复运行。
+充分的路径；Claude 和 Cursor 使用同一套 hook runtime。它可以重复运行。
 
 如果想全局安装命令：
 
