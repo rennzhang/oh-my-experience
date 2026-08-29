@@ -323,7 +323,20 @@ function segmentPrompt(text: string): string[] {
   return unique(String(text).split(/[\n。.!?？；;]/).map((item) => item.trim()).filter((item) => item.length > 8));
 }
 
-const NEGATED_SPAN_PATTERN = /(?:\b(?:do\s+not|don't|does\s+not(?!\s+make\s+sense\s+to\s+me\b)|doesn't(?!\s+make\s+sense\s+to\s+me\b)|not(?!\s+only\b)(?:\s+(?:a|an|the))?|no\s+need(?:\s+(?:to|for))?|no\s+(?:code\s+)?(?:review|dispatch|multi[-\s]?model\s+audit|audit|diff)|need\s+not|without)\b|(?:(?<!是)不是|并非|不属于|不涉及|不要|不用|不需|无需|无须|不必|别(?:再|先|急着|直接|继续|马上|立刻|随便)?(?=(?:执行|实现|修改|修复|运行|落地|改|动|删|清|推|提交|部署|发布|重启|覆盖|用|做|跑|开|写|读|碰|安装|调用|声称|把|将|认为|假设))))[^\n。.!?？；;,，]*?(?=\b(?:but|however|instead)\b|(?:但是|但|不过|而是|改为|换成)|[\n。.!?？；;,，]|$)/gi;
+// A negated span ends at a contrast marker, at punctuation, or once a new
+// request clause starts. Without the request-clause terminator the span runs to
+// the end of the prompt, because prompts often separate clauses with spaces
+// instead of punctuation, and it then erases the request that followed the
+// prohibition. The leading-space requirement keeps these markers from cutting a
+// span short when they are part of the negated phrase itself ("不要先执行").
+const NEGATION_TERMINATOR =
+  "(?=\\b(?:but|however|instead)\\b|(?:但是|但|不过|而是|改为|换成)|(?<=\\s)(?:给我|帮我|然后|另外|接着|还有|并且|顺便|顺手|记得|同时|以及|最后|请|我要|我想|先)|[\\n。.!?？；;,，]|$)";
+const NEGATED_SPAN_PATTERN = new RegExp(
+  "(?:\\b(?:do\\s+not|don't|does\\s+not(?!\\s+make\\s+sense\\s+to\\s+me\\b)|doesn't(?!\\s+make\\s+sense\\s+to\\s+me\\b)|not(?!\\s+only\\b)(?:\\s+(?:a|an|the))?|no\\s+need(?:\\s+(?:to|for))?|no\\s+(?:code\\s+)?(?:review|dispatch|multi[-\\s]?model\\s+audit|audit|diff)|need\\s+not|without)\\b" +
+    "|(?:(?<!是)不是|并非|不属于|不涉及|不要|不用|不需|无需|无须|不必|别(?:再|先|急着|直接|继续|马上|立刻|随便)?(?=(?:执行|实现|修改|修复|运行|落地|改|动|删|清|推|提交|部署|发布|重启|覆盖|用|做|跑|开|写|读|碰|安装|调用|声称|把|将|认为|假设))))" +
+    `[^\\n。.!?？；;,，]*?${NEGATION_TERMINATOR}`,
+  "gi"
+);
 
 const HIGH_RISK_AUTHORIZATION_GATE_PATTERNS = [
   /(?:未(?:经|获)|没有|缺少).{0,12}(?:授权|批准|确认).{0,24}(?:不要|不得|禁止).{0,24}(?:(?:删除|清空).{0,24}(?:线上|生产).{0,12}(?:数据|记录)|(?:修改|变更).{0,20}生产配置)/i,

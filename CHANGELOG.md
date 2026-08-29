@@ -52,6 +52,10 @@ contributors, or release safety.
   `<session-id>/chat_history.jsonl`, so the whole history previously collapsed
   into a single `chat_history` entry in the session catalog and the watermark
   could not support incremental scans.
+- A Chinese negation span now ends where the next request clause begins instead
+  of running to the next punctuation mark. Prompts like `先不要动 给我方案` are
+  written without punctuation between the clauses, so the span starting at
+  `不要` used to swallow the actual request and no card could match it.
 
 ## 0.4.0 - 2026-08-20
 

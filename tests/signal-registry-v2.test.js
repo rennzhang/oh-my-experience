@@ -952,6 +952,34 @@ test("Chinese standalone 别 negation does not split ordinary words", () => {
   assert.ok(buildTaskEnvelope("先别修改代码。").negatives.some((span) => span.includes("别修改代码")));
 });
 
+test("a negated span stops once a new request clause starts", () => {
+  // Prompts often separate clauses with spaces instead of punctuation, and the
+  // span used to run to the end of the prompt and erase the actual request.
+  const envelope = buildTaskEnvelope("先不要动 给我完整的方案 解释整体流程包含细节");
+
+  assert.ok(envelope.negatives.some((span) => span.includes("不要动")));
+  for (const span of envelope.negatives) {
+    assert.equal(span.includes("给我完整的方案"), false, span);
+    assert.equal(span.includes("解释整体流程"), false, span);
+  }
+  assert.ok(envelope.keywords.includes("方案"));
+
+  const second = buildTaskEnvelope("这个不用隔离 另外给我一个切换脚本就行");
+  assert.ok(second.negatives.some((span) => span.includes("不用隔离")));
+  for (const span of second.negatives) {
+    assert.equal(span.includes("切换脚本"), false, span);
+  }
+});
+
+test("a request marker inside the negated phrase does not cut the span short", () => {
+  assert.ok(buildTaskEnvelope("不要先执行部署。").negatives.some((span) => span.includes("不要先执行部署")));
+});
+
+test("a negated span still crosses spaces inside the phrase it negates", () => {
+  const negated = buildTaskEnvelope("不要使用 provider adapter hook runtime。").negatives;
+  assert.ok(negated.some((span) => span.includes("provider adapter hook runtime")));
+});
+
 test("fenced prose stays out of summaries while useful diagnostic terms remain searchable", () => {
   const prompt = [
     "Fix this:",
