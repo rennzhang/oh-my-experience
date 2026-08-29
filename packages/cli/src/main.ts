@@ -43,6 +43,8 @@ import {
   runDoctor,
   saveConfig,
   buildUserMessageIndex,
+  recordScannedSessions,
+  findPainpointMarkers,
   setConfigValue,
   searchUserMessageIndex,
   showUserIndexContext,
@@ -64,6 +66,7 @@ import { runHook } from "../../hook-runtime/src/run.js";
 
 type CliFlags = Record<string, any>;
 type ParsedArgs = { flags: CliFlags; positionals: string[] };
+type UserIndexProviderName = "codex" | "claude" | "grok";
 const RETROSPECTIVE_GUIDE_REF = "skills/oh-my-experience/references/reflect-retrospective.md";
 const EXPERIENCE_REVIEW_FILE = "experience-review.md";
 const SPOOL_CLI_PACKAGE = "@spool-lab/cli";
@@ -1253,7 +1256,7 @@ function sourceCommand(dataDir: string, subcommand: string | undefined, args: Pa
     const config = loadConfig(dataDir);
     return print(saveConfig(dataDir, { ...config, sources: { ...config.sources, spool: { mode } } }), args);
   }
-  throw new Error("usage: ome source status|user-index build|user-index search|user-index show|scan codex|scan spool|clean|connect spool");
+  throw new Error("usage: ome source status|user-index build|user-index search|user-index show|user-index markers|scan codex|scan spool|clean|connect spool");
 }
 
 function userIndexCommand(dataDir: string, args: ParsedArgs) {
@@ -1261,7 +1264,8 @@ function userIndexCommand(dataDir: string, args: ParsedArgs) {
   if (action === "build") return buildUserIndexCommand(dataDir, args);
   if (action === "search") return searchUserIndexCommand(args);
   if (action === "show") return showUserIndexCommand(args);
-  throw new Error("usage: ome source user-index build|search|show");
+  if (action === "markers") return markersUserIndexCommand(args);
+  throw new Error("usage: ome source user-index build|search|show|markers");
 }
 
 function buildUserIndexCommand(dataDir: string, args: ParsedArgs) {
@@ -1273,10 +1277,12 @@ function buildUserIndexCommand(dataDir: string, args: ParsedArgs) {
   const outputPath = args.flags.out || args.flags.output
     ? path.resolve(String(args.flags.out || args.flags.output))
     : defaultUserIndexPath(dataDir);
+  const recordSources = !args.flags["no-record-sources"];
   return {
     ...writeUserMessageIndex(index, outputPath),
     command: "source.user-index.build",
     unavailableSources,
+    recordedSessions: recordSources ? recordScannedSessions(dataDir, index).recordedSessions : 0,
   };
 }
 
@@ -1311,6 +1317,19 @@ function showUserIndexCommand(args: ParsedArgs) {
   };
 }
 
+function markersUserIndexCommand(args: ParsedArgs) {
+  const indexPath = userIndexPathArg(args);
+  return {
+    ok: true,
+    command: "source.user-index.markers",
+    indexPath,
+    ...findPainpointMarkers(readUserMessageIndex(indexPath), {
+      provider: args.flags.provider ? String(args.flags.provider) : undefined,
+      limit: args.flags.limit ? Number(args.flags.limit) : undefined,
+    }),
+  };
+}
+
 function userIndexPathArg(args: ParsedArgs): string {
   const indexPath = args.flags.index || args.flags["index-path"];
   if (!indexPath) throw new Error("user-index command requires --index <file>");
@@ -1333,7 +1352,7 @@ function userIndexSources(args: ParsedArgs): { sources: UserIndexSourceInput[]; 
   const sources: UserIndexSourceInput[] = [];
   const unavailableSources: string[] = [];
   for (const provider of providers) {
-    const root = provider === "claude" ? claudeSessionsDir(args, providers.length === 1) : codexSessionsDir(args, providers.length === 1);
+    const root = userIndexSourceRoot(provider, args, providers.length === 1);
     if (fs.existsSync(root)) sources.push({ provider, root });
     else {
       unavailableSources.push(`${provider}:${root}`);
@@ -1343,17 +1362,18 @@ function userIndexSources(args: ParsedArgs): { sources: UserIndexSourceInput[]; 
   return { sources, unavailableSources };
 }
 
-function userIndexProviders(args: ParsedArgs): Array<"codex" | "claude"> {
+function userIndexProviders(args: ParsedArgs): UserIndexProviderName[] {
   const raw = String(args.flags.provider || args.flags.providers || "all");
   const values = raw.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
   if (!values.length || values.some((item) => ["none", "skip", "no", "off"].includes(item))) return [];
-  if (values.some((item) => ["all", "both"].includes(item))) return ["codex", "claude"];
+  if (values.some((item) => ["all", "both"].includes(item))) return ["codex", "claude", "grok"];
   const normalized = values.map((item) => {
     if (item === "codex") return "codex";
     if (["claude", "cloud"].includes(item)) return "claude";
-    throw new Error(`unsupported user-index provider: ${item}; use codex, claude, or all`);
+    if (item === "grok") return "grok";
+    throw new Error(`unsupported user-index provider: ${item}; use codex, claude, grok, or all`);
   });
-  return Array.from(new Set(normalized)) as Array<"codex" | "claude">;
+  return Array.from(new Set(normalized)) as UserIndexProviderName[];
 }
 
 function codexSessionsDir(args: ParsedArgs, allowGenericSessions: boolean): string {
@@ -1362,6 +1382,20 @@ function codexSessionsDir(args: ParsedArgs, allowGenericSessions: boolean): stri
 
 function claudeSessionsDir(args: ParsedArgs, allowGenericSessions: boolean): string {
   return path.resolve(String(args.flags["claude-sessions"] || (allowGenericSessions ? args.flags.sessions : "") || path.join(claudeHome(args), "projects")));
+}
+
+function grokSessionsDir(args: ParsedArgs, allowGenericSessions: boolean): string {
+  return path.resolve(String(args.flags["grok-sessions"] || (allowGenericSessions ? args.flags.sessions : "") || path.join(grokHome(args), "sessions")));
+}
+
+function grokHome(args: ParsedArgs) {
+  return args.flags["grok-home"] ? path.resolve(args.flags["grok-home"]) : process.env.GROK_HOME || path.join(os.homedir(), ".grok");
+}
+
+function userIndexSourceRoot(provider: UserIndexProviderName, args: ParsedArgs, allowGenericSessions: boolean): string {
+  if (provider === "claude") return claudeSessionsDir(args, allowGenericSessions);
+  if (provider === "grok") return grokSessionsDir(args, allowGenericSessions);
+  return codexSessionsDir(args, allowGenericSessions);
 }
 
 function scanSource(dataDir: string, args: ParsedArgs) {
@@ -1863,6 +1897,8 @@ function renderSourceResult(record: Record<string, any>, subcommand: string): st
         `Index: ${record.indexPath || ""}`,
         `Messages: ${record.messages || 0}`,
         `Sources: ${sources.map((source) => `${asRecord(source).provider}:${asRecord(source).messages || 0}`).join(", ")}`,
+        ...sources.map((source) => renderUserIndexFilterLine(asRecord(source))).filter(Boolean),
+        `Recorded sessions: ${record.recordedSessions || 0}`,
         Array.isArray(record.unavailableSources) && record.unavailableSources.length ? `Unavailable: ${record.unavailableSources.join(", ")}` : "",
         jsonHint(),
       ].filter(Boolean).join("\n");
@@ -1876,6 +1912,19 @@ function renderSourceResult(record: Record<string, any>, subcommand: string): st
         ...hits.slice(0, 8).map((hit) => {
           const item = asRecord(hit);
           return `  - ${item.id} ${item.provider}:${item.line} ${item.snippet || ""}`;
+        }),
+        jsonHint(),
+      ].join("\n");
+    }
+    if (record.command === "source.user-index.markers") {
+      const markers = Array.isArray(record.markers) ? record.markers : [];
+      return [
+        "User index painpoint markers",
+        `Sessions scanned: ${record.sessionsScanned || 0}`,
+        `Markers: ${formatCounts(asRecord(record.counts))}`,
+        ...markers.slice(0, 12).map((marker) => {
+          const item = asRecord(marker);
+          return `  - ${item.kind} ${item.provider}:${item.line} ${item.hitId} ${String(item.snippet || "").replace(/\s+/g, " ").slice(0, 140)}`;
         }),
         jsonHint(),
       ].join("\n");
@@ -1938,6 +1987,14 @@ function formatCounts(counts: Record<string, any>) {
   const entries = Object.entries(counts);
   if (!entries.length) return "";
   return entries.map(([key, value]) => `${key}=${value}`).join(", ");
+}
+
+function renderUserIndexFilterLine(source: Record<string, any>): string {
+  const filtered = asRecord(source.filtered);
+  const dropped = Object.values(filtered).reduce((total, value) => total + Number(value || 0), 0);
+  const skipped = Array.isArray(source.skippedSessions) ? source.skippedSessions.length : 0;
+  if (!dropped && !skipped) return "";
+  return `  ${source.provider} filtered: ${formatCounts(filtered)}, skippedSessions=${skipped}`;
 }
 
 function renderReflectResult(record: Record<string, any>): string {
@@ -2230,7 +2287,7 @@ Core commands:
   ome uninstall [--provider codex|claude|cursor|all] [--delete-library --yes]
   ome version | ome -v
   ome config get|preview|set
-  ome source status|user-index build|user-index search|user-index show|scan codex|scan spool|clean|connect spool
+  ome source status|user-index build|user-index search|user-index show|user-index markers|scan codex|scan spool|clean|connect spool
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume
   ome experience list|show|enable|archive|migrate-legacy

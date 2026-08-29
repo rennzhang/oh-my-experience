@@ -2,7 +2,8 @@ import fs from "node:fs";
 import { listCards } from "./cards.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { SessionIndexRecordSchema, type SessionIndexRecord, type SessionRecord } from "./schema.js";
-import { layout, nowIso, operationLog, readJson, withLock, writeJsonAtomic } from "./storage.js";
+import { hashText, layout, nowIso, operationLog, readJson, withLock, writeJsonAtomic } from "./storage.js";
+import type { UserMessageIndex } from "./user-index.js";
 
 export type SourceCatalog = {
   version: 1;
@@ -35,6 +36,31 @@ export function writeSessionRecords(dataDir: string, records: SessionRecord[]) {
       catalogPath: layout(dataDir).sourceIndex,
     };
   });
+}
+
+export function recordScannedSessions(dataDir: string, index: UserMessageIndex) {
+  const bySession = new Map<string, SessionRecord>();
+  for (const message of index.messages) {
+    const key = `${message.provider}:${message.sessionId}`;
+    const existing = bySession.get(key);
+    if (existing) {
+      existing.messages.push({ role: "user", text: "", createdAt: message.createdAt });
+      if (message.createdAt && (!existing.startedAt || message.createdAt < existing.startedAt)) existing.startedAt = message.createdAt;
+      continue;
+    }
+    bySession.set(key, {
+      id: message.sessionId,
+      provider: message.provider,
+      sourcePath: message.sourcePath,
+      startedAt: message.createdAt,
+      cwd: message.cwd,
+      summary: "",
+      messages: [{ role: "user", text: "", createdAt: message.createdAt }],
+      metadataHash: hashText(`${message.provider}:${message.sessionId}:${message.sourcePath}`),
+    });
+  }
+  const result = writeSessionRecords(dataDir, Array.from(bySession.values()));
+  return { ...result, recordedSessions: bySession.size };
 }
 
 export function rebuildSessionIndex(dataDir: string, { dryRun = false, dropSummaries = false }: { dryRun?: boolean; dropSummaries?: boolean } = {}) {

@@ -75,8 +75,10 @@ specific project context.
 ```bash
 ome source status
 ome source user-index build --provider all
+ome source user-index build --provider all --no-record-sources
 ome source user-index search "browser validation" --index <file>
 ome source user-index show <hit-id> --index <file> --context 4
+ome source user-index markers --index <file>
 ome source scan codex --sessions <dir>
 ome source scan spool --limit 20
 ome source scan spool --query "browser validation" --source codex
@@ -88,9 +90,22 @@ ome source connect spool --mode enabled
 ```
 
 `ome source user-index` is the native evidence workbench for retrospectives. It
-builds a temporary user-only index from Codex and Claude session files, supports
-repeated lexical searches, and replays source context for agent judgment. It does
-not update the long-term source index or generate experience cards.
+builds a temporary user-only index from Codex, Claude, and Grok session files,
+supports repeated lexical searches, and replays source context for agent
+judgment. It does not generate experience cards, and the index itself is always
+ephemeral.
+
+The build filters provider noise before indexing and reports what it dropped per
+source: tool results stored under the user role, subagent records,
+injected-wrapper-only messages, provider-generated interruption markers, and
+skipped headless or subagent sessions. It also records the covered sessions as
+pointers in the long-term session catalog, which gives the next retrospective a
+real watermark. Only pointers are written, never message text; pass
+`--no-record-sources` when the build must leave no trace.
+
+`ome source user-index markers` enumerates structural painpoint markers (turn
+aborts, rejected tool calls, repeated user messages) and returns the nearest user
+message id for replay.
 
 Spool is optional. If it is unavailable, native Codex/Claude user indexing and
 local recall still work. Source scans write pointer indexes; they do not copy

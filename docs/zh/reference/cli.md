@@ -62,8 +62,10 @@ ome match "<task>" --cwd /path/to/project --explain
 ```bash
 ome source status
 ome source user-index build --provider all
+ome source user-index build --provider all --no-record-sources
 ome source user-index search "browser validation" --index <file>
 ome source user-index show <hit-id> --index <file> --context 4
+ome source user-index markers --index <file>
 ome source scan codex --sessions <dir>
 ome source scan spool --limit 20
 ome source scan spool --query "browser validation" --source codex
@@ -74,7 +76,11 @@ ome source connect spool --mode ask
 ome source connect spool --mode enabled
 ```
 
-`ome source user-index` 是复盘用的原生证据工作台。它从 Codex 和 Claude 会话文件构建临时 user-only 索引，支持多次词面搜索，并围绕命中回放原始上下文供 Agent 判断。它不会更新长期 source index，也不会生成经验卡。
+`ome source user-index` 是复盘用的原生证据工作台。它从 Codex、Claude 和 Grok 会话文件构建临时 user-only 索引，支持多次词面搜索，并围绕命中回放原始上下文供 Agent 判断。它不会生成经验卡，索引本身始终是临时的。
+
+构建时会先过滤各 provider 的噪音，并按来源报告丢弃了什么：记在 user 角色下的 tool result、subagent 记录、只有注入包裹层的消息、provider 生成的打断标记，以及被整体跳过的无人值守会话和子代理会话。它还会把覆盖到的会话作为 pointer 写入长期会话目录，给下一次复盘留下真实水位线；只写 pointer，不写消息正文。确实不想留痕时用 `--no-record-sources`。
+
+`ome source user-index markers` 穷举结构性痛点标记（用户打断、拒绝工具调用、重复发同一条消息），并返回最近的用户消息 id 供回放。
 
 Spool 是可选能力。Spool 不可用时，Codex/Claude 原生 user-index 和本地召回仍然可用。来源扫描只写 pointer index，不复制原始完整会话。`ome source clean` 默认 dry-run，`--yes` 才真正清掉历史 summary 和 materialized 标记。
 

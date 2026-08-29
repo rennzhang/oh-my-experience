@@ -6,6 +6,53 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## Unreleased
+
+### Added
+
+- `ome source user-index` supports Grok as a first-class provider through
+  `--provider grok`, `--grok-sessions`, and `--grok-home`, so Grok chat history
+  no longer needs a hand-built mirror directory.
+- `ome source user-index build` now filters provider noise before indexing and
+  reports what it dropped per source: tool results stored under the user role,
+  subagent records, injected-wrapper-only messages, provider-generated
+  interruption markers, and skipped headless or subagent sessions.
+- Added `ome source user-index markers`, which enumerates structural painpoint
+  markers (turn aborts, rejected tool calls, repeated user messages) and returns
+  the nearest user message id for replay.
+- `ome source user-index build` now records the covered sessions as pointers in
+  the session catalog so the next retrospective can resume from a real
+  watermark. Only pointers are written, never message text. Pass
+  `--no-record-sources` to keep the build fully traceless.
+
+### Changed
+
+- Retrospective audits with `sourceCoverage: bounded` must now carry the same
+  structured coverage fields as `all-accessible`. Previously any coverage value
+  other than `all-accessible` silently skipped `userOnlyIndexBuilt`,
+  `nativeSourcesCovered`, `queryFamilies`, `contextReplaySamples`, and
+  `spoolSupplement`.
+- The experience review page now sorts candidates from general to narrow by
+  applicability level, evidence breadth, recall policy strength, and confidence,
+  instead of rendering them in write order.
+- `ome source user-index build` follows symlinked session directories and files
+  instead of silently skipping them.
+
+### Fixed
+
+- `ome reflect candidates` no longer drops candidate fields that were authored
+  flat instead of nested. `triggers`, `negativeTriggers`, `topics`, `risk`,
+  `recallPolicy`, and `applicability` are now read as fallbacks for
+  `recall.*`, `criteria.*`, and `scope`. Previously a flat `applicability` was
+  ignored in favour of an empty `scope`, which silently reset every card to the
+  default level and confidence and made the review page ordering meaningless,
+  and a flat `triggers` left the trigger section empty.
+- Sessions whose provider writes every file under the same name now keep
+  distinct ids taken from the owning directory. Grok stores each session as
+  `<session-id>/chat_history.jsonl`, so the whole history previously collapsed
+  into a single `chat_history` entry in the session catalog and the watermark
+  could not support incremental scans.
+
 ## 0.4.0 - 2026-08-20
 
 ### Added

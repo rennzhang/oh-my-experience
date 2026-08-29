@@ -29,7 +29,11 @@ Before submitting retrospective results, verify:
 - [ ] system / developer / AGENTS / assistant / subagent / prompt-template noise was filtered.
 - [ ] Original user messages were replayed for wording, corrections, acceptance, and rejection.
 - [ ] Repeated patterns, failure causes, final working paths, and user standards were clustered.
+- [ ] Structural painpoint markers were enumerated and every occurrence was triaged.
+- [ ] Coverage funnel numbers are recorded per provider.
+- [ ] Audit structured fields carry real values, not defaults.
 - [ ] Similar active cards were checked through `references/similarity-check.md`.
+- [ ] Candidates are sorted from general to narrow.
 - [ ] Remaining evidence gaps are listed.
 - [ ] Retrospective judgment is produced before candidates.
 
@@ -71,12 +75,23 @@ be submitted.
   generated but before approval, extra links, pasted content, corrections,
   counterexamples, or "absorb this too" feedback refine the same run. Do not
   create a sibling run unless the user asks for a new topic or new card.
-- **Narrow scenarios stay narrow; broad scenarios may stay broad**: narrow cards
-  must be anchored to real execution entrypoints, accepting missed recall over
-  unrelated false positives. Broad cards are acceptable when they apply to most
-  related tasks and do not make ordinary results worse. If a false positive
-  makes the result worse, narrow it. If broad recall generally does not make
-  results worse, it may remain broad.
+- **Recall-first when proposing, precision-first when firing**: these are two
+  different stages and must not share one bias.
+  - Proposing candidates: prefer breadth. A cluster with thin but real user
+    evidence becomes a low-confidence candidate, not a silent drop. The user
+    reviews every draft, so a weak candidate costs one approval decision while
+    a dropped one is lost. Never discard a cluster only because it feels too
+    broad or too small.
+  - Firing at prompt time: keep precision. Breadth belongs in *what gets
+    proposed*; restraint belongs in *how it triggers*. Express restraint through
+    `recallPolicy`, `risk`, and `criteria.ignore_when` instead of by refusing to
+    propose.
+- **Narrow scenarios stay narrow; broad scenarios may stay broad**: this governs
+  activation, not proposal. Narrow cards must be anchored to real execution
+  entrypoints, accepting missed recall over unrelated false positives. Broad
+  cards are acceptable when they apply to most related tasks and do not make
+  ordinary results worse. If a false positive makes the result worse, narrow it.
+  If broad recall generally does not make results worse, it may remain broad.
 
 ---
 
@@ -141,6 +156,16 @@ Requirements:
 - Replay high-value hits with `ome source user-index show <hit-id> --index <file> --context <n> --json`.
 - For `sourceCoverage=all-accessible`, audit must include `userOnlyIndexBuilt: true`, `nativeSourcesCovered`, `queryFamilies`, and `contextReplaySamples`.
 - Evidence anchors prefer original user wording. Assistant/tool context can explain causality and counterexamples, but cannot replace user evidence.
+- The index parser is provider-generic. Additional JSONL providers (for example
+  Grok `chat_history.jsonl`) can be ingested by mirroring main-session files
+  into a flat directory and passing it via `--claude-sessions <dir>`. Use hard
+  links or copies; the file collector skips symlinks. Record the real provider
+  in `searchedSources` even when a borrowed provider label was used.
+- The builder does not filter subagent or headless records natively. Pre-filter
+  sessions with provider metadata (Claude `isSidechain`, Grok
+  `summary.json.agent_name` and `prompt_context.is_non_interactive`, Codex
+  `session_meta.originator`) or post-filter hits before clustering, and record
+  the filter rules in `noiseFilters`.
 
 ### Agent Query Expansion
 
@@ -160,8 +185,99 @@ Requirements:
   and context type.
 - Search counterexamples and boundaries: cases where the user accepted
   compatibility, temporary solutions, or concept-only discussion.
+- When the focus is user-behavior lessons, include high-signal query families:
+  demands the user repeats across sessions, frustration about low-quality
+  output, and repeated corrections of the same work until acceptance. Emotion
+  and rule keywords often match pasted config or persona documents instead of
+  real reactions; replay hits before treating them as evidence.
 - Record actual query families, backends, and filtering rules in
   `searchedSources`.
+
+### Corpus-Level Mining
+
+Keyword search only recalls what the agent already guessed. For deep scans, or
+when a previous pass felt shallow, complement query families with corpus-level
+passes over the cleaned user-only corpus:
+
+- Cover the window since the last retrospective (or all accessible history when
+  the library is young). Do not default to a fixed recent window such as 30
+  days.
+- Compute corpus statistics first: message counts per provider, per project
+  (cwd), per month, and per session. They reveal where the value concentrates
+  and which sources are polluted.
+- Mine frequency before deduplication. Count repeated short commands across
+  sessions and identical text across providers; repetition is itself the
+  signal, so keep the counts even when deduping evidence anchors. Verify
+  whether repeats are spontaneous demands or broadcast/benchmark material.
+- Rank sessions by interactive user-message count and read the top sessions'
+  user messages end to end. High-iteration sessions concentrate corrections,
+  preferences, and acceptance criteria that no keyword family predicts.
+- Treat corpus reading and keyword search as complementary: reading finds the
+  unknown clusters, search then gathers cross-session evidence for each
+  cluster.
+- Ranking sessions by volume covers the densest sessions but misses short
+  sessions that contain one sharp painpoint. Pair it with structural markers
+  below.
+
+### Structural Painpoint Markers
+
+Keyword families depend on the agent guessing the right words, and volume
+ranking depends on the painpoint living in a long session. Neither has a
+coverage property. Structural markers do: friction between the user and the
+agent leaves topic-independent, provider-independent traces that can be
+enumerated exhaustively.
+
+Enumerate every occurrence of these markers across all providers. `ome source
+user-index markers --index <file>` enumerates the first three automatically and
+returns the nearest user message id for replay; the rest still need agent
+judgment:
+
+| Marker | Detection |
+| --- | --- |
+| user aborted a turn | `markers` kind `abort` (provider abort records such as Codex `turn_aborted` or `Request interrupted by user`) |
+| user rejected a tool call | `markers` kind `tool_rejected` |
+| user repeated the same message | `markers` kind `repeated_user_message`: identical consecutive user messages in one session, meaning the agent did not understand |
+| dense correction session | one session containing 3+ user messages with negation or correction markers |
+| short negative reply after a long assistant turn | rejection of the previous output |
+| user escalated to another model | user asks a different agent to check or redo the same work |
+
+Requirements:
+
+- Markers locate friction; they are not evidence by themselves. Replay each hit
+  with `ome source user-index show <hit-id>` to read what the user actually
+  wanted and what the agent got wrong.
+- **Every marker occurrence must be triaged.** Each one ends as a candidate, a
+  merge into an existing candidate, or a rejection with a recorded reason.
+  Untriaged occurrences mean the scan is incomplete.
+- Markers survive the noise filters in Step 5. An aborted turn inside a headless
+  or subagent session is still noise; an aborted turn in an interactive session
+  is a signal.
+
+### Coverage Accounting
+
+Coverage must be an auditable number, not an intention. Record a funnel and
+report it **per provider**, not only as a total:
+
+```text
+<provider>: raw user records -> after noise filters -> markers found
+  -> markers triaged -> candidates -> rejected (with reasons)
+```
+
+Requirements:
+
+- Per-provider numbers are mandatory. A single total hides a provider whose
+  parsing silently failed; one provider returning a suspiciously small share of
+  records must be questioned in `unavailableSources` or
+  `remainingEvidenceGaps` before candidates are written.
+- Take "raw user records -> after noise filters" from the build report itself.
+  Each source reports `messages`, `filtered.toolResults`,
+  `filtered.subagentRecords`, `filtered.injectedContext`,
+  `filtered.interruptionMarkers`, and `skippedSessions`; do not re-derive these
+  by hand.
+- `markers triaged` must equal `markers found` minus explicitly recorded noise.
+  Any shortfall is an evidence gap.
+- Record the funnel in `searchedSources` and, when a provider is degraded, in
+  `unavailableSources`.
 
 ### Spool Branch Strategy
 
@@ -246,6 +362,22 @@ Do not use these as direct user evidence:
 | subagent reports | child-agent output |
 | prompt templates | fixed prompt formats |
 | non-user wording inside paraphrases | third-person inference |
+| non-interactive one-shot sessions | headless task briefs generated by an orchestrator or automation (e.g. Codex `session_meta.originator=codex_exec`, Grok `prompt_context.is_non_interactive=true`) |
+| supervisor / approval sessions | sessions that embed another session's transcript for assessment; quoted user text inside them is extracted evidence at best |
+| user config / persona documents pasted into prompts | emotion or rule keywords matched inside the user's own pasted config files |
+| continuation duplicates | resumed sessions re-embedding earlier user messages; dedupe identical user text before counting evidence |
+| tool results stored under the user role | some providers (e.g. Claude Code) record tool_result blocks as user-role messages; filter by content shape before treating them as user wording |
+| benchmark / broadcast prompts | identical prompts the user sends to multiple agents as test material; repetition here reflects the test design, not a spontaneous repeated demand |
+| connectivity probes | health-check messages such as "Reply exactly OK." sent by bridges or automation |
+
+`ome source user-index build` already removes the mechanically detectable rows
+(headless and subagent sessions, tool results stored under the user role,
+injected-wrapper-only messages, provider-generated interruption markers) and
+reports the counts per source. The remaining
+rows still need agent judgment: supervisor sessions, pasted config or persona
+documents, continuation duplicates, benchmark or broadcast prompts, and
+connectivity probes. Record both the automatic counts and the manual filters in
+`noiseFilters`.
 
 When paraphrased material is used, extract only identifiable original user
 input and label it as extracted evidence.
@@ -358,6 +490,25 @@ For each evidence cluster, answer:
   store the unfenced rule text.
 - Produce retrospective judgment before candidates.
 
+### Candidate Ordering
+
+The review page renders candidates in write order, so the agent must sort them
+before writing. Order from general to narrow so the user reviews the
+widest-impact experiences first:
+
+1. `applicability.level`: `global`, then `project-family`, then `project`.
+2. Within the same level, evidence breadth: number of providers, then projects,
+   then sessions the evidence spans. Evidence spanning several providers means
+   the painpoint is model-independent, which is the strongest generality
+   signal.
+3. Within equal breadth, `recallPolicy` strength: `must`, `should`, `summary`.
+   An unconditional rule applies more widely than an optional one.
+4. Within equal strength, `applicability.confidence` high to low.
+
+Low-confidence candidates are ordered last, not omitted. Set
+`applicability.level` and `confidence` from real evidence rather than leaving
+schema defaults, otherwise ordering degrades to write order.
+
 ---
 
 ## Recall Field Writing
@@ -433,6 +584,40 @@ Fill these before writing candidates:
 | `remainingEvidenceGaps` | Remaining evidence gaps |
 
 Legacy `scope` is compatibility only. It does not define topic or source range.
+
+### Structured Fields Are Not Optional
+
+The audit schema already carries machine-readable fields. Prose in
+`searchedSources` does not satisfy them, and a later run cannot read prose to
+know what was already covered.
+
+- `userOnlyIndexBuilt`, `nativeSourcesCovered`, `queryFamilies`, and
+  `contextReplaySamples` must reflect what actually happened. Writing the facts
+  only into `searchedSources` narrative while leaving these empty is a
+  defective audit.
+- `spoolSupplement` must be one of `unavailable` / `skipped` / `used`; leaving
+  it `unknown` after checking `ome source status` is a defective audit.
+- This applies at every `sourceCoverage`, not only `all-accessible`. Choosing
+  `bounded` does not waive the structured fields; it only describes the source
+  range.
+- Candidate `sourceRefs` and `applicability` carry traceability and scope. Do
+  not leave them at defaults when the evidence supports real values.
+
+### Scan Continuity Across Runs
+
+A retrospective should not restart from zero every time.
+
+- Read prior runs first (`ome reflect list`) and read the previous audit's
+  covered sources and funnel numbers before choosing this run's window.
+- The default window is "since the last retrospective", derived from prior
+  audits, not a fixed recent period.
+- `ome source user-index build` records the sessions covered by this run in the
+  session catalog automatically, so the watermark does not depend on remembering
+  a flag. Do not pass `--no-record-sources` during a retrospective; doing so
+  leaves the next run with no watermark.
+- When a prior run's audit is missing structured coverage data, say so in
+  `remainingEvidenceGaps` and fall back to full history rather than guessing a
+  watermark.
 
 ---
 

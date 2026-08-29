@@ -99,7 +99,7 @@ test("CLI full lifecycle runs in temporary dataDir", () => {
   const init = json(run(["init", "--data-dir", dataDir, "--json"]));
   assert.equal("locale" in init, false);
   const scanResult = json(run(["source", "scan", "codex", "--sessions", path.join(root, "tests", "fixtures", "codex"), "--data-dir", dataDir, "--json"]));
-  assert.equal(scanResult.indexed.length, 3);
+  assert.equal(scanResult.indexed.length, 4);
   const sessionIndex = JSON.parse(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8"));
   assert.equal(sessionIndex.storage, "sources");
   assert.equal("messages" in sessionIndex.sessions[0], false);
@@ -213,13 +213,29 @@ test("source user-index builds searchable Codex and Claude user evidence", () =>
     "--provider", "all",
     "--codex-sessions", path.join(root, "tests", "fixtures", "codex"),
     "--claude-sessions", path.join(root, "tests", "fixtures", "claude"),
+    "--grok-sessions", path.join(root, "tests", "fixtures", "grok"),
     "--data-dir", dataDir,
     "--json",
   ]));
   assert.equal(built.command, "source.user-index.build");
   assert.equal(built.ephemeral, true);
-  assert.equal(built.messages, 4);
+  assert.equal(built.messages, 8);
   assert.equal(fs.existsSync(built.indexPath), true);
+  const reportFor = (provider) => built.sources.find((source) => source.provider === provider);
+  assert.deepEqual(reportFor("claude").filtered, {
+    subagentRecords: 1,
+    toolResults: 1,
+    injectedContext: 1,
+    interruptionMarkers: 1,
+  });
+  assert.deepEqual(reportFor("codex").skippedSessions.map((session) => session.reason), [
+    "headless session (originator=codex_exec)",
+  ]);
+  assert.deepEqual(reportFor("grok").skippedSessions.map((session) => session.reason).sort(), [
+    "non-interactive session (prompt_context.is_non_interactive)",
+    "subagent session (summary.session_kind)",
+  ]);
+  assert.equal(built.recordedSessions > 0, true);
   if (process.platform !== "win32") {
     assert.equal(fs.statSync(built.indexPath).mode & 0o777, 0o600);
     assert.equal(fs.statSync(path.dirname(built.indexPath)).mode & 0o777, 0o700);
@@ -251,12 +267,52 @@ test("source user-index builds searchable Codex and Claude user evidence", () =>
   assert.equal(context.context.some((message) => message.isHit && message.role === "user"), true);
   assert.equal(context.context.some((message) => message.role === "assistant"), true);
 
-  const noiseSearch = json(run([
-    "source", "user-index", "search", "System prompt should",
+  const grokSearch = json(run([
+    "source", "user-index", "search", "一等来源纳入 user-index",
     "--index", built.indexPath,
     "--json",
   ]));
-  assert.equal(noiseSearch.hits.length, 0);
+  assert.equal(grokSearch.hits.length, 2);
+  assert.equal(grokSearch.hits.every((hit) => hit.provider === "grok"), true);
+
+  for (const noise of [
+    "System prompt should",
+    "Tool output should not become review evidence",
+    "Subagent brief should not become review evidence",
+    "Injected reminder should not become review evidence",
+    "codex_exec 下发的无人值守任务简报",
+    "编排器下发的无人值守任务简报",
+    "子代理任务简报",
+    "Request interrupted by user",
+  ]) {
+    const noiseSearch = json(run([
+      "source", "user-index", "search", noise,
+      "--index", built.indexPath,
+      "--json",
+    ]));
+    assert.equal(noiseSearch.hits.length, 0, `noise leaked into user-index: ${noise}`);
+  }
+
+  const survived = json(run([
+    "source", "user-index", "search", "请保留包裹层之外的真实用户诉求",
+    "--index", built.indexPath,
+    "--json",
+  ]));
+  assert.equal(survived.hits.length, 1);
+  assert.equal(survived.hits[0].snippet.includes("system-reminder"), false);
+
+  const markers = json(run([
+    "source", "user-index", "markers",
+    "--index", built.indexPath,
+    "--json",
+  ]));
+  assert.equal(markers.counts.repeated_user_message, 1);
+  assert.equal(markers.counts.abort, 1);
+  const abortMarker = markers.markers.find((marker) => marker.kind === "abort");
+  assert.equal(abortMarker.provider, "claude");
+  assert.equal(abortMarker.snippet, "打断之后我真正想要的是先给结论。");
+  const repeatMarker = markers.markers.find((marker) => marker.kind === "repeated_user_message");
+  assert.equal(repeatMarker.provider, "grok");
 
   const staleIndexPath = path.join(dataDir, "stale-user-index.json");
   const staleIndex = JSON.parse(fs.readFileSync(built.indexPath, "utf8"));
@@ -279,7 +335,111 @@ test("source user-index builds searchable Codex and Claude user evidence", () =>
   assert.notEqual(invalidProvider.status, 0);
   assert.match(invalidProvider.stdout, /unsupported user-index provider/);
 
-  assert.equal(fs.existsSync(path.join(dataDir, "indexes", "sources.json")), false);
+  const catalog = JSON.parse(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8"));
+  assert.equal(catalog.sessions.every((session) => !("messages" in session)), true);
+  assert.equal(catalog.sessions.every((session) => session.summary === ""), true);
+});
+
+test("source user-index records a cross-run watermark and can opt out", () => {
+  const dataDir = tmpDir("user-index-watermark");
+  const recorded = json(run([
+    "source", "user-index", "build",
+    "--provider", "grok",
+    "--grok-sessions", path.join(root, "tests", "fixtures", "grok"),
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+  assert.equal(recorded.recordedSessions, 1);
+  const catalogPath = path.join(dataDir, "indexes", "sources.json");
+  const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+  assert.equal(catalog.sessions.length, 1);
+  assert.equal(catalog.sessions[0].provider, "grok");
+  assert.equal(catalog.sessions[0].messageCount, 2);
+  assert.equal(catalog.sessions[0].summary, "");
+  assert.equal("messages" in catalog.sessions[0], false);
+
+  const ephemeralDir = tmpDir("user-index-no-watermark");
+  const skipped = json(run([
+    "source", "user-index", "build",
+    "--provider", "grok",
+    "--grok-sessions", path.join(root, "tests", "fixtures", "grok"),
+    "--no-record-sources",
+    "--data-dir", ephemeralDir,
+    "--json",
+  ]));
+  assert.equal(skipped.recordedSessions, 0);
+  assert.equal(fs.existsSync(path.join(ephemeralDir, "indexes", "sources.json")), false);
+});
+
+test("sessions sharing one filename keep distinct ids from their directory", () => {
+  const dataDir = tmpDir("shared-filename-sessions");
+  const built = json(run([
+    "source", "user-index", "build",
+    "--provider", "grok",
+    "--grok-sessions", path.join(root, "tests", "fixtures", "grok-multi"),
+    "--out", path.join(dataDir, "idx.json"),
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+  assert.equal(built.messages, 2);
+  assert.equal(built.recordedSessions, 2);
+
+  const index = JSON.parse(fs.readFileSync(path.join(dataDir, "idx.json"), "utf8"));
+  const sessionIds = index.messages.map((message) => message.sessionId).sort();
+  assert.deepEqual(sessionIds, [
+    "019ff490-2d95-7522-8a75-0b503179c60c",
+    "019ff490-2d95-7522-8a75-0b503179c60d",
+  ]);
+  assert.equal(sessionIds.includes("chat_history"), false);
+
+  const catalog = JSON.parse(fs.readFileSync(path.join(dataDir, "indexes", "sources.json"), "utf8"));
+  assert.equal(catalog.sessions.length, 2);
+});
+
+test("candidate input keeps flat fields instead of dropping them", () => {
+  const dataDir = tmpDir("flat-candidate-input");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
+  const candidatesFile = path.join(dataDir, "flat-candidates.json");
+  fs.writeFileSync(candidatesFile, JSON.stringify({
+    candidates: [
+      {
+        title: "Flat shaped rule",
+        summary: "Authored with flat fields instead of nested recall/scope.",
+        rule: "Honour the flat shape.",
+        triggers: ["flat trigger"],
+        negativeTriggers: ["flat non-trigger"],
+        topics: ["flat-topic"],
+        applicability: { level: "global", confidence: "high" },
+        recallPolicy: "must",
+        risk: "high",
+        evidence: ["flat anchor"],
+      },
+    ],
+  }), "utf8");
+  json(run([
+    "reflect", "candidates", retrospective.runId,
+    "--from-file", candidatesFile,
+    "--allow-incomplete-audit",
+    "--incomplete-audit-reason", "flat shape test",
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+
+  const stored = json(run(["reflect", "show", retrospective.runId, "--data-dir", dataDir, "--json"]));
+  const candidate = stored.candidates[0];
+  assert.deepEqual(candidate.triggers, ["flat trigger"]);
+  assert.deepEqual(candidate.negativeTriggers, ["flat non-trigger"]);
+  assert.deepEqual(candidate.topics, ["flat-topic"]);
+  assert.equal(candidate.applicability.level, "global");
+  assert.equal(candidate.applicability.confidence, "high");
+  assert.equal(candidate.recallPolicy, "must");
+  assert.equal(candidate.risk, "high");
+
+  const reviewPath = path.join(dataDir, "retrospectives", retrospective.runId, "experience-review.md");
+  const review = fs.readFileSync(reviewPath, "utf8");
+  assert.match(review, /- flat trigger/);
+  assert.equal(review.includes("待补充"), false);
 });
 
 test("experience list reports invalid archived cards without crashing", () => {
@@ -487,6 +647,107 @@ test("reflect candidates rejects missing source audit unless explicitly overridd
   ]));
   assert.equal(accepted.candidates.length, 1);
   assert.match(fs.readFileSync(accepted.reviewFile, "utf8"), /审计：不完整：test override/);
+});
+
+test("bounded source coverage cannot skip the structured audit fields", () => {
+  const dataDir = tmpDir("audit-bounded");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
+  const candidate = currentCandidate({
+    title: "Bounded scan candidate",
+    summary: "A bounded scan still reads native provider sources.",
+    rule: "Record the structured coverage fields for every native scan.",
+    triggers: ["retrospective"],
+    topics: ["audit"],
+  });
+  const proseOnlyAudit = {
+    scope: "broad",
+    focusLens: "user painpoints",
+    sourceCoverage: "bounded",
+    searchedSources: ["codex user-index", "claude user-index"],
+    noiseFilters: ["subagent records", "tool results"],
+    evidenceClusters: ["repeated corrections"],
+    activeCardOverlapQa: "- no overlap with active cards",
+  };
+  const candidatesFile = path.join(dataDir, "bounded-candidates.json");
+  const write = (audit) => {
+    fs.writeFileSync(candidatesFile, JSON.stringify({ audit, candidates: [candidate] }), "utf8");
+    return run(["reflect", "candidates", retrospective.runId, "--from-file", candidatesFile, "--data-dir", dataDir, "--json"]);
+  };
+
+  const rejected = write(proseOnlyAudit);
+  assert.notEqual(rejected.status, 0);
+  const message = `${rejected.stderr}\n${rejected.stdout}`;
+  assert.match(message, /retrospective source audit is incomplete/);
+  for (const field of ["userOnlyIndexBuilt=true", "nativeSourcesCovered", "queryFamilies", "contextReplaySamples", "spoolSupplement"]) {
+    assert.match(message, new RegExp(field));
+  }
+
+  const accepted = json(write({
+    ...proseOnlyAudit,
+    userOnlyIndexBuilt: true,
+    nativeSourcesCovered: ["codex", "claude"],
+    queryFamilies: ["repeated demands", "corrections"],
+    contextReplaySamples: ["hit-abc123"],
+    spoolSupplement: "unavailable",
+  }));
+  assert.equal(accepted.candidates.length, 1);
+});
+
+test("experience review page sorts candidates from general to narrow", () => {
+  const dataDir = tmpDir("review-order");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
+  const candidatesFile = path.join(dataDir, "ordered-candidates.json");
+  fs.writeFileSync(candidatesFile, JSON.stringify({
+    candidates: [
+      currentCandidate({
+        title: "Narrow project rule",
+        summary: "Applies to a single project only.",
+        rule: "Keep the project-specific step.",
+        triggers: ["project"],
+        scope: { level: "project", confidence: "high" },
+        recallPolicy: "must",
+      }),
+      currentCandidate({
+        title: "Weak global rule",
+        summary: "Applies everywhere but with thin evidence.",
+        rule: "Prefer the general habit.",
+        triggers: ["global"],
+        scope: { level: "global", confidence: "low" },
+        recallPolicy: "summary",
+        evidence: ["one anchor"],
+      }),
+      currentCandidate({
+        title: "Strong global rule",
+        summary: "Applies everywhere with broad evidence.",
+        rule: "Always apply the general habit.",
+        triggers: ["global"],
+        scope: { level: "global", confidence: "medium" },
+        recallPolicy: "must",
+        evidence: ["anchor one", "anchor two", "anchor three"],
+      }),
+    ],
+  }), "utf8");
+  const written = json(run([
+    "reflect", "candidates", retrospective.runId,
+    "--from-file", candidatesFile,
+    "--allow-incomplete-audit",
+    "--incomplete-audit-reason", "ordering test",
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+  assert.deepEqual(written.candidates.map((item) => item.title), [
+    "Narrow project rule",
+    "Weak global rule",
+    "Strong global rule",
+  ]);
+  const review = fs.readFileSync(written.reviewFile, "utf8");
+  assert.deepEqual(review.match(/## 经验 \d+：.*/g), [
+    "## 经验 1：Strong global rule",
+    "## 经验 2：Weak global rule",
+    "## 经验 3：Narrow project rule",
+  ]);
 });
 
 test("retrospective run creation rejects session-scoped CLI design", () => {

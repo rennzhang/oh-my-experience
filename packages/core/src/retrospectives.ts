@@ -151,6 +151,8 @@ function resolveRetrospectiveAudit(dataDir: string, runId: string, options: Writ
   });
 }
 
+const NATIVE_SCAN_COVERAGES = new Set<RetrospectiveAudit["sourceCoverage"]>(["all-accessible", "bounded"]);
+
 function validateRetrospectiveAudit(audit: RetrospectiveAudit, allowIncomplete: boolean): void {
   const missing = [
     ["sourceCoverage", audit.sourceCoverage !== "unknown" ? 1 : 0],
@@ -159,7 +161,7 @@ function validateRetrospectiveAudit(audit: RetrospectiveAudit, allowIncomplete: 
     ["evidenceClusters", audit.evidenceClusters.length],
     ["activeCardOverlapQa", audit.activeCardOverlapQa.trim().length],
   ].filter(([, length]) => !length).map(([field]) => field);
-  if (audit.sourceCoverage === "all-accessible") {
+  if (NATIVE_SCAN_COVERAGES.has(audit.sourceCoverage)) {
     if (!audit.userOnlyIndexBuilt) missing.push("userOnlyIndexBuilt=true");
     if (!audit.nativeSourcesCovered.length) missing.push("nativeSourcesCovered");
     if (!audit.queryFamilies.length) missing.push("queryFamilies");
@@ -343,20 +345,20 @@ export function candidateFromLesson(runId: string, lesson: JsonRecord): Retrospe
     category: normalizeCategory(lesson.category || lesson.categoryName || inferCategory(lesson)),
     summary: lesson.summary,
     rule: lesson.rule,
-    triggers: toStringArray(recall.triggers).length ? toStringArray(recall.triggers) : toStringArray(criteria.use_when),
-    negativeTriggers: toStringArray(criteria.ignore_when),
-    topics: toStringArray(recall.topics),
-    intentModes: criteria.intent_modes || {},
+    triggers: firstFilledArray(recall.triggers, criteria.use_when, lesson.triggers),
+    negativeTriggers: firstFilledArray(criteria.ignore_when, lesson.negativeTriggers),
+    topics: firstFilledArray(recall.topics, lesson.topics),
+    intentModes: criteria.intent_modes || lesson.intentModes || {},
     requiredSignals: toStringArray(engineHints.positive),
     requiredAllSignals: toStringArray(engineHints.required_all || engineHints.requiredAll),
     blockedSignals: toStringArray(engineHints.negative),
-    applicability: normalizeScope(lesson.scope || {}),
+    applicability: normalizeScope(firstFilledRecord(lesson.scope, lesson.applicability)),
     evidence: Array.isArray(lesson.evidence) ? lesson.evidence : [],
     origin: lesson.origin || {},
     sourceRefs: Array.isArray(lesson.sourceRefs) ? lesson.sourceRefs : [],
     conflicts: Array.isArray(lesson.conflicts) ? lesson.conflicts : [],
-    risk: recall.risk || "medium",
-    recallPolicy: recall.policy || "should",
+    risk: recall.risk || lesson.risk || "medium",
+    recallPolicy: recall.policy || lesson.recallPolicy || "should",
   });
 }
 
@@ -366,6 +368,25 @@ function asRecord(value: unknown): JsonRecord {
 
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+// Candidate input files are hand/agent authored, so the same field shows up either
+// nested (recall.triggers, scope) or flat (triggers, applicability). Reading only one
+// shape silently drops the other and the loss is invisible until the review page renders.
+function firstFilledArray(...values: unknown[]): string[] {
+  for (const value of values) {
+    const items = toStringArray(value);
+    if (items.length) return items;
+  }
+  return [];
+}
+
+function firstFilledRecord(...values: unknown[]): JsonRecord {
+  for (const value of values) {
+    const record = asRecord(value);
+    if (Object.keys(record).length) return record;
+  }
+  return {};
 }
 
 function normalizeScope(value: unknown): JsonRecord {
@@ -448,7 +469,7 @@ function refreshRetrospectiveMarkdown(dataDir: string, runId: string): void {
 
 function renderRetrospectiveMarkdown(runId: string, state: string, audit: RetrospectiveAudit | null, candidates: RetrospectiveCandidate[], decisions: RetrospectiveDecision[]): string {
   const latestDecision = new Map(decisions.map((decision) => [decision.candidateId, decision]));
-  const sections = candidates.map((candidate, index) => {
+  const sections = sortCandidatesForReview(candidates).map((candidate, index) => {
     const triggerText = [
       candidate.triggers.map((trigger) => `- ${trigger}`).join("\n") || "- 待补充",
       candidate.negativeTriggers.length ? ["不触发：", candidate.negativeTriggers.map((trigger) => `- ${trigger}`).join("\n")].join("\n") : "",
@@ -473,6 +494,44 @@ function renderRetrospectiveMarkdown(runId: string, state: string, audit: Retros
     renderAuditStatus(audit),
     ...sections,
   ].filter(Boolean).join("\n\n").trimEnd() + "\n";
+}
+
+const REVIEW_LEVEL_ORDER: Record<string, number> = { global: 0, "project-family": 1, project: 2 };
+const REVIEW_POLICY_ORDER: Record<string, number> = { must: 0, should: 1, summary: 2, off: 3 };
+const REVIEW_CONFIDENCE_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+export function sortCandidatesForReview(candidates: RetrospectiveCandidate[]): RetrospectiveCandidate[] {
+  return candidates
+    .map((candidate, index) => ({ candidate, index }))
+    .sort((left, right) => compareReviewCandidates(left, right))
+    .map((item) => item.candidate);
+}
+
+function compareReviewCandidates(
+  left: { candidate: RetrospectiveCandidate; index: number },
+  right: { candidate: RetrospectiveCandidate; index: number },
+): number {
+  return reviewLevelRank(left.candidate) - reviewLevelRank(right.candidate)
+    || reviewBreadth(right.candidate) - reviewBreadth(left.candidate)
+    || reviewPolicyRank(left.candidate) - reviewPolicyRank(right.candidate)
+    || reviewConfidenceRank(left.candidate) - reviewConfidenceRank(right.candidate)
+    || left.index - right.index;
+}
+
+function reviewLevelRank(candidate: RetrospectiveCandidate): number {
+  return REVIEW_LEVEL_ORDER[candidate.applicability.level] ?? REVIEW_LEVEL_ORDER.project;
+}
+
+function reviewPolicyRank(candidate: RetrospectiveCandidate): number {
+  return REVIEW_POLICY_ORDER[candidate.recallPolicy] ?? REVIEW_POLICY_ORDER.should;
+}
+
+function reviewConfidenceRank(candidate: RetrospectiveCandidate): number {
+  return REVIEW_CONFIDENCE_ORDER[candidate.applicability.confidence] ?? REVIEW_CONFIDENCE_ORDER.medium;
+}
+
+function reviewBreadth(candidate: RetrospectiveCandidate): number {
+  return Math.max(candidate.sourceRefs.length, candidate.evidence.length);
 }
 
 function fencedMarkdownBlock(content: string, info = ""): string {

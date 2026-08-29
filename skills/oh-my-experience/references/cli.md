@@ -67,9 +67,12 @@ Rules:
 
 ```bash
 ome source status
-ome source user-index build --provider all --codex-sessions ~/.codex/sessions --claude-sessions ~/.claude/projects
+ome source user-index build --provider all --codex-sessions ~/.codex/sessions --claude-sessions ~/.claude/projects --grok-sessions ~/.grok/sessions
+ome source user-index build --provider all --no-record-sources
 ome source user-index search "browser validation" --index <file>
 ome source user-index show <hit-id> --index <file> --context 4
+ome source user-index markers --index <file>
+ome source user-index markers --index <file> --provider claude --limit 50
 ome source scan codex --sessions <dir>
 ome source scan spool --limit 20
 ome source scan spool --query "browser validation" --source codex
@@ -87,10 +90,13 @@ spool show <uuid> --json
 Rules:
 
 - Spool is optional. If it is unavailable, continue with Codex, Claude, or local sources.
-- `source user-index` is the default evidence workbench for deep retrospectives. It builds a temporary user-only index from raw Codex and Claude JSONL sources, does not write the long-term source index, and does not make experience judgments for the agent.
-- `source user-index build` writes to the system temp directory by default. Pass the returned `indexPath` to `search` and `show`. It writes to a chosen path only when `--out` / `--output` is explicit.
+- `source user-index` is the default evidence workbench for deep retrospectives. It builds a temporary user-only index from raw Codex, Claude, and Grok JSONL sources and does not make experience judgments for the agent. The index itself is always ephemeral.
+- `source user-index build` writes to the system temp directory by default. Pass the returned `indexPath` to `search`, `show`, and `markers`. It writes to a chosen path only when `--out` / `--output` is explicit.
+- `source user-index build` filters provider noise before indexing and reports what it dropped per source: `filtered.toolResults` (tool output stored under the user role), `filtered.subagentRecords`, `filtered.injectedContext` (messages that were only injected wrappers), `filtered.interruptionMarkers` (provider-generated interruption text), and `skippedSessions` (headless and subagent sessions). Read these counts; a source reporting a suspiciously small share of messages belongs in `unavailableSources` or `remainingEvidenceGaps`.
+- `source user-index build` records the covered sessions as pointers in the long-term session catalog, so the next retrospective can resume from a real watermark. Only pointers are written: provider, session id, source path, cwd, timestamps, and message counts, never message text. Pass `--no-record-sources` when the build must leave no trace.
 - `source user-index search` only locates lexical hits; the agent still owns query-family expansion.
 - `source user-index show` replays raw context around a hit. Candidate-card evidence should anchor on user wording first, with surrounding context used only for causality and counterexamples.
+- `source user-index markers` enumerates structural painpoint markers (`abort`, `tool_rejected`, `repeated_user_message`) and returns each hit with the nearest user message id for replay. It locates friction; it is not evidence by itself, and every occurrence must be triaged.
 - Spool mode is only `off`, `ask`, or `enabled`. Use `enabled` when the user asks to turn it on; use `ask` for per-run confirmation.
 - Deep scans build the Codex/Claude `user-index` first. The agent then expands meaning and runs multiple `source user-index search` / `show` queries. Spool is only a secondary supplemental source.
 - When current history matters, record `spool status`, run `spool sync`, and write the before/after state into `searchedSources`.

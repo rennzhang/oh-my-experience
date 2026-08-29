@@ -1,0 +1,7 @@
+{"timestamp":"2026-05-28T08:00:00.000Z","type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Tool output should not become review evidence."}]},"toolUseResult":{"stdout":"ok"},"cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T08:00:10.000Z","type":"user","isSidechain":true,"message":{"role":"user","content":[{"type":"text","text":"Subagent brief should not become review evidence."}]},"cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T08:00:20.000Z","type":"user","message":{"role":"user","content":[{"type":"text","text":"<system-reminder>Injected reminder should not become review evidence.</system-reminder>"}]},"cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T08:00:30.000Z","type":"user","message":{"role":"user","content":[{"type":"text","text":"<system-reminder>Injected preamble</system-reminder>\n请保留包裹层之外的真实用户诉求。"}]},"cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T08:00:40.000Z","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"我会只保留用户真实诉求。"}]},"cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T08:00:50.000Z","type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]},"cwd":"/tmp/example"}
+{"timestamp":"2026-05-28T08:01:00.000Z","type":"user","message":{"role":"user","content":[{"type":"text","text":"打断之后我真正想要的是先给结论。"}]},"cwd":"/tmp/example"}

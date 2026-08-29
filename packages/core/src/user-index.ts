@@ -23,11 +23,25 @@ export type UserIndexMessage = {
   cwd: string | null;
 };
 
+export type UserIndexNoiseCounts = {
+  subagentRecords: number;
+  toolResults: number;
+  injectedContext: number;
+  interruptionMarkers: number;
+};
+
+export type UserIndexSkippedSession = {
+  file: string;
+  reason: string;
+};
+
 export type UserIndexSourceReport = {
   provider: UserIndexProvider;
   root: string;
   files: number;
   messages: number;
+  filtered: UserIndexNoiseCounts;
+  skippedSessions: UserIndexSkippedSession[];
   failed: Array<{ file: string; error: string }>;
   warnings: string[];
 };
@@ -55,13 +69,25 @@ type VisibleMessage = {
   text: string;
   createdAt: string | null;
   cwd: string | null;
+  noise?: string;
 };
 
 type JsonRecord = Record<string, any>;
 
 const CONTEXT_ROLES = new Set(["user", "assistant", "tool"]);
 const AGENTS_BLOCK_RE = /# AGENTS\.md instructions for[\s\S]*?(?:<\/environment_context>|<\/INSTRUCTIONS>)/g;
-const XML_CONTEXT_BLOCK_RE = /<(?:environment_context|skills_instructions|plugins_instructions|collaboration_mode)>[\s\S]*?<\/(?:environment_context|skills_instructions|plugins_instructions|collaboration_mode)>/g;
+const INJECTED_BLOCK_TAGS = [
+  "environment_context",
+  "skills_instructions",
+  "plugins_instructions",
+  "collaboration_mode",
+  "system-reminder",
+  "workspace-context",
+  "recommended_plugins",
+  "heartbeat",
+];
+const XML_CONTEXT_BLOCK_RE = new RegExp(`<(?:${INJECTED_BLOCK_TAGS.join("|")})>[\\s\\S]*?</(?:${INJECTED_BLOCK_TAGS.join("|")})>`, "g");
+const SESSION_META_PROBE_LINES = 5;
 
 export function buildUserMessageIndex(sources: UserIndexSourceInput[]): UserMessageIndex {
   const sourceReports: UserIndexSourceReport[] = [];
@@ -72,6 +98,8 @@ export function buildUserMessageIndex(sources: UserIndexSourceInput[]): UserMess
       root: path.resolve(source.root),
       files: 0,
       messages: 0,
+      filtered: { subagentRecords: 0, toolResults: 0, injectedContext: 0, interruptionMarkers: 0 },
+      skippedSessions: [],
       failed: [],
       warnings: [],
     };
@@ -83,10 +111,19 @@ export function buildUserMessageIndex(sources: UserIndexSourceInput[]): UserMess
     for (const file of collectJsonl(report.root)) {
       report.files += 1;
       try {
-        const parsed = parseVisibleMessages(source.provider, file);
-        const userMessages = parsed.filter((message): message is UserIndexMessage => message.role === "user");
+        const exclusion = classifySessionExclusion(file);
+        if (exclusion) {
+          report.skippedSessions.push({ file, reason: exclusion });
+          continue;
+        }
+        const parsed = parseSessionMessages(source.provider, file);
+        const userMessages = parsed.messages.filter((message): message is UserIndexMessage => message.role === "user" && !message.noise);
         messages.push(...userMessages);
         report.messages += userMessages.length;
+        report.filtered.subagentRecords += parsed.filtered.subagentRecords;
+        report.filtered.toolResults += parsed.filtered.toolResults;
+        report.filtered.injectedContext += parsed.filtered.injectedContext;
+        report.filtered.interruptionMarkers += parsed.filtered.interruptionMarkers;
       } catch (error) {
         report.failed.push({ file, error: error instanceof Error ? error.message : String(error) });
       }
@@ -162,6 +199,98 @@ export function searchUserMessageIndex(index: UserMessageIndex, query: string, o
     }));
 }
 
+export type UserIndexMarkerKind = "abort" | "tool_rejected" | "repeated_user_message";
+
+export type UserIndexMarkerHit = {
+  kind: UserIndexMarkerKind;
+  provider: UserIndexProvider;
+  sessionId: string;
+  sourcePath: string;
+  line: number;
+  hitId: string;
+  snippet: string;
+};
+
+const MARKER_PATTERNS: Array<{ kind: UserIndexMarkerKind; pattern: RegExp }> = [
+  { kind: "abort", pattern: /turn_aborted|Request interrupted by user/ },
+  { kind: "tool_rejected", pattern: /doesn't want to proceed with this tool use|does not want to proceed with this tool use/ },
+];
+
+export function findPainpointMarkers(index: UserMessageIndex, options: { provider?: string; limit?: number } = {}): {
+  markers: UserIndexMarkerHit[];
+  counts: Record<UserIndexMarkerKind, number>;
+  sessionsScanned: number;
+} {
+  const provider = options.provider ? String(options.provider) : "";
+  const messages = index.messages.filter((message) => !provider || message.provider === provider);
+  const bySource = new Map<string, UserIndexMessage[]>();
+  for (const message of messages) {
+    const bucket = bySource.get(message.sourcePath);
+    if (bucket) bucket.push(message);
+    else bySource.set(message.sourcePath, [message]);
+  }
+  const markers: UserIndexMarkerHit[] = [];
+  for (const [sourcePath, sessionMessages] of bySource) {
+    const ordered = [...sessionMessages].sort((left, right) => left.line - right.line);
+    markers.push(...repeatedMessageMarkers(ordered));
+    markers.push(...transcriptMarkers(sourcePath, ordered));
+  }
+  markers.sort((left, right) => left.sourcePath.localeCompare(right.sourcePath) || left.line - right.line);
+  const counts: Record<UserIndexMarkerKind, number> = { abort: 0, tool_rejected: 0, repeated_user_message: 0 };
+  for (const marker of markers) counts[marker.kind] += 1;
+  const limit = options.limit ? Math.max(1, Number(options.limit)) : markers.length;
+  return { markers: markers.slice(0, limit), counts, sessionsScanned: bySource.size };
+}
+
+function repeatedMessageMarkers(ordered: UserIndexMessage[]): UserIndexMarkerHit[] {
+  const markers: UserIndexMarkerHit[] = [];
+  for (let position = 1; position < ordered.length; position += 1) {
+    const previous = normalizeSearchText(ordered[position - 1].text);
+    const current = ordered[position];
+    if (!previous || previous !== normalizeSearchText(current.text)) continue;
+    markers.push({
+      kind: "repeated_user_message",
+      provider: current.provider,
+      sessionId: current.sessionId,
+      sourcePath: current.sourcePath,
+      line: current.line,
+      hitId: current.id,
+      snippet: truncate(current.text, 240),
+    });
+  }
+  return markers;
+}
+
+function transcriptMarkers(sourcePath: string, ordered: UserIndexMessage[]): UserIndexMarkerHit[] {
+  if (!ordered.length || !fs.existsSync(sourcePath)) return [];
+  const markers: UserIndexMarkerHit[] = [];
+  let lineNumber = 0;
+  for (const line of readLinesSync(sourcePath)) {
+    lineNumber += 1;
+    for (const { kind, pattern } of MARKER_PATTERNS) {
+      if (!pattern.test(line)) continue;
+      const anchor = nearestUserMessage(ordered, lineNumber);
+      if (!anchor) continue;
+      markers.push({
+        kind,
+        provider: anchor.provider,
+        sessionId: anchor.sessionId,
+        sourcePath,
+        line: lineNumber,
+        hitId: anchor.id,
+        snippet: truncate(anchor.text, 240),
+      });
+    }
+  }
+  return markers;
+}
+
+function nearestUserMessage(ordered: UserIndexMessage[], line: number): UserIndexMessage | null {
+  const following = ordered.find((message) => message.line > line);
+  if (following) return following;
+  return ordered[ordered.length - 1] || null;
+}
+
 export function showUserIndexContext(index: UserMessageIndex, hitId: string, options: { context?: number; maxChars?: number } = {}) {
   const hit = index.messages.find((message) => message.id === hitId);
   if (!hit) throw new Error(`user-index hit not found: ${hitId}`);
@@ -186,7 +315,12 @@ export function showUserIndexContext(index: UserMessageIndex, hitId: string, opt
 }
 
 export function parseVisibleMessages(provider: UserIndexProvider, filePath: string): VisibleMessage[] {
+  return parseSessionMessages(provider, filePath).messages;
+}
+
+export function parseSessionMessages(provider: UserIndexProvider, filePath: string): { messages: VisibleMessage[]; filtered: UserIndexNoiseCounts } {
   const messages: VisibleMessage[] = [];
+  const filtered: UserIndexNoiseCounts = { subagentRecords: 0, toolResults: 0, injectedContext: 0, interruptionMarkers: 0 };
   const sessionId = sessionIdForFile(provider, filePath);
   let lastCwd: string | null = null;
   let lineNumber = 0;
@@ -199,11 +333,15 @@ export function parseVisibleMessages(provider: UserIndexProvider, filePath: stri
       continue;
     }
     const role = normalizeRole(extractRole(event));
-    const text = role === "user" ? cleanUserText(extractText(event)) : extractText(event).trim();
+    const raw = extractText(event);
+    const text = role === "user" ? cleanUserText(raw) : raw.trim();
     const eventCwd = event.cwd || event.working_directory || event.current_dir || event.session?.cwd || event.message?.cwd || null;
     const cwd: string | null = eventCwd ? String(eventCwd) : lastCwd;
     lastCwd = cwd;
-    if (!text || !CONTEXT_ROLES.has(role)) continue;
+    if (!CONTEXT_ROLES.has(role)) continue;
+    const noise = role === "user" ? classifyUserNoise(event, raw, text) : null;
+    if (noise) countNoise(filtered, noise);
+    if (!text) continue;
     const base = {
       provider,
       sessionId,
@@ -219,12 +357,89 @@ export function parseVisibleMessages(provider: UserIndexProvider, filePath: stri
         ...base,
         id: hashHitId(provider, filePath, lineNumber, text),
         role: "user",
+        ...(noise ? { noise } : {}),
       });
     } else {
       messages.push(base);
     }
   }
-  return messages;
+  return { messages, filtered };
+}
+
+type UserNoiseKind = "subagent record" | "tool result stored under the user role" | "injected context only" | "provider interruption marker";
+
+const INTERRUPTION_MARKER_RE = /^\[Request interrupted by user[^\]]*\]$/;
+
+function classifyUserNoise(event: JsonRecord, raw: string, cleaned: string): UserNoiseKind | null {
+  if (event.isSidechain === true) return "subagent record";
+  if (isToolResultRecord(event)) return "tool result stored under the user role";
+  if (!cleaned && raw.trim()) return "injected context only";
+  if (INTERRUPTION_MARKER_RE.test(cleaned)) return "provider interruption marker";
+  return null;
+}
+
+function countNoise(counts: UserIndexNoiseCounts, kind: UserNoiseKind): void {
+  if (kind === "subagent record") counts.subagentRecords += 1;
+  else if (kind === "tool result stored under the user role") counts.toolResults += 1;
+  else if (kind === "provider interruption marker") counts.interruptionMarkers += 1;
+  else counts.injectedContext += 1;
+}
+
+function isToolResultRecord(event: JsonRecord): boolean {
+  if (event.toolUseResult !== undefined) return true;
+  const content = event.message?.content ?? event.content ?? event.payload?.content;
+  if (!Array.isArray(content)) return false;
+  let hasToolResult = false;
+  let hasAuthoredText = false;
+  for (const item of content) {
+    if (!item || typeof item !== "object") continue;
+    const type = String((item as JsonRecord).type || "");
+    if (type === "tool_result" || type === "tool_use") hasToolResult = true;
+    if ((type === "text" || type === "input_text") && String((item as JsonRecord).text || "").trim()) hasAuthoredText = true;
+  }
+  return hasToolResult && !hasAuthoredText;
+}
+
+export function classifySessionExclusion(filePath: string): string | null {
+  const sidecar = sessionSidecarExclusion(path.dirname(filePath));
+  if (sidecar) return sidecar;
+  return sessionMetaExclusion(filePath);
+}
+
+function sessionSidecarExclusion(dir: string): string | null {
+  const summary = readJsonFileSafe(path.join(dir, "summary.json"));
+  if (summary && String(summary.session_kind || "") === "subagent") return "subagent session (summary.session_kind)";
+  const promptContext = readJsonFileSafe(path.join(dir, "prompt_context.json"));
+  if (!promptContext) return null;
+  if (promptContext.is_non_interactive === true) return "non-interactive session (prompt_context.is_non_interactive)";
+  if (String(promptContext.audience || "") === "subagent") return "subagent session (prompt_context.audience)";
+  return null;
+}
+
+function sessionMetaExclusion(filePath: string): string | null {
+  let scanned = 0;
+  for (const line of readLinesSync(filePath)) {
+    scanned += 1;
+    if (scanned > SESSION_META_PROBE_LINES) break;
+    let event: JsonRecord;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const originator = String(event.payload?.originator || event.originator || "");
+    if (originator === "codex_exec") return "headless session (originator=codex_exec)";
+  }
+  return null;
+}
+
+function readJsonFileSafe(filePath: string): JsonRecord | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed as JsonRecord : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeIndexMessage(value: unknown): UserIndexMessage | null {
@@ -245,14 +460,38 @@ function normalizeIndexMessage(value: unknown): UserIndexMessage | null {
   };
 }
 
-function collectJsonl(root: string): string[] {
+function collectJsonl(root: string, visited: Set<string> = new Set()): string[] {
+  const realRoot = realPathSafe(root);
+  if (visited.has(realRoot)) return [];
+  visited.add(realRoot);
   const files: string[] = [];
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     const fullPath = path.join(root, entry.name);
-    if (entry.isDirectory()) files.push(...collectJsonl(fullPath));
-    else if (entry.isFile() && entry.name.endsWith(".jsonl")) files.push(fullPath);
+    const kind = entryKind(entry, fullPath);
+    if (kind === "dir") files.push(...collectJsonl(fullPath, visited));
+    else if (kind === "file" && entry.name.endsWith(".jsonl")) files.push(fullPath);
   }
   return files;
+}
+
+function entryKind(entry: fs.Dirent, fullPath: string): "dir" | "file" | "other" {
+  if (entry.isDirectory()) return "dir";
+  if (entry.isFile()) return "file";
+  if (!entry.isSymbolicLink()) return "other";
+  try {
+    const stats = fs.statSync(fullPath);
+    return stats.isDirectory() ? "dir" : stats.isFile() ? "file" : "other";
+  } catch {
+    return "other";
+  }
+}
+
+function realPathSafe(target: string): string {
+  try {
+    return fs.realpathSync(target);
+  } catch {
+    return path.resolve(target);
+  }
 }
 
 function* readLinesSync(filePath: string): Generator<string> {
@@ -359,10 +598,18 @@ function cleanUserText(raw: string): string {
     .trim();
 }
 
+// Some providers name every session file identically (Grok writes chat_history.jsonl
+// per session directory), so the filename cannot identify the session. The owning
+// directory carries the real id in that layout.
+const SHARED_SESSION_FILENAMES = new Set(["session", "chat_history"]);
+
 function sessionIdForFile(provider: UserIndexProvider, filePath: string): string {
-  const base = path.basename(filePath).replace(/\.jsonl$/i, "");
-  if (base && base !== "session") return base;
-  return `${provider}-${crypto.createHash("sha1").update(path.resolve(filePath)).digest("hex").slice(0, 16)}`;
+  const resolved = path.resolve(filePath);
+  const base = path.basename(resolved).replace(/\.jsonl$/i, "");
+  if (base && !SHARED_SESSION_FILENAMES.has(base.toLowerCase())) return base;
+  const parent = path.basename(path.dirname(resolved));
+  if (parent && !SHARED_SESSION_FILENAMES.has(parent.toLowerCase())) return parent;
+  return `${provider}-${crypto.createHash("sha1").update(resolved).digest("hex").slice(0, 16)}`;
 }
 
 function hashHitId(provider: UserIndexProvider, filePath: string, line: number, text: string): string {

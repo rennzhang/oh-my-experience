@@ -1,0 +1,5 @@
+{
+  "audience": "primary",
+  "is_non_interactive": true,
+  "working_directory": "/tmp/example"
+}
