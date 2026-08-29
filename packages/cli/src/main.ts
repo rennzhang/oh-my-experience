@@ -48,6 +48,7 @@ import {
   setConfigValue,
   searchUserMessageIndex,
   showUserIndexContext,
+  verifyEvidenceAgainstIndex,
   readUserMessageIndex,
   writeUserMessageIndex,
   writeCandidates,
@@ -1180,7 +1181,20 @@ function reflectCommand(dataDir: string, subcommand: string | undefined, args: P
     if (args.flags["dry-run"]) return print(withReviewPaths(dataDir, previewApplyRetrospective(dataDir, runId)), args);
     return print(withReviewPaths(dataDir, applyRetrospective(dataDir, runId)), args);
   }
-  throw new Error("usage: ome reflect [start|list|show|candidates|add|decide|apply|resume]");
+  if (subcommand === "verify-evidence") {
+    const runId = args.positionals[2];
+    if (!runId) throw new Error("usage: ome reflect verify-evidence <runId> --index <file>");
+    const indexPath = userIndexPathArg(args);
+    const candidates = getRetrospectiveRun(dataDir, runId).candidates;
+    return print({
+      ok: true,
+      command: "reflect.verify-evidence",
+      runId,
+      indexPath,
+      ...verifyEvidenceAgainstIndex(candidates, readUserMessageIndex(indexPath)),
+    }, args);
+  }
+  throw new Error("usage: ome reflect [start|list|show|candidates|add|decide|apply|resume|verify-evidence]");
 }
 
 function readReflectAuditInput(args: ParsedArgs, raw: Record<string, any> = {}): Record<string, any> | null {
@@ -1998,6 +2012,23 @@ function renderUserIndexFilterLine(source: Record<string, any>): string {
 }
 
 function renderReflectResult(record: Record<string, any>): string {
+  if (record.command === "reflect.verify-evidence") {
+    const unverified = (Array.isArray(record.checks) ? record.checks : [])
+      .map(asRecord)
+      .filter((check) => check.status === "unverified");
+    return [
+      "Candidate evidence checked against the user index",
+      `Reflect id: ${record.runId || ""}`,
+      `Result: ${formatCounts(asRecord(record.counts))}`,
+      "Unverified means the quote is not in this index verbatim. That also happens when",
+      "the session was rotated away or the quote was elided while being authored.",
+      ...unverified.slice(0, 12).map((check) => {
+        const missing = Array.isArray(check.missingFragments) ? check.missingFragments.length : 0;
+        return `  - ${String(check.cardId).slice(0, 36)} (${missing} missing) ${String(check.evidence).replace(/\s+/g, " ").slice(0, 110)}`;
+      }),
+      jsonHint(),
+    ].join("\n");
+  }
   if (Array.isArray(record.retrospectives) || Array.isArray(record.candidates) || Array.isArray(record.drafts)) {
     return renderRetrospectiveResult(record);
   }
@@ -2289,7 +2320,7 @@ Core commands:
   ome config get|preview|set
   ome source status|user-index build|user-index search|user-index show|user-index markers|scan codex|scan spool|clean|connect spool
   ome reflect start [--focus <text>]
-  ome reflect list|show|add|candidates|decide|apply|resume
+  ome reflect list|show|add|candidates|decide|apply|resume|verify-evidence
   ome experience list|show|enable|archive|migrate-legacy
   ome project init|status
   ome eval recall --suite <file>

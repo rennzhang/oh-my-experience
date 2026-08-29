@@ -20,6 +20,11 @@ contributors, or release safety.
 - Added `ome source user-index markers`, which enumerates structural painpoint
   markers (turn aborts, rejected tool calls, repeated user messages) and returns
   the nearest user message id for replay.
+- Added `ome reflect verify-evidence <run-id> --index <file>`, which looks up
+  every quote a candidate cites in a user-index and reports it as `verified`,
+  `unverified`, or `not-a-quote`. Quotes stitched from several messages are
+  checked fragment by fragment so only the missing half is reported. Nothing
+  previously checked that a cited quote existed at all.
 - `ome source user-index build` now records the covered sessions as pointers in
   the session catalog so the next retrospective can resume from a real
   watermark. Only pointers are written, never message text. Pass

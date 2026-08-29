@@ -405,6 +405,19 @@ For each evidence item:
 - Confirm context: correction, acceptance, rejection, or casual mention.
 - Label extracted wording when using paraphrased material.
 
+After the candidates are written, run the check instead of trusting the quotes:
+
+```bash
+ome reflect verify-evidence <run-id> --index <index-file>
+```
+
+Every `unverified` entry has to be resolved before review. It is not proof that
+the quote was invented; the same result appears when the session was rotated
+away or when the quote was elided while being authored. Resolve it by finding
+the message again and quoting it verbatim, by relabelling the entry as extracted
+wording, or by dropping it. A card whose evidence cannot be shown does not
+survive review.
+
 ### Step 8: Cluster Evidence
 
 For each cluster, answer: how often did it repeat, what finally worked, and did
@@ -520,11 +533,32 @@ Candidate recall fields must help the model decide whether to use a card.
 | `summary` | One judgment-ready sentence: trigger scenario + common failure/confusion + correct action + necessary boundary. |
 | `criteria.use_when` | Natural workflow entrypoints, not generic keywords. |
 | `criteria.ignore_when` | Near-miss cases that should not trigger; prefer natural language. |
-| `recall.triggers` | Short anchors extracted from `use_when`, usually 3-5 items. |
+| `recall.triggers` | Short anchors quoted from real user wording, usually 3-5 items. |
 | `recall.topics` | Broad categories only; topics do not replace triggers. |
 | `engine_hints.positive` | Use only when hints clearly reduce false positives or misses. Routing hints are strict gates. |
 | `engine_hints.negative` | Use for known false-positive patterns. |
 | `rule` | Future-agent executable rule text only. |
+
+### Triggers Must Be Attested, Not Paraphrased
+
+A trigger is text the retrieval engine matches literally, so a paraphrase of
+what the user meant never fires. Take every anchor from a message that is
+actually in the corpus, and search the index to confirm the wording appears
+before writing it down. A card whose triggers were all invented reads perfectly
+and recalls nothing.
+
+Two shapes fail even when the wording is real:
+
+- Negated phrases. The engine strips negated spans so a card is not recalled by
+  the very thing the user ruled out, which means an anchor like `先不要动` can
+  never match. Anchor on the request that sits next to the refusal instead
+  (`给我方案`, `先讨论`, `分析一下`).
+- Composites. `先给我方案` looks like one phrase but the corpus may only contain
+  `给我完整的整理方案`. Quote the fragment that exists.
+
+After the cards are active, check recall with prompts taken from the corpus
+rather than prompts written from the card's own trigger list. Testing a card
+against its own triggers only proves the list matches itself.
 
 ### summary
 

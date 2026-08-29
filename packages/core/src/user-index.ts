@@ -199,6 +199,73 @@ export function searchUserMessageIndex(index: UserMessageIndex, query: string, o
     }));
 }
 
+export type EvidenceCheckStatus = "verified" | "unverified" | "not-a-quote";
+
+export type EvidenceCheck = {
+  cardId: string;
+  evidence: string;
+  status: EvidenceCheckStatus;
+  missingFragments: string[];
+};
+
+export type EvidenceCheckReport = {
+  counts: Record<EvidenceCheckStatus, number>;
+  checks: EvidenceCheck[];
+};
+
+// Evidence is authored as "[direct|codex] quote" and sometimes carries a nested
+// role marker, a trailing note in parentheses, or several messages stitched with
+// an ellipsis. Only the quoted fragments can be looked up in the corpus.
+const EVIDENCE_TAG_PATTERN = /^\s*\[[^\]]*\]\s*/;
+const EVIDENCE_TRAILING_NOTE_PATTERN = /[（(][^）)]*[）)]\s*$/;
+const EVIDENCE_FRAGMENT_SEPARATOR = /……|\.\.\.|…|\s\/\s/;
+const EVIDENCE_MIN_FRAGMENT_LENGTH = 6;
+
+function normalizeEvidenceText(value: string): string {
+  return value.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+}
+
+function evidenceFragments(evidence: string): { quoted: boolean; fragments: string[] } {
+  let body = evidence;
+  let quoted = true;
+  while (EVIDENCE_TAG_PATTERN.test(body)) {
+    const tag = EVIDENCE_TAG_PATTERN.exec(body)?.[0] || "";
+    if (/signal/i.test(tag)) quoted = false;
+    body = body.slice(tag.length);
+  }
+  if (!quoted) return { quoted: false, fragments: [] };
+  const stripped = body.replace(EVIDENCE_TRAILING_NOTE_PATTERN, "").trim();
+  const fragments = stripped
+    .split(EVIDENCE_FRAGMENT_SEPARATOR)
+    .map(normalizeEvidenceText)
+    .filter((fragment) => fragment.length >= EVIDENCE_MIN_FRAGMENT_LENGTH);
+  return { quoted: fragments.length > 0, fragments };
+}
+
+export function verifyEvidenceAgainstIndex(
+  cards: Array<{ id: string; evidence: string[] }>,
+  index: UserMessageIndex
+): EvidenceCheckReport {
+  const haystack = index.messages.map((message) => normalizeEvidenceText(message.text));
+  const counts: Record<EvidenceCheckStatus, number> = { verified: 0, unverified: 0, "not-a-quote": 0 };
+  const checks: EvidenceCheck[] = [];
+  for (const card of cards) {
+    for (const evidence of card.evidence || []) {
+      const { quoted, fragments } = evidenceFragments(String(evidence));
+      if (!quoted) {
+        counts["not-a-quote"] += 1;
+        checks.push({ cardId: card.id, evidence: String(evidence), status: "not-a-quote", missingFragments: [] });
+        continue;
+      }
+      const missingFragments = fragments.filter((fragment) => !haystack.some((text) => text.includes(fragment)));
+      const status: EvidenceCheckStatus = missingFragments.length ? "unverified" : "verified";
+      counts[status] += 1;
+      checks.push({ cardId: card.id, evidence: String(evidence), status, missingFragments });
+    }
+  }
+  return { counts, checks };
+}
+
 export type UserIndexMarkerKind = "abort" | "tool_rejected" | "repeated_user_message";
 
 export type UserIndexMarkerHit = {

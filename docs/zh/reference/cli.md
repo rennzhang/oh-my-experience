@@ -99,10 +99,16 @@ ome reflect add <run-id> --title "仓库发版 gate" --summary "..." --rule "...
 ome reflect candidates <run-id> --from-file <file>
 ome reflect candidates <run-id> --scope project --from-file <file>
 ome reflect candidates <run-id> --from-file <file> --audit-file <audit.json>
+ome reflect verify-evidence <run-id> --index <index-file>
 ome reflect decide <run-id> <candidate-id> --action approve --category "Product UI"
 ome reflect apply <run-id> --dry-run
 ome reflect apply <run-id>
 ```
+
+`ome reflect verify-evidence` 把候选卡引用的每条引文回查 user-index，结果分为
+`verified`、`unverified`、`not-a-quote`。`unverified` 表示该引文在这个索引里没有原样出现，
+但会话被轮转掉、或者作者引用时省略了中间内容也会落到这一类，所以它是"回去核对来源"的提示，
+不是判定引文造假。
 
 `ome reflect start --focus <text>` 只是本次分析镜头。除非用户明确限制来源集合，否则它不能缩小来源覆盖、跳过 source audit 或降低证据标准。
 

@@ -169,6 +169,20 @@ Candidate writes require source audit. The audit must cover at least:
 
 `sourceCoverage: unknown` must not write candidates by default.
 
+Check the quotes a candidate cites against the corpus before reviewing it:
+
+```bash
+ome reflect verify-evidence <run-id> --index <index-file>
+```
+
+Each evidence entry comes back as `verified`, `unverified`, or `not-a-quote`.
+`not-a-quote` is for `[signal]` entries that state a statistic instead of
+quoting the user. `unverified` means the quote is not in that index verbatim;
+treat it as a prompt to re-read the source, because it also happens when the
+session was rotated away or when the quote was elided while being authored.
+Quotes stitched from several messages with `……` are checked fragment by
+fragment, and only the missing fragments are reported.
+
 ## Draft Approval Lifecycle
 
 Candidate decisions:

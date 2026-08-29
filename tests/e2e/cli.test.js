@@ -371,6 +371,55 @@ test("source user-index records a cross-run watermark and can opt out", () => {
   assert.equal(fs.existsSync(path.join(ephemeralDir, "indexes", "sources.json")), false);
 });
 
+test("reflect verify-evidence separates attested quotes from unattested ones", () => {
+  const dataDir = tmpDir("verify-evidence");
+  json(run(["init", "--data-dir", dataDir, "--json"]));
+  const built = json(run([
+    "source", "user-index", "build",
+    "--provider", "grok",
+    "--grok-sessions", path.join(root, "tests", "fixtures", "grok"),
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
+  const candidatesFile = path.join(dataDir, "verify-candidates.json");
+  fs.writeFileSync(candidatesFile, JSON.stringify({
+    audit: completeAudit(),
+    candidates: [currentCandidate({
+      title: "Evidence verification",
+      summary: "Some quotes are attested, some are not.",
+      rule: "Only cite what the corpus can still show.",
+      triggers: ["evidence"],
+      topics: ["audit"],
+      evidence: [
+        "[direct|grok] Grok 会话也要作为一等来源纳入 user-index。",
+        "[direct|grok] 这句话从来没有在语料里出现过",
+        "[signal] 放行语族全语料命中 60 次",
+        "[direct|grok] Grok 会话也要作为一等来源纳入 user-index。……这半句同样查不到",
+      ],
+    })],
+  }), "utf8");
+  json(run(["reflect", "candidates", retrospective.runId, "--from-file", candidatesFile, "--data-dir", dataDir, "--json"]));
+
+  const report = json(run([
+    "reflect", "verify-evidence", retrospective.runId,
+    "--index", built.indexPath,
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+  assert.equal(report.command, "reflect.verify-evidence");
+  assert.deepEqual(report.counts, { verified: 1, unverified: 2, "not-a-quote": 1 });
+  assert.deepEqual(report.checks.map((check) => check.status), [
+    "verified",
+    "unverified",
+    "not-a-quote",
+    "unverified",
+  ]);
+  // The composite quote keeps its attested half and only reports the missing one.
+  assert.equal(report.checks[3].missingFragments.length, 1);
+  assert.match(report.checks[3].missingFragments[0], /这半句同样查不到/);
+});
+
 test("sessions sharing one filename keep distinct ids from their directory", () => {
   const dataDir = tmpDir("shared-filename-sessions");
   const built = json(run([

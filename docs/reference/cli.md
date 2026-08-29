@@ -129,10 +129,17 @@ ome reflect add <run-id> --title "Repo release gate" --summary "..." --rule "...
 ome reflect candidates <run-id> --from-file <file>
 ome reflect candidates <run-id> --scope project --from-file <file>
 ome reflect candidates <run-id> --from-file <file> --audit-file <audit.json>
+ome reflect verify-evidence <run-id> --index <index-file>
 ome reflect decide <run-id> <candidate-id> --action approve --category "Product UI"
 ome reflect apply <run-id> --dry-run
 ome reflect apply <run-id>
 ```
+
+`ome reflect verify-evidence` looks up every quote a candidate cites in a
+user-index and reports it as `verified`, `unverified`, or `not-a-quote`.
+`unverified` means the quote is not in that index verbatim, which also happens
+when the session was rotated away or the quote was elided while being authored,
+so read it as a prompt to re-check the source rather than a verdict.
 
 `ome reflect start --focus <text>` sets the analysis lens for the run. It does
 not narrow source coverage, skip source audit, or lower the evidence bar unless
