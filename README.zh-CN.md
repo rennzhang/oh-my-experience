@@ -21,8 +21,8 @@
   <a href="docs/zh/index.md">中文文档</a>
 </p>
 
-Oh My Experience 是一个本地优先的 AI 编码经验召回层。它把真实 Codex、Claude 和 Cursor
-会话里的纠正、返工和交付教训整理成经过审核的经验卡；下一次类似任务出现时，在
+Oh My Experience 是一个本地优先的 AI 编码经验召回层。它把真实编码会话里的纠正、
+返工和交付教训整理成经过审核的经验卡；下一次类似任务出现时，在
 prompt 阶段把最相关的提醒给到 Agent。
 
 OME 不是让你写更多规则，而是让提醒出现得更准：在 Agent 还来得及改变下一步动作时，
@@ -33,6 +33,9 @@ OME 不是让你写更多规则，而是让提醒出现得更准：在 Agent 还
 ```bash
 npx oh-my-experience@latest init
 ```
+
+OMP（OhMyPi）使用 `npx oh-my-experience@latest init --provider omp`。
+自定义 Agent 目录和 profile 见 [OMP 配置](docs/zh/guides/setup.md#omp-ohmypi)。
 
 然后把一个真实任务发给 Agent：
 
@@ -66,7 +69,7 @@ OME 把它们移出常驻上下文，只在任务匹配时召回。
 
 - 本地优先：prompt 阶段召回不走网络。
 - 先审批再召回：经验卡遵循 `candidate -> draft -> active -> archived`。
-- Codex 和 Claude hook 共用同一套本地 runtime。
+- Codex、Claude、Cursor 和 OMP（OhMyPi）hook 共用同一套本地 runtime。
 - 原生 Codex/Claude user-only 证据索引，用于复盘深扫。
 - 支持全局经验库，也支持项目根目录 `.oh-my-experience/`。
 - 可解释召回：能看到命中的卡、分数、原因和压入上下文。

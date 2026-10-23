@@ -24,6 +24,13 @@ Provider mappings:
 | --- | --- | --- |
 | Codex | Codex hook input | `prompt.submit` |
 | Claude | `UserPromptSubmit` | `prompt.submit` |
+| OMP (OhMyPi) | `before_agent_start` | `prompt.submit` |
+
+OMP maps `before_agent_start` to the same `prompt.submit` runtime event.
+Its extension delivers the returned `additionalContext` without rewriting
+`prompt` or `systemPrompt`; matching and event logging remain in the shared
+runtime. An installed extension or rendered context alone does not prove the
+model used the reminder.
 
 Hook log event:
 

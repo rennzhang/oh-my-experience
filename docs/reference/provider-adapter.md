@@ -7,7 +7,7 @@ status: active
 
 ## Purpose
 
-Provider adapters isolate Codex, Claude, and Cursor hook differences from the core
+Provider adapters isolate Codex, Claude, Cursor, and OMP hook differences from the core
 retrieval engine.
 
 ## Target Interface
@@ -40,6 +40,15 @@ interface ProviderAdapter {
 
 ## Current Shape
 
-Codex, Claude, and Cursor use the shared hook runtime and inject additional context
+Codex, Claude, Cursor, and OMP use the shared hook runtime and inject additional context
 through provider-specific hook output. Adapter code lives under
 `packages/adapters/agents/<provider>/` and owns install/status/uninstall.
+
+## OMP extension
+
+The OMP adapter installs `extensions/ome-recall.ts` in the resolved OMP agent
+directory. `before_agent_start` sends the task to the existing `ome hook run`
+runtime; the extension delivers the returned `additionalContext` to OMP.
+It does not change `prompt` or `systemPrompt`, or duplicate retrieval scoring.
+Install, status, uninstall, and doctor use the same target resolver;
+[OMP setup](../guides/setup.md#omp-ohmypi) documents its flags and profile rules.

@@ -39,6 +39,7 @@ ome init --yes
 ome init --provider claude
 ome init --provider all
 ome init --provider cursor
+ome init --provider omp
 ome init --no-hook
 ome init --reset-config
 ```
@@ -48,6 +49,12 @@ each selected agent, the prompt-time hook plus bundled OME skill. `--no-hook`
 initializes or updates the library only; it does not install hooks or skills.
 `--reset-config` restores runtime config without deleting experiences, source
 indexes, or retrospective runs.
+
+OMP uses `ome init --provider omp`. `--omp-home <agent-directory>` selects
+its installation target for init, hook status, doctor, and uninstall;
+`--provider all` includes OMP. See [OMP setup](../guides/setup.md#omp-ohmypi)
+for profile and environment-based directory resolution. This adds OMP hooks,
+not an OMP session-history scanner.
 
 ## Recall
 
@@ -245,7 +252,7 @@ PATH. Invalid active or draft cards are errors. Invalid archived cards are
 reported as governance warnings because archived cards are history and never
 enter runtime recall.
 
-`ome hook run` is the runtime entrypoint used by installed Codex, Claude, and Cursor
+`ome hook run` is the runtime entrypoint used by installed Codex, Claude, Cursor, and OMP
 hooks. It is kept public so installed hooks can execute it, but normal setup
 should happen through `ome init`.
 

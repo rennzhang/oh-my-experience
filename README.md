@@ -22,7 +22,7 @@
 </p>
 
 Oh My Experience is a local-first experience layer for AI coding agents. It
-turns real Codex, Claude, and Cursor corrections into reviewed experience cards, then
+turns corrections from real coding sessions into reviewed experience cards, then
 can recall a relevant approved lesson at prompt time before the agent repeats
 the same kind of mistake.
 
@@ -31,6 +31,9 @@ the same kind of mistake.
 ```bash
 npx oh-my-experience@latest init
 ```
+
+For OMP (OhMyPi), use `npx oh-my-experience@latest init --provider omp`.
+See [OMP setup](docs/guides/setup.md#omp-ohmypi) for custom agent directories and profiles.
 
 Then send a real task to your agent:
 
@@ -71,7 +74,7 @@ card; how the agent uses that reminder stays part of the workflow.
 
 - Local-first recall: no network calls on the prompt-time path.
 - Draft approval before recall: `candidate -> draft -> active -> archived`.
-- Codex, Claude, and Cursor hooks using the same local runtime.
+- Codex, Claude, Cursor, and OMP (OhMyPi) hooks using the same local runtime.
 - Native Codex/Claude user-only evidence indexing for deep retrospectives.
 - Global libraries plus optional project libraries at `.oh-my-experience/`.
 - Explainable matching with scores, reasons, and compact injected context.

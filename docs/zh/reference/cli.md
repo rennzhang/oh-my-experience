@@ -32,6 +32,7 @@ ome init --yes
 ome init --provider claude
 ome init --provider all
 ome init --provider cursor
+ome init --provider omp
 ome init --no-hook
 ome init --reset-config
 ```
@@ -39,6 +40,11 @@ ome init --reset-config
 `ome init` 可以重复运行。它会安装 OME 经验库，并给每个选中的 Agent 安装提示词阶段
 hook 和对应 skill。`--no-hook` 只初始化或更新经验库，不安装 hook 或 skill。
 `--reset-config` 只恢复运行配置，不删除经验、来源索引或复盘 run。
+
+OMP 使用 `ome init --provider omp`。初始化、hook status、doctor 和卸载均支持
+`--omp-home <Agent目录>`；`--provider all` 包含 OMP。目录和 profile 规则见
+[OMP 配置](../guides/setup.md#omp-ohmypi)。此支持针对 OMP hook，
+不表示新增了 OMP 历史会话扫描器。
 
 ## 召回
 
@@ -197,7 +203,7 @@ which -a ome
 
 `ome doctor` 检查 dataDir 可写性、配置 schema、卡片生命周期完整性、active 索引一致性、reflect 状态、hook 状态、事件 JSONL、包运行时要求，以及 PATH 中冲突的 `ome` 二进制。无效 active 或 draft 卡是错误；无效 archived 卡只作为治理 warning 暴露，因为 archived 只是历史，不会进入运行时召回。
 
-`ome hook run` 是已安装 Codex、Claude 和 Cursor hook 使用的 runtime 入口。它保留为公开命令是为了让 hook 能执行；普通设置应通过 `ome init` 完成。
+`ome hook run` 是已安装 Codex、Claude、Cursor 和 OMP hook 使用的 runtime 入口。它保留为公开命令是为了让 hook 能执行；普通设置应通过 `ome init` 完成。
 
 ## 配置
 

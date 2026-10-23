@@ -24,6 +24,7 @@ ome init --yes
 ome init --provider claude
 ome init --provider all
 ome init --provider cursor
+ome init --provider omp
 ome init --no-hook
 ome init --reset-config
 ```
@@ -35,7 +36,7 @@ Rules:
 - CI, pipes, and agent runners skip interaction and use flags/defaults.
 - `--no-hook` initializes or updates the library only; it does not install an agent hook or OME skill.
 - `--reset-config` restores runtime config without deleting experiences, source indexes, or reflect runs.
-- Claude hook setup uses `ome init --provider claude`; Cursor uses `ome init --provider cursor`; `ome init --provider all` installs Codex, Claude, and Cursor. Do not ask users to remember a separate hook install command.
+- Claude hook setup uses `ome init --provider claude`; Cursor uses `ome init --provider cursor`; OMP uses `ome init --provider omp`; `ome init --provider all` installs Codex, Claude, Cursor, and OMP. Do not ask users to remember a separate hook install command.
 
 Inspect or change `dataDir`:
 
@@ -62,6 +63,14 @@ Rules:
 - `ome project init` creates `.oh-my-experience/` only at the current project root.
 - Project libraries are for cards that should travel with a repository; personal or private experiences stay in the global library.
 - `ome project status --json` returns project context, project library path, existence, readability, warnings, experience counts, and `invalidCards`. Invalid project active/draft cards make `ok: false`.
+
+OMP target selection is shared by init, hook status, doctor, and uninstall:
+use `--omp-home <agent-directory>` for an explicit path. Otherwise the adapter
+follows OMP's environment/profile resolution; see [setup.md](setup.md#omp-ohmypi).
+OMP's own `--profile` CLI flag is not forwarded to OME; pass `--omp-home`
+explicitly for that case. `--provider all` includes OMP, but source scanners
+retain their own supported-provider lists; hook support does not add an OMP
+history scanner.
 
 ## Source Scanning
 
@@ -289,7 +298,7 @@ ome hook run
 Rules:
 
 - Install and uninstall hooks/skills through `ome init` / `ome uninstall`.
-- `ome hook run` is the runtime entrypoint for installed Codex/Claude hooks and must remain available.
+- `ome hook run` is the runtime entrypoint for installed Codex/Claude/Cursor/OMP hooks and must remain available.
 - Hook runtime derives project context from the prompt payload and applies card `scope`.
 - If a project library exists, the hook reads project active cards; hook events still write to global `dataDir`.
 - Do not change hooks as a side effect of retrospective work. Retrospectives and setup are separate lifecycle stages.

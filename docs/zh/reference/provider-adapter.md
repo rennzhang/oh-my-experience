@@ -8,7 +8,7 @@ status: active
 
 ## 目的
 
-Provider adapters 隔离 Codex 和 Claude 的 hook 差异，避免这些差异进入 core
+Provider adapters 隔离 Codex、Claude、Cursor 和 OMP 的 hook 差异，避免这些差异进入 core
 retrieval engine。
 
 ## 目标接口
@@ -41,6 +41,14 @@ interface ProviderAdapter {
 
 ## 当前形态
 
-Codex 和 Claude 都使用共享 hook runtime，并通过 provider-specific hook output 注入
+Codex、Claude、Cursor 和 OMP 都使用共享 hook runtime，并通过 provider-specific hook output 注入
 additional context。Adapter code 位于 `packages/adapters/agents/<provider>/`，
 负责 install/status/uninstall。
+
+## OMP 扩展
+
+OMP adapter 在解析后的 Agent 目录安装 `extensions/ome-recall.ts`。
+`before_agent_start` 把任务交给已有 `ome hook run`，再将返回的
+`additionalContext` 加入 OMP 当前回合。不修改 `prompt` 或 `systemPrompt`，
+也不复制召回评分逻辑。安装、状态检查、卸载和 doctor 共用同一套目标目录解析；
+参数及 profile 规则见 [OMP 配置](../guides/setup.md#omp-ohmypi)。

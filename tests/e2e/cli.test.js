@@ -11,6 +11,7 @@ const configHome = fs.mkdtempSync(path.join(os.tmpdir(), "ome-e2e-config-home-")
 const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "ome-e2e-codex-home-"));
 
 const cursorHome = fs.mkdtempSync(path.join(os.tmpdir(), "ome-e2e-cursor-home-"));
+const ompHome = fs.mkdtempSync(path.join(os.tmpdir(), "ome-e2e-omp-home-"));
 
 function tmpDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `ome-e2e-${name}-`));
@@ -33,7 +34,7 @@ function similarityCheckFixture(candidate = "fixture candidate") {
 function run(args, options = {}) {
   const result = spawnSync(process.execPath, [bin, ...args], {
     cwd: options.cwd || root,
-    env: { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome, CURSOR_HOME: cursorHome, ...(options.env || {}) },
+    env: { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome, CURSOR_HOME: cursorHome, PI_CODING_AGENT_DIR: ompHome, OMP_PROFILE: "", PI_PROFILE: "", ...(options.env || {}) },
     input: options.input,
     encoding: "utf8",
   });
@@ -979,7 +980,7 @@ test("interactive init exposes first-run choices without migration prompts", () 
   assert.match(result.stdout, /Enter accepts path defaults · confirmation requires y\/n · Ctrl\+C cancels/);
   assert.match(result.stdout, /Which agents should OME connect/);
   assert.match(result.stdout, /Codex is the best-tested path today/);
-  assert.match(result.stdout, /Choices: codex, claude, cursor, all, none/);
+  assert.match(result.stdout, /Choices: codex, claude, cursor, omp, all, none/);
   assert.match(result.stdout, /Setup summary/);
   assert.match(result.stdout, /Recall is ready for your next agent task/);
   assert.match(result.stdout, /Send this to your selected agent so the hook can recall relevant experience automatically/);
@@ -1452,27 +1453,27 @@ test("init installs claude hook through the same runtime command", () => {
   assert.equal(doctor.checked.agentSkills[0].inSync, true);
 });
 
-test("init provider all installs hooks and skills for Codex, Claude, and Cursor", () => {
+test("init provider all installs hooks and skills for Codex, Claude, Cursor, and OMP", () => {
   const dataDir = tmpDir("all-provider-skills");
   const localCodexHome = tmpDir("all-provider-codex-home");
   const claudeHome = tmpDir("all-provider-claude-home");
   const localCursorHome = tmpDir("all-provider-cursor-home");
 
   const installed = json(run(["init", "--provider", "all", "--data-dir", dataDir, "--codex-home", localCodexHome, "--claude-home", claudeHome, "--cursor-home", localCursorHome, "--json"]));
-  assert.deepEqual(installed.hooks.map((hook) => hook.provider), ["codex", "claude", "cursor"]);
-  assert.deepEqual(installed.skills.map((skill) => skill.provider), ["codex", "claude", "cursor"]);
+  assert.deepEqual(installed.hooks.map((hook) => hook.provider), ["codex", "claude", "cursor", "omp"]);
+  assert.deepEqual(installed.skills.map((skill) => skill.provider), ["codex", "claude", "cursor", "omp"]);
   assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience", "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(claudeHome, "skills", "oh-my-experience", "SKILL.md")), true);
   assert.equal(fs.existsSync(path.join(localCursorHome, "skills", "oh-my-experience", "SKILL.md")), true);
 
   const doctor = json(run(["doctor", "--data-dir", dataDir, "--codex-home", localCodexHome, "--claude-home", claudeHome, "--cursor-home", localCursorHome, "--json"]));
   assert.equal(doctor.ok, true, doctor.errors.join("\n"));
-  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.provider), ["codex", "claude", "cursor"]);
-  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.inSync), [true, true, true]);
+  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.provider), ["codex", "claude", "cursor", "omp"]);
+  assert.deepEqual(doctor.checked.agentSkills.map((skill) => skill.inSync), [true, true, true, true]);
 
   const removed = json(run(["uninstall", "--provider", "all", "--data-dir", dataDir, "--codex-home", localCodexHome, "--claude-home", claudeHome, "--cursor-home", localCursorHome, "--json"]));
-  assert.deepEqual(removed.skills.map((skill) => skill.provider), ["codex", "claude", "cursor"]);
-  assert.deepEqual(removed.skills.map((skill) => skill.uninstalled), [true, true, true]);
+  assert.deepEqual(removed.skills.map((skill) => skill.provider), ["codex", "claude", "cursor", "omp"]);
+  assert.deepEqual(removed.skills.map((skill) => skill.uninstalled), [true, true, true, true]);
   assert.equal(fs.existsSync(path.join(localCodexHome, "skills", "oh-my-experience")), false);
   assert.equal(fs.existsSync(path.join(claudeHome, "skills", "oh-my-experience")), false);
   assert.equal(fs.existsSync(path.join(localCursorHome, "skills", "oh-my-experience")), false);

@@ -24,6 +24,12 @@ Provider 映射：
 | --- | --- | --- |
 | Codex | Codex hook input | `prompt.submit` |
 | Claude | `UserPromptSubmit` | `prompt.submit` |
+| OMP (OhMyPi) | `before_agent_start` | `prompt.submit` |
+
+OMP 将 `before_agent_start` 规范化为同一 `prompt.submit` 事件。
+扩展把运行时返回的 `additionalContext` 加入当前回合，不改 `prompt` 或
+`systemPrompt`；匹配和事件记录仍由共享运行时负责。扩展已安装或上下文已生成，
+都不单独证明模型实际采用了提醒。
 
 Hook 日志事件：
 

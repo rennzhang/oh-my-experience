@@ -87,13 +87,57 @@ the repository should carry its own cards.
 ome hook status --provider codex     # Check current hook state
 ome init --provider claude            # Add Claude hook and skill
 ome init --provider cursor            # Add Cursor hook and skill
-ome init --provider all               # Install Codex, Claude, and Cursor
+ome init --provider omp               # Add OMP extension and skill
+ome init --provider all               # Install Codex, Claude, Cursor, and OMP
 ```
 
-Interactive `ome init` lets you choose `codex`, `claude`, `cursor`, `all`, or `none`.
+Interactive `ome init` lets you choose `codex`, `claude`, `cursor`, `omp`, `all`, or `none`.
 Codex is the best-tested path today, but OME is a hook-based recall layer, not
 a Codex-only tool. For each selected agent, OME installs the prompt-time hook
 and bundled skill. The wizard shows paths before writing.
+
+## OMP (OhMyPi)
+
+```bash
+ome init --provider omp --dry-run
+ome init --provider omp
+ome hook status --provider omp
+ome doctor
+```
+
+OMP loads `extensions/ome-recall.ts` and `skills/oh-my-experience` from its
+agent directory, normally `~/.omp/agent`. The extension listens to
+`before_agent_start`, calls the existing `ome hook run` runtime, and delivers
+its `additionalContext` as an OMP context message (`display: false`) for that
+turn. It does not rewrite the user prompt or
+system prompt, and it does not implement a separate matcher.
+
+Use `--omp-home <agent-directory>` to select an explicit installation target.
+Otherwise, OME follows OMP's environment-based directory selection. The config
+root is the directory under your home named by `PI_CONFIG_DIR` (default `.omp`,
+so normally `~/.omp`). Named `OMP_PROFILE` profiles use
+`<config-root>/profiles/<profile>/agent` and ignore `PI_CODING_AGENT_DIR`.
+An empty or `default` profile uses `PI_CODING_AGENT_DIR` when set, otherwise
+`<config-root>/agent`. If `OMP_PROFILE` is unset, the legacy `PI_PROFILE` alias
+is used. For an arbitrary absolute directory, use `--omp-home`.
+
+OMP's own `--profile` flag is not passed to OME. If you launch OMP with that
+flag, pass the matching agent directory explicitly when installing or inspecting:
+
+```bash
+ome init --provider omp --omp-home ~/.omp/profiles/work/agent --dry-run
+ome init --provider omp --omp-home ~/.omp/profiles/work/agent
+ome hook status --provider omp --omp-home ~/.omp/profiles/work/agent
+ome doctor --omp-home ~/.omp/profiles/work/agent
+ome uninstall --provider omp --omp-home ~/.omp/profiles/work/agent
+```
+
+Restart OMP or reload its extensions after installation. `hook status` and
+`doctor` inspect installation health; use a real task in OMP to verify recall.
+`--provider all` includes OMP for init and uninstall. Check each host separately
+with `hook status --provider omp` (or its corresponding provider). Uninstall
+removes OME's extension and skill from the selected agent directory and keeps
+the experience library by default.
 
 ## Uninstall
 

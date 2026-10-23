@@ -18,7 +18,7 @@ npx oh-my-experience@latest init
 This runs the latest published OME CLI through npm, creates your local
 experience library, and lets you choose which supported agents to connect. For
 each selected agent, OME installs the prompt-time hook and bundled skill. Codex
-is the best-tested path today; Claude and Cursor use the same hook runtime. It is safe to
+is the best-tested path today; Claude, Cursor, and OMP use the same hook runtime. It is safe to
 rerun.
 
 To install the command globally instead:
@@ -27,6 +27,9 @@ To install the command globally instead:
 npm install -g oh-my-experience
 ome init
 ```
+
+For OMP, run `npx oh-my-experience@latest init --provider omp`; see
+[OMP setup](setup.md#omp-ohmypi) if you use a named profile or custom agent directory.
 
 ## 2. Send a real task to your agent
 

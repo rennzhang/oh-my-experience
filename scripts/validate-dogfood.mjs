@@ -10,6 +10,7 @@ const configHome = path.join(runRoot, "config-home");
 const codexHome = path.join(runRoot, "codex-home");
 const claudeHome = path.join(runRoot, "claude-home");
 const cursorHome = path.join(runRoot, "cursor-home");
+const ompHome = path.join(runRoot, "omp-home");
 const env = { ...process.env, OH_MY_EXPERIENCE_CONFIG_HOME: configHome, CODEX_HOME: codexHome, CURSOR_HOME: cursorHome };
 const steps = [];
 
@@ -53,6 +54,27 @@ fs.writeFileSync(path.join(installDir, "package.json"), `${JSON.stringify({ priv
 step("tarball-install", "npm", ["install", tgz, "--silent"], { cwd: installDir });
 step("installed-init", "npx", ["ome", "init", "--data-dir", path.join(runRoot, "installed-data"), "--no-hook", "--json"], { cwd: installDir });
 step("installed-doctor", "npx", ["ome", "doctor", "--data-dir", path.join(runRoot, "installed-data"), "--json"], { cwd: installDir });
+const installedOmp = jsonStep("installed-init-omp", "npx", ["ome", "init", "--provider", "omp", "--omp-home", ompHome,
+  "--bin", path.join(installDir, "node_modules", ".bin", "ome"), "--data-dir", hookDataDir, "--yes", "--json"], { cwd: installDir });
+jsonStep("installed-omp-status", "npx", ["ome", "hook", "status", "--provider", "omp", "--omp-home", ompHome,
+  "--bin", path.join(installDir, "node_modules", ".bin", "ome"), "--data-dir", hookDataDir, "--json"], {
+  cwd: installDir, validate: output => { if (!output.matchesExpectedCommand) fail("installed-omp-status", "installed OMP extension differs from expected package"); },
+});
+jsonStep("installed-omp-doctor", "npx", ["ome", "doctor", "--provider", "omp", "--omp-home", ompHome, "--data-dir", hookDataDir, "--json"], { cwd: installDir });
+const ompSmoke = path.join(runRoot, "omp-extension-smoke.mjs");
+fs.writeFileSync(ompSmoke, `import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+const { default: extension } = await import(pathToFileURL(${JSON.stringify(installedOmp.hooks[0].target)}).href);
+let handler;
+extension({ on(name, callback) { assert.equal(name, "before_agent_start"); handler = callback; } });
+const result = await handler({ prompt: ${JSON.stringify(hookPrompt)} }, { cwd: ${JSON.stringify(installDir)}, sessionManager: { getSessionId: () => "dogfood-omp" } });
+assert.ok(result.message.content.includes("browser-validation"));
+assert.equal(result.message.display, false);
+assert.equal(result.systemPrompt, undefined);
+console.log(JSON.stringify({ recalled: true, display: false, systemPromptReplaced: false }));
+`, "utf8");
+step("installed-omp-extension-recall", "bun", [ompSmoke]);
+jsonStep("installed-omp-uninstall", "npx", ["ome", "uninstall", "--provider", "omp", "--omp-home", ompHome, "--data-dir", hookDataDir, "--json"], { cwd: installDir });
 
 step("bun-binary", "npm", ["run", "build:binary:bun"]);
 step("binary-init", path.join(root, "build", "ome"), ["init", "--data-dir", path.join(runRoot, "binary-data"), "--no-hook", "--json"]);

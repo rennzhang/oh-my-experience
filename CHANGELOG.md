@@ -10,6 +10,10 @@ contributors, or release safety.
 
 ### Added
 
+- Native OMP prompt-time recall through `ome init --provider omp`, including
+  owned extension installation, health checks, idempotent updates and selective
+  uninstall. It shares the existing recall runtime and experience library.
+
 - `ome source user-index` supports Grok as a first-class provider through
   `--provider grok`, `--grok-sessions`, and `--grok-home`, so Grok chat history
   no longer needs a hand-built mirror directory.

@@ -82,12 +82,53 @@ ome doctor                                                # 确认迁移成功
 ome hook status --provider codex     # 查看当前 hook 状态
 ome init --provider claude            # 追加 Claude hook 和 skill
 ome init --provider cursor            # 追加 Cursor hook 和 skill
-ome init --provider all               # 安装 Codex、Claude 和 Cursor
+ome init --provider omp               # 追加 OMP 扩展和 skill
+ome init --provider all               # 安装 Codex、Claude、Cursor 和 OMP
 ```
 
-交互式 `ome init` 会让你选择 `codex`、`claude`、`cursor`、`all` 或 `none`。Codex 是当前验证
+交互式 `ome init` 会让你选择 `codex`、`claude`、`cursor`、`omp`、`all` 或 `none`。Codex 是当前验证
 最充分的路径，但 OME 是基于 hook 的召回层，不是 Codex 专用工具。向导会在写入前展示
 写入路径。对每个选中的 Agent，OME 都会安装 prompt-time hook 和内置 skill。
+
+## OMP (OhMyPi)
+
+```bash
+ome init --provider omp --dry-run
+ome init --provider omp
+ome hook status --provider omp
+ome doctor
+```
+
+OMP 从 Agent 目录加载 `extensions/ome-recall.ts` 和
+`skills/oh-my-experience`，默认目录为 `~/.omp/agent`。扩展监听
+`before_agent_start`，调用已有 `ome hook run`，把返回的
+`additionalContext` 作为 OMP 上下文消息（`display: false`）加入当前回合。
+不改用户 prompt 或 system prompt，
+也不另写一套匹配逻辑。
+
+`--omp-home <Agent目录>` 可显式指定安装目标。未指定时，OME 跟随 OMP
+的环境变量。配置根目录为 home 下 `PI_CONFIG_DIR` 指定的目录名，默认 `.omp`，
+即通常的 `~/.omp`。命名 `OMP_PROFILE` 使用
+`<配置根目录>/profiles/<profile>/agent`，不使用 `PI_CODING_AGENT_DIR`。
+空值或 `default` profile 优先使用 `PI_CODING_AGENT_DIR`，否则使用
+`<配置根目录>/agent`。未设置 `OMP_PROFILE` 时兼容 `PI_PROFILE`。
+要使用任意绝对目录，请直接传 `--omp-home`。
+
+OMP 自己的 `--profile` 参数不会传给 OME。用该参数启动 OMP 时，安装和检查
+需要显式指定对应的 Agent 目录：
+
+```bash
+ome init --provider omp --omp-home ~/.omp/profiles/work/agent --dry-run
+ome init --provider omp --omp-home ~/.omp/profiles/work/agent
+ome hook status --provider omp --omp-home ~/.omp/profiles/work/agent
+ome doctor --omp-home ~/.omp/profiles/work/agent
+ome uninstall --provider omp --omp-home ~/.omp/profiles/work/agent
+```
+
+安装后重启 OMP 或重新加载扩展。`hook status` 和 `doctor` 只检查安装状态；
+实际召回仍要在 OMP 中用真实任务验证。初始化和卸载的 `--provider all`
+均包含 OMP；状态按宿主分别检查，OMP 使用 `hook status --provider omp`。
+卸载只移除所选 Agent 目录下的 OME 扩展和 skill，默认保留经验库。
 
 ## 卸载
 

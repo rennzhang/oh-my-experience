@@ -44,6 +44,7 @@ export function createDefaultConfig(dataDir: string): Config {
         codex: { enabled: false },
         claude: { enabled: false },
         cursor: { enabled: false },
+        omp: { enabled: false },
       },
     },
     codex: {

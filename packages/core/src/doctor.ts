@@ -1,13 +1,15 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { ompHookStatus } from "../../adapters/agents/omp/src/hook-install.js";
 import { inspectCards, listCards, rebuildCardIndex, type CardIndex } from "./cards.js";
 import { ConfigSchema, type Config } from "./schema.js";
 import { validateSignalIds } from "./signal-registry.js";
 import { defaultDataDir, layout, readJson } from "./storage.js";
 import { validateTriggerSignalContract, type TriggerSignalContractViolation } from "./trigger-signal-contract.js";
 
-type DoctorOptions = { codexHome?: string; claudeHome?: string; cursorHome?: string };
+type DoctorOptions = { codexHome?: string; claudeHome?: string; cursorHome?: string; ompHome?: string };
+type HookHomes = Required<Omit<DoctorOptions, "ompHome">> & Pick<DoctorOptions, "ompHome">;
 type HookFileFormat = "nested-user-prompt-submit" | "flat-before-submit-prompt";
 type HookEntry = { hooks?: Array<{ command?: string }>; command?: string };
 
@@ -15,6 +17,7 @@ export function runDoctor(dataDir: string, {
   codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex"),
   claudeHome = path.join(os.homedir(), ".claude"),
   cursorHome = process.env.CURSOR_HOME || path.join(os.homedir(), ".cursor"),
+  ompHome,
 }: DoctorOptions = {}) {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -32,7 +35,7 @@ export function runDoctor(dataDir: string, {
   checkIndex(dataDir, errors);
   checkJsonl(l.events, "events", warnings);
   const config = checkConfig(dataDir, errors, warnings);
-  checkHook(config, { codexHome, claudeHome, cursorHome }, errors, warnings);
+  checkHook(config, { codexHome, claudeHome, cursorHome, ompHome }, dataDir, errors, warnings);
   checkPackage(errors, warnings);
   return {
     ok: errors.length === 0,
@@ -159,7 +162,7 @@ function checkConfig(dataDir: string, errors: string[], warnings: string[]): Con
   return config;
 }
 
-function checkHook(config: Config | null, { codexHome, claudeHome, cursorHome }: Required<DoctorOptions>, errors: string[], warnings: string[]): void {
+function checkHook(config: Config | null, { codexHome, claudeHome, cursorHome, ompHome }: HookHomes, dataDir: string, errors: string[], warnings: string[]): void {
   const codexEnabled = config?.hooks?.providers?.codex?.enabled;
   if (codexEnabled) {
     checkProviderHook("Codex", path.join(codexHome, "hooks.json"), "nested-user-prompt-submit", errors);
@@ -170,7 +173,31 @@ function checkHook(config: Config | null, { codexHome, claudeHome, cursorHome }:
   if (config?.hooks?.providers?.cursor?.enabled) {
     checkProviderHook("Cursor", path.join(cursorHome, "hooks.json"), "flat-before-submit-prompt", errors);
   }
+  if (config?.hooks?.providers?.omp?.enabled) checkOmpHook(ompHome, dataDir, errors);
   checkDuplicateCursorClaudeHooks(cursorHome, claudeHome, warnings);
+}
+
+function checkOmpHook(ompHome: string | undefined, dataDir: string, errors: string[]): void {
+  try {
+    const options = { ompHome, dataDir };
+    const status = ompHookStatus(options);
+    if (status.conflict || status.installed && !status.owned) {
+      errors.push(`OMP hook enabled but extension is foreign or not OME-managed: ${status.target}`);
+    } else if (!status.installed) {
+      errors.push(`OMP hook enabled but extension not found: ${status.target}`);
+    } else {
+      // The installer may legitimately use a custom binary. Reuse only its
+      // structured metadata, then compare the complete current template; a
+      // retained ownership header alone never proves that code is unchanged.
+      const installedBin = status.installedBin;
+      const current = installedBin ? ompHookStatus({ ...options, bin: installedBin }) : status;
+      if (!installedBin || !current.matchesExpectedCommand) {
+        errors.push(`OMP hook enabled but managed extension does not match current expected content or dataDir: ${status.target}`);
+      }
+    }
+  } catch {
+    errors.push("OMP hook enabled but extension inspection failed; check its permissions and installation metadata");
+  }
 }
 
 function checkProviderHook(provider: string, hookFile: string, format: HookFileFormat, errors: string[]): void {
