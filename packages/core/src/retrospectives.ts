@@ -395,6 +395,7 @@ function normalizeScope(value: unknown): JsonRecord {
     ...input,
     projectKey: input.projectKey ?? input.project_key ?? null,
     modulePath: input.modulePath ?? input.module_path ?? null,
+    excludeProjects: firstFilledArray(input.excludeProjects, input.exclude_projects),
   };
 }
 
@@ -597,8 +598,14 @@ function candidateWithDecision(candidate: RetrospectiveCandidate, decision: Retr
 }
 
 function mergeApplicability(current: ExperienceCard["applicability"], next: RetrospectiveCandidate["applicability"]): ExperienceCard["applicability"] {
-  if (current.level !== "global") return current;
-  return next;
+  const base = current.level !== "global" ? current : next;
+  return {
+    ...base,
+    excludeProjects: Array.from(new Set([
+      ...(current.excludeProjects || []),
+      ...(next.excludeProjects || []),
+    ].map((value) => String(value || "").trim()).filter(Boolean))),
+  };
 }
 
 function mergeIntentModes(current: ExperienceCard["intentModes"], next: RetrospectiveCandidate["intentModes"]): ExperienceCard["intentModes"] {

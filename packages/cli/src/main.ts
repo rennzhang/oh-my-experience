@@ -1510,6 +1510,7 @@ function parseApplicability(args: ParsedArgs) {
     level,
     projectKey: args.flags["project-key"] || null,
     modulePath: args.flags["module-path"] || null,
+    excludeProjects: splitList(args.flags["exclude-project"] || args.flags["exclude-projects"]),
     confidence: args.flags["scope-confidence"] || "medium",
     rationale: args.flags["scope-rationale"] || "",
   };

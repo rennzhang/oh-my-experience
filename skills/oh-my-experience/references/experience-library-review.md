@@ -211,6 +211,7 @@ Each active card should satisfy:
 - `recall.triggers` generalize into ordinary-task pollution.
 - `engine_hints` lack known negative signals, or natural-language boundaries are overfit into program fields.
 - Project-scoped cards lack `scope.level`, `project_key`, or `module_path`, causing global over-recall.
+- Global cards that should stay out of a named repo lack `scope.exclude_projects`.
 
 ### P2: Schedule Later
 

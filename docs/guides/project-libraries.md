@@ -114,6 +114,23 @@ ome reflect add <reflect-id> \
   --module-path "."
 ```
 
+A global card can also stay out of named repositories without becoming a
+project-scoped card:
+
+```bash
+ome reflect add <reflect-id> \
+  --title "No-spec UI polish" \
+  --summary "Use the shared UI polish path except in named product repos." \
+  --rule "Do not apply this lesson inside excluded product repositories." \
+  --triggers "ui polish" \
+  --scope-level global \
+  --exclude-project "schoolroom,github.com/example/schoolroom"
+```
+
+`scope.exclude_projects` matches the current project key, package name, or
+directory name. A repo name such as `schoolroom` also matches a full
+`host/group/schoolroom` project key.
+
 Internal candidate files can set the same `scope` object directly.
 These cards stay in the global `dataDir`, but OME filters them by the detected
 project before scoring.

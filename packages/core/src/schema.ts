@@ -35,6 +35,7 @@ export const ApplicabilitySchema = z.object({
   level: ApplicabilityLevelSchema.default("global"),
   projectKey: z.string().nullable().default(null),
   modulePath: z.string().nullable().default(null),
+  excludeProjects: z.array(z.string().min(1)).default([]),
   confidence: ConfidenceSchema.default("medium"),
   rationale: z.string().default(""),
 }).default({});

@@ -1286,6 +1286,85 @@ test("global hooks filter project-specific cards by scope", () => {
   assert.equal(other.includes("project-family-browser-validation"), false);
 });
 
+test("global cards honor exclude_projects before scoring", () => {
+  const dataDir = tmpDir("exclude-projects");
+  initializeDataDir({ dataDir });
+  removeStarterCards(dataDir);
+  const now = new Date().toISOString();
+  writeCard(dataDir, {
+    id: "no-spec-ui-polish",
+    status: "active",
+    title: "No-spec UI polish",
+    category: "Product UI",
+    summary: "Use the shared UI polish path except in excluded product repositories.",
+    rule: "Do not apply this lesson inside excluded product repositories.",
+    triggers: ["exclude-project ui polish"],
+    topics: ["ui"],
+    applicability: {
+      level: "global",
+      excludeProjects: ["schoolroom", "schoolroom-monorepo", "github.com/example/blocked"],
+    },
+    body: "Do not apply this lesson inside excluded product repositories.",
+    createdAt: now,
+    updatedAt: now,
+  });
+  const stored = getCard(dataDir, "no-spec-ui-polish");
+  assert.deepEqual(stored.applicability.excludeProjects, ["schoolroom", "schoolroom-monorepo", "github.com/example/blocked"]);
+  assert.match(serializeCard(stored), /exclude_projects:/);
+  assert.deepEqual(parseCardMarkdown(serializeCard(stored)).applicability.excludeProjects, stored.applicability.excludeProjects);
+
+  const prompt = "exclude-project ui polish";
+  const ids = (projectContext) => matchCards(dataDir, prompt, projectContext ? { projectContext } : {}).map((item) => item.card.id);
+  const schoolroom = {
+    cwd: null,
+    root: "/work/schoolroom",
+    projectKey: "gitlab.example.com/fe-web/schoolroom",
+    modulePath: ".",
+    packageName: "schoolroom-monorepo",
+    source: "git",
+  };
+  const blockedByKey = {
+    cwd: null,
+    root: "/work/blocked",
+    projectKey: "github.com/example/blocked",
+    modulePath: ".",
+    packageName: null,
+    source: "git",
+  };
+  const packageOnly = {
+    cwd: null,
+    root: "/tmp/copy",
+    projectKey: "schoolroom-monorepo",
+    modulePath: ".",
+    packageName: "schoolroom-monorepo",
+    source: "package",
+  };
+  const other = {
+    cwd: null,
+    root: "/work/other",
+    projectKey: "github.com/example/other",
+    modulePath: ".",
+    packageName: "other-app",
+    source: "git",
+  };
+
+  assert.equal(ids(schoolroom).includes("no-spec-ui-polish"), false);
+  assert.equal(ids(blockedByKey).includes("no-spec-ui-polish"), false);
+  assert.equal(ids(packageOnly).includes("no-spec-ui-polish"), false);
+  assert.equal(ids(other).includes("no-spec-ui-polish"), true);
+  assert.equal(ids(null).includes("no-spec-ui-polish"), true);
+  assert.match(renderAdditionalContext(matchCards(dataDir, prompt, { projectContext: other })), /exclude schoolroom/);
+
+  const candidate = candidateFromLesson("run-exclude", {
+    title: "No-spec UI polish",
+    summary: "Use the shared UI polish path except in excluded product repositories.",
+    rule: "Do not apply this lesson inside excluded product repositories.",
+    triggers: ["exclude-project ui polish"],
+    scope: { level: "global", exclude_projects: ["schoolroom"] },
+  });
+  assert.deepEqual(candidate.applicability.excludeProjects, ["schoolroom"]);
+});
+
 test("project library cards merge with global recall without writing project events", () => {
   const globalDataDir = tmpDir("project-stack-global");
   initializeDataDir({ dataDir: globalDataDir });

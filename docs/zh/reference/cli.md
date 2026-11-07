@@ -102,6 +102,7 @@ ome reflect list
 ome reflect show <run-id>
 ome reflect add <run-id> --title "Browser validation" --summary "..." --rule "..."
 ome reflect add <run-id> --title "仓库发版 gate" --summary "..." --rule "..." --triggers "发版验证" --scope-level project --project-key github.com/example/repo
+ome reflect add <run-id> --title "无设计稿 UI 打磨" --summary "..." --rule "..." --triggers "ui polish" --exclude-project schoolroom,github.com/example/schoolroom
 ome reflect candidates <run-id> --from-file <file>
 ome reflect candidates <run-id> --scope project --from-file <file>
 ome reflect candidates <run-id> --from-file <file> --audit-file <audit.json>

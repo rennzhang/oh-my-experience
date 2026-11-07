@@ -6,6 +6,15 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## Unreleased
+
+### Added
+
+- Global cards can list `scope.exclude_projects` so they stay out of named
+  repositories. `ome reflect add` accepts `--exclude-project`. Matching uses
+  the current project key, package name, and directory name; a repo name
+  also matches a full `host/group/repo` key.
+
 ## 0.5.0 — 2026-10-23
 
 ### Added

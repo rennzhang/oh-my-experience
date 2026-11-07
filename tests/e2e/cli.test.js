@@ -1618,6 +1618,45 @@ test("hook run applies project scope from real cwd payload", () => {
   assert.deepEqual(miss, {});
 });
 
+test("hook run excludes global cards from listed projects", () => {
+  const dataDir = tmpDir("hook-exclude-projects");
+  const blockedDir = tmpDir("blocked-schoolroom");
+  const allowedDir = tmpDir("allowed-app");
+  fs.writeFileSync(path.join(blockedDir, "package.json"), JSON.stringify({ name: "schoolroom-monorepo" }), "utf8");
+  fs.writeFileSync(path.join(allowedDir, "package.json"), JSON.stringify({ name: "@eval/allowed-app" }), "utf8");
+  json(run(["init", "--data-dir", dataDir, "--no-hook", "--json"]));
+  const retrospective = json(run(["reflect", "start", "--data-dir", dataDir, "--json"]));
+  const candidate = json(run([
+    "reflect", "add", retrospective.runId,
+    "--title", "No-spec UI polish",
+    "--category", "Product UI",
+    "--summary", "Use the shared UI polish path except in excluded product repos.",
+    "--rule", "Do not apply this lesson inside excluded product repositories.",
+    "--triggers", "exclude-project ui polish",
+    "--topics", "ui",
+    "--scope-level", "global",
+    "--exclude-project", "schoolroom-monorepo,schoolroom",
+    "--allow-incomplete-audit",
+    "--incomplete-audit-reason", "exclude projects fixture",
+    "--data-dir", dataDir,
+    "--json",
+  ]));
+  assert.deepEqual(candidate.candidate.applicability.excludeProjects, ["schoolroom-monorepo", "schoolroom"]);
+  const candidateId = candidate.candidates[0].id;
+  json(run(["reflect", "decide", retrospective.runId, candidateId, "--action", "approve", "--data-dir", dataDir, "--json"]));
+  const applied = json(run(["reflect", "apply", retrospective.runId, "--data-dir", dataDir, "--json"]));
+  const cardId = applied.drafts[0].id;
+  json(run(["experience", "enable", cardId, "--data-dir", dataDir, "--json"]));
+  const hit = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
+    input: JSON.stringify({ prompt: "exclude-project ui polish", cwd: allowedDir, session_id: "s-allowed" }),
+  }));
+  assert.ok(hit.hookSpecificOutput.additionalContext.includes("No-spec UI polish"));
+  const miss = json(run(["hook", "run", "--data-dir", dataDir, "--json"], {
+    input: JSON.stringify({ prompt: "exclude-project ui polish", cwd: blockedDir, session_id: "s-blocked" }),
+  }));
+  assert.deepEqual(miss, {});
+});
+
 test("hook run uses Cursor workspace_roots and records provider cursor", () => {
   const dataDir = tmpDir("hook-cursor-workspace-roots");
   const projectDir = tmpDir("cursor-project-context");

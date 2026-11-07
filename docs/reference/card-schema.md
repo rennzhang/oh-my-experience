@@ -133,6 +133,10 @@ appear in the lesson.
 - `scope.project_key`: the project identity used for project matching, such as
   a repository key.
 - `scope.module_path`: optional path inside the project, such as `apps/web`.
+- `scope.exclude_projects`: optional project identities that must not recall
+  this card. Matches the current project key, package name, or directory name.
+  A repo name such as `schoolroom` also matches a full `host/group/schoolroom`
+  project key.
 - `engine_hints.positive`: registered internal recall hints for task shapes OME
   can detect reliably. It is the required-any group: when several ids are
   listed, at least one positive signal must be present. Routing hints such as
@@ -239,10 +243,13 @@ or `review`. They are used for matching and filtering.
 
 `scope` describes where the card may be recalled:
 
-- `global`: usable in any project.
+- `global`: usable in any project, unless `scope.exclude_projects` lists the
+  current project.
 - `project`: recall only when the current project key matches.
 - `project-family`: recall when the project family matches, such as the same
   GitHub owner.
+- `exclude_projects`: keep an otherwise matching card out of named
+  repositories. This is the project-identity equivalent of `ignore_when`.
 
 The hook uses this metadata at prompt time to keep broad cards broad and scoped
 cards scoped.

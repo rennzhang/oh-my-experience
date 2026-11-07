@@ -534,7 +534,8 @@ function sameApplicabilityScope(left: CardIndexEntry, right: CardIndexEntry): bo
   const b = right.applicability || { level: "global" };
   return a.level === b.level
     && (a.projectKey || "") === (b.projectKey || "")
-    && (a.modulePath || "") === (b.modulePath || "");
+    && (a.modulePath || "") === (b.modulePath || "")
+    && uniqueNonEmpty(a.excludeProjects).sort().join("\0") === uniqueNonEmpty(b.excludeProjects).sort().join("\0");
 }
 
 function primaryTopic(card: CardIndexEntry): string {
@@ -543,6 +544,7 @@ function primaryTopic(card: CardIndexEntry): string {
 
 function isApplicable(card: CardIndexEntry, context: ProjectContext | null): boolean {
   const applicability = card.applicability || { level: "global" };
+  if (excludedProjectMatches(applicability.excludeProjects, context)) return false;
   if (applicability.level === "global") return true;
   if (!context?.projectKey || !applicability.projectKey) return false;
   if (applicability.level === "project") {
@@ -553,6 +555,29 @@ function isApplicable(card: CardIndexEntry, context: ProjectContext | null): boo
       && modulePathMatches(applicability.modulePath, context.modulePath);
   }
   return false;
+}
+
+function excludedProjectMatches(excludeProjects: string[] | undefined, context: ProjectContext | null): boolean {
+  const exclusions = uniqueNonEmpty(excludeProjects);
+  if (!exclusions.length || !context) return false;
+  const identity = uniqueNonEmpty([
+    context.projectKey,
+    projectFamilyKey(context.projectKey),
+    context.packageName,
+    context.root ? path.basename(context.root) : "",
+  ]);
+  return exclusions.some((pattern) => identity.some((value) => projectIdentityMatches(value, pattern)));
+}
+
+function projectIdentityMatches(value: string, pattern: string): boolean {
+  const haystack = value.toLowerCase();
+  const needle = pattern.trim().toLowerCase();
+  if (!needle) return false;
+  return haystack === needle || haystack.endsWith(`/${needle}`);
+}
+
+function uniqueNonEmpty(values: Array<string | null | undefined> | undefined): string[] {
+  return Array.from(new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean)));
 }
 
 function filteredByApplicability(cards: CardIndexEntry[], context: ProjectContext | null) {
@@ -644,11 +669,16 @@ function contextCopy(): ContextCopy {
 function formatCardScope(card: CardIndexEntry): string {
   const applicability = card.applicability || { level: "global" };
   const level = applicability.level || card.libraryScope || "global";
-  if (level === "global") return card.libraryScope === "project" ? "project library, global card" : "global";
+  const exclusions = uniqueNonEmpty(applicability.excludeProjects);
+  const exclusionSuffix = exclusions.length ? `; exclude ${exclusions.join(", ")}` : "";
+  if (level === "global") {
+    const base = card.libraryScope === "project" ? "project library, global card" : "global";
+    return `${base}${exclusionSuffix}`;
+  }
   const parts: string[] = [level];
   if (applicability.projectKey) parts.push(applicability.projectKey);
   if (applicability.modulePath) parts.push(applicability.modulePath);
-  return parts.join(" / ");
+  return `${parts.join(" / ")}${exclusionSuffix}`;
 }
 
 function cardMarkdownLink(card: CardIndexEntry): string {

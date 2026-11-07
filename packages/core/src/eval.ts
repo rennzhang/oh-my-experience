@@ -249,6 +249,11 @@ function normalizeFixtureCard(card: Record<string, any>): Record<string, any> {
       level: scope.level || "global",
       projectKey: scope.project_key || scope.projectKey || null,
       modulePath: scope.module_path || scope.modulePath || null,
+      excludeProjects: Array.isArray(scope.exclude_projects)
+        ? scope.exclude_projects
+        : Array.isArray(scope.excludeProjects)
+          ? scope.excludeProjects
+          : [],
       confidence: "medium",
       rationale: "",
     },

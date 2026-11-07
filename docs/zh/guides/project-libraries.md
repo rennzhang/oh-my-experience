@@ -102,6 +102,21 @@ ome reflect add <复盘编号> \
   --module-path "."
 ```
 
+全局卡也可以只排除若干仓库，而不必改成 `project` 卡：
+
+```bash
+ome reflect add <复盘编号> \
+  --title "无设计稿 UI 打磨" \
+  --summary "无标准设计稿时走共享打磨路径，指定产品仓库除外。" \
+  --rule "不要在被排除的产品仓库里套用这条经验。" \
+  --triggers "ui polish" \
+  --scope-level global \
+  --exclude-project "schoolroom,github.com/example/schoolroom"
+```
+
+`scope.exclude_projects` 匹配当前项目 key、包名或目录名。仓库名 `schoolroom`
+也会匹配完整的 `host/group/schoolroom`。
+
 内部候选文件也可以直接写同样的 `scope` 对象。这类卡仍保存在全局 `dataDir`，
 但召回时会先按当前项目过滤，再进入评分。
 

@@ -112,6 +112,8 @@ Hook 上下文不会注入完整规则，只注入轻量候选索引，并要求
 - `scope.level`：卡片适用级别，可选 `global`、`project`、`project-family`。
 - `scope.project_key`：项目匹配用的项目标识，例如仓库 key。
 - `scope.module_path`：项目内可选路径，例如 `apps/web`。
+- `scope.exclude_projects`：当前项目命中时不要召回。匹配项目 key、包名或目录名；
+  仓库名 `schoolroom` 也会匹配完整的 `host/group/schoolroom`。
 - `engine_hints.positive`：已注册的内部召回提示，只写 OME 能稳定识别的任务形态。
   这是 required-any group：列出多个 id 时，至少需要一个 positive signal。
   `ui_surface`、`goal_execute`、`worktree_diff_operation` 这类路由 hint
@@ -196,9 +198,11 @@ Active 卡片保持卡面克制。日期、原始来源、`origin`、`source_ref
 
 `scope` 描述卡片可以在哪里被召回：
 
-- `global`：任何项目都可使用。
+- `global`：任何项目都可使用，除非 `scope.exclude_projects` 列出了当前项目。
 - `project`：只有当前 project key 匹配时召回。
 - `project-family`：项目族匹配时召回，例如同一个 GitHub owner。
+- `exclude_projects`：把本来会命中的卡从指定仓库里拿掉。这是项目身份版的
+  `ignore_when`。
 
 Hook 会在提示词阶段使用这些信息，让通用卡片保持通用，让范围明确的卡片只在
 合适场景出现。

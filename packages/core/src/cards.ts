@@ -448,7 +448,7 @@ function starterCardDefinitions(): ExperienceCard[] {
       negativeTriggers: ["goal docs example", "explain goal", "discuss goal", "business goal", "OKR"],
       aliases: {},
       topics: ["goal", "execution", "delivery", "validation"],
-      applicability: { level: "global", projectKey: null, modulePath: null, confidence: "medium", rationale: "Starter lesson for OME recall." },
+      applicability: { level: "global", projectKey: null, modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
       intentModes: { include: ["execute"], exclude: ["discuss", "explain"] },
       requiredSignals: ["goal_execute"],
       blockedSignals: ["goal_example_discussion", "business_goal_discussion", "explain_only"],
@@ -467,7 +467,7 @@ function starterCardDefinitions(): ExperienceCard[] {
       negativeTriggers: ["unit-only helper change", "static copy edit"],
       aliases: {},
       topics: ["validation", "e2e", "delivery"],
-      applicability: { level: "global", projectKey: null, modulePath: null, confidence: "medium", rationale: "Starter lesson for OME recall." },
+      applicability: { level: "global", projectKey: null, modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
       recallPolicy: "should",
       risk: "high",
       body: "",
@@ -490,7 +490,7 @@ function starterCardDefinitions(): ExperienceCard[] {
       negativeTriggers: ["temporary local experiment", "throwaway script"],
       aliases: {},
       topics: ["kiss", "architecture", "maintenance"],
-      applicability: { level: "global", projectKey: null, modulePath: null, confidence: "medium", rationale: "Starter lesson for OME recall." },
+      applicability: { level: "global", projectKey: null, modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
       requiredSignals: ["architecture_quality"],
       recallPolicy: "should",
       risk: "medium",
@@ -588,6 +588,7 @@ function findCardPath(dataDir: string, id: string): string | undefined {
 function pickCardPatch(patch: Record<string, any> = {}): Record<string, any> {
   const allowed: Record<string, any> = {};
   if (Object.hasOwn(patch, "scope")) allowed.applicability = normalizeApplicabilityInput(patch.scope);
+  if (Object.hasOwn(patch, "applicability")) allowed.applicability = normalizeApplicabilityInput(patch.applicability);
   for (const key of ["title", "category", "summary", "rule", "triggers", "negativeTriggers", "aliases", "topics", "intentModes", "requiredSignals", "requiredAllSignals", "blockedSignals", "language", "recallPolicy", "risk", "confidence", "archivedReason"]) {
     if (Object.hasOwn(patch, key)) allowed[key] = patch[key];
   }
@@ -639,6 +640,7 @@ function compactApplicability(applicability: ExperienceCard["applicability"]) {
     level: applicability.level,
     ...(applicability.projectKey ? { project_key: applicability.projectKey } : {}),
     ...(applicability.modulePath ? { module_path: applicability.modulePath } : {}),
+    ...(applicability.excludeProjects?.length ? { exclude_projects: [...applicability.excludeProjects] } : {}),
   });
 }
 
@@ -649,6 +651,7 @@ function normalizeApplicabilityInput(value: unknown): unknown {
     ...input,
     projectKey: input.projectKey ?? input.project_key ?? null,
     modulePath: input.modulePath ?? input.module_path ?? null,
+    excludeProjects: firstArray(input.excludeProjects, input.exclude_projects).map((item) => item.trim()).filter(Boolean),
   };
 }
 

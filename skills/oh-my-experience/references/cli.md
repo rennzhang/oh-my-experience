@@ -145,6 +145,7 @@ Quick manual lesson entry:
 ```bash
 ome reflect add <run-id> --title "Browser validation" --summary "..." --rule "..."
 ome reflect add <run-id> --title "Browser validation" --category "Testing" --summary "..." --rule "..."
+ome reflect add <run-id> --title "No-spec UI polish" --summary "..." --rule "..." --triggers "ui polish" --exclude-project schoolroom,github.com/example/schoolroom
 ```
 
 ## Candidate Writes And Audit
