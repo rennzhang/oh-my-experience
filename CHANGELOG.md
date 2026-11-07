@@ -6,7 +6,7 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
-## Unreleased
+## 0.5.1 — 2026-11-07
 
 ### Added
 
