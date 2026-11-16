@@ -204,11 +204,13 @@ Active 卡片保持卡面克制。日期、原始来源、`origin`、`source_ref
 - `project-family`：项目族匹配时召回，例如同一个 GitHub owner。
 - `exclude_projects`：把本来会命中的卡从指定仓库里拿掉。这是项目身份版的
   `ignore_when`。
+- `global` 卡又写了 `project_key` 或 `project_keys` 是自相矛盾：doctor 报错，运行时
+  永不命中，避免把范围卡误扩成全部仓库。
 - `scope.project_keys`：多个项目身份，任一命中即可。一张卡确实覆盖多个仓库时用它，
   不要同时写 `scope.project_key`；两者同时出现是 `ome doctor` 错误，召回只读
   `project_keys`。
-- `scope.project_keys` 与 `scope.module_path` 组合会被 `ome doctor` 报错，运行时永不
-  命中：同一个相对模块路径在多个仓库里不代表同一个东西。
+- `scope.project_keys` 不能与 `scope.module_path` 组合，即使数组里只有一个值：doctor
+  报错，运行时永不命中。单仓库加模块路径请用 `scope.project_key`，或去掉路径。
 - `exclude_projects` 先于任何正向 scope 判断，被排除的项目不能被其它字段重新纳入。
 
 Hook 会在提示词阶段使用这些信息，让通用卡片保持通用，让范围明确的卡片只在

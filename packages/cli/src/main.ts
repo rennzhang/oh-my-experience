@@ -10,7 +10,9 @@ import {
   auditStorage,
   compareRecallReports,
   baselineOptionsFromConfig,
+  baselineBudgetWarnings,
   baselineStatus,
+  cardSemanticFindings,
   compactSessionIndex,
   createRetrospectiveRun,
   DEFAULT_RETRIEVAL_LIMIT,
@@ -145,6 +147,7 @@ function doctorCommand(dataDir: string, args: ParsedArgs) {
     claudeHome: args.flags["claude-home"] ? path.resolve(args.flags["claude-home"]) : undefined,
     cursorHome: args.flags["cursor-home"] ? path.resolve(args.flags["cursor-home"]) : process.env.CURSOR_HOME,
     ompHome: ompHome(args),
+    projectRoot: detectProjectContext(args.flags.cwd ? path.resolve(args.flags.cwd) : process.cwd()).root,
   };
   if (!args.flags["repair-index"]) return print(withLocalDiagnostics(runDoctor(dataDir, options), args), args);
   const repairedIndex = repairIndex(dataDir);
@@ -154,7 +157,7 @@ function doctorCommand(dataDir: string, args: ParsedArgs) {
 function withLocalDiagnostics(record: any, args: ParsedArgs) {
   const errors = [...(Array.isArray(record.errors) ? record.errors : [])];
   const warnings = [...(Array.isArray(record.warnings) ? record.warnings : [])];
-  const projectLibrary = inspectCurrentProjectLibraryHealth(args);
+  const projectLibrary = inspectCurrentProjectLibraryHealth(args, String(record.checked?.dataDir || ""));
   if (projectLibrary?.exists && projectLibrary.readable) {
     for (const issue of projectLibrary.invalidCards || []) {
       const message = `project card schema invalid: ${path.relative(projectLibrary.dataDir, issue.path)}: ${issue.message}`;
@@ -162,6 +165,7 @@ function withLocalDiagnostics(record: any, args: ParsedArgs) {
       else errors.push(message);
     }
   }
+  for (const error of projectLibrary?.errors || []) errors.push(`project library: ${error}`);
   for (const warning of projectLibrary?.warnings || []) warnings.push(warning);
   const agentSkills = inspectAgentSkillsHealth(args, String(record.checked?.dataDir || ""));
   for (const skill of agentSkills) {
@@ -180,7 +184,7 @@ function withLocalDiagnostics(record: any, args: ParsedArgs) {
   };
 }
 
-function inspectCurrentProjectLibraryHealth(args: ParsedArgs) {
+function inspectCurrentProjectLibraryHealth(args: ParsedArgs, dataDir = "") {
   const cwd = args.flags.cwd ? path.resolve(args.flags.cwd) : process.cwd();
   const projectContext = detectProjectContext(cwd);
   if (!projectContext.root) return null;
@@ -200,7 +204,28 @@ function inspectCurrentProjectLibraryHealth(args: ParsedArgs) {
   const inspection = inspectCards(library.dataDir);
   health.experiences = inspection.cards.length;
   health.invalidCards = inspection.issues;
+  health.errors = [];
   health.ok = inspection.issues.every((issue) => issue.status === "archived");
+  for (const card of inspection.cards) {
+    const findings = cardSemanticFindings(card);
+    health.errors.push(...findings.errors);
+    health.warnings.push(...findings.warnings);
+  }
+  if (dataDir) {
+    try {
+      const config = loadConfig(dataDir);
+      health.warnings.push(...baselineBudgetWarnings(
+        inspection.cards,
+        baselineOptionsFromConfig(config.retrieval),
+        "project",
+      ));
+    } catch {
+      // A broken global config is already reported by the main doctor pass; it
+      // must not replace the rest of the project diagnostics.
+      health.warnings.push("global config unreadable; project baseline budget check skipped");
+    }
+  }
+  health.ok = health.ok && health.errors.length === 0;
   return health;
 }
 
@@ -1402,13 +1427,13 @@ function matchCommand(dataDir: string, args: ParsedArgs) {
   return print({ ok: true, query, warnings: stack.warnings, libraries: stack.libraries, matches, additionalContext: renderAdditionalContext(matches) }, args);
 }
 
-function projectCommand(_dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
+function projectCommand(dataDir: string, subcommand: string | undefined, args: ParsedArgs) {
   const cwd = args.flags.cwd ? path.resolve(args.flags.cwd) : process.cwd();
   const projectContext = detectProjectContext(cwd);
   if (!projectContext.root) throw new Error("project command requires running inside a project");
   if (!subcommand || subcommand === "status") {
     const library = inspectProjectLibrary(projectContext.root);
-    const health = inspectCurrentProjectLibraryHealth({ ...args, flags: { ...args.flags, cwd } });
+    const health = inspectCurrentProjectLibraryHealth({ ...args, flags: { ...args.flags, cwd } }, dataDir);
     return print({
       ok: health?.ok ?? true,
       projectContext,
@@ -1416,6 +1441,7 @@ function projectCommand(_dataDir: string, subcommand: string | undefined, args: 
       exists: library.exists,
       readable: library.readable,
       warnings: health?.warnings ?? library.warnings,
+      errors: health?.errors ?? [],
       experiences: health?.experiences ?? 0,
       invalidCards: health?.invalidCards ?? [],
     }, args);
@@ -1892,6 +1918,7 @@ function retrospectiveNextStep(record: Record<string, any>): string {
 }
 
 function renderExperienceResult(record: Record<string, any>, subcommand: string): string {
+  if (subcommand === "baseline") return renderBaselineResult(record);
   const cards = Array.isArray(record.experiences) ? record.experiences : [];
   const invalidCards = Array.isArray(record.invalidCards) ? record.invalidCards : [];
   const lines = [subcommand === "list" || cards.length ? `Experiences: ${cards.length}` : "Experience updated"];
@@ -1905,6 +1932,32 @@ function renderExperienceResult(record: Record<string, any>, subcommand: string)
     }
     if (invalidCards.length > 5) lines.push(`  ... ${invalidCards.length - 5} more invalid`);
   }
+  lines.push(jsonHint());
+  return lines.join("\n");
+}
+
+function renderBaselineResult(record: Record<string, any>): string {
+  const cards = Array.isArray(record.cards) ? record.cards : [];
+  if (record.baseline !== undefined) {
+    return [`Baseline: ${record.baseline ? "on" : "off"} for ${record.id}`, jsonHint()].join("\n");
+  }
+  const budgets = asRecord(record.budgets);
+  const perSet = asRecord(record.perSetChars);
+  const lines = [
+    `Baseline cards: ${cards.length}${record.enabled === false ? " (channel disabled)" : ""}`,
+    `Refresh: every ${record.refreshEveryTurns} turns`,
+    `Budget: ${record.totalChars}/${budgets.maxChars} chars total; per library ${budgets.setMaxChars}`,
+  ];
+  const setText = Object.entries(perSet).map(([scope, chars]) => `${scope} ${chars}`).join(", ");
+  if (setText) lines.push(`Used: ${setText}`);
+  for (const card of cards.slice(0, 10)) {
+    const item = asRecord(card);
+    const applies = Array.isArray(item.appliesTo) && item.appliesTo.length ? ` [${item.appliesTo.join(", ")}]` : "";
+    lines.push(`  - ${item.id} (${item.libraryScope}${applies}): ${item.chars} chars`);
+  }
+  if (cards.length > 10) lines.push(`  ... ${cards.length - 10} more`);
+  const neverDelivered = Array.isArray(record.neverDelivered) ? record.neverDelivered : [];
+  if (neverDelivered.length) lines.push(`Never delivered under the current budget: ${neverDelivered.join(", ")}`);
   lines.push(jsonHint());
   return lines.join("\n");
 }
@@ -1948,11 +2001,13 @@ function renderProjectResult(record: Record<string, any>, subcommand: string): s
       jsonHint(),
     ].join("\n");
   }
+  const errors = Array.isArray(record.errors) ? record.errors : [];
   return [
-    "Project library status",
+    `Project library status: ${record.ok === false ? "problems found" : "ok"}`,
     `Project library: ${record.projectLibrary || ""}`,
     `Exists: ${record.exists ? "yes" : "no"}`,
     `Readable: ${record.readable ? "yes" : "no"}`,
+    ...errors.map((error) => `Error: ${error}`),
     ...(Array.isArray(record.warnings) && record.warnings.length ? [`Warnings: ${record.warnings.join("; ")}`] : []),
     jsonHint(),
   ].join("\n");

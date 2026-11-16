@@ -251,13 +251,16 @@ or `review`. They are used for matching and filtering.
   GitHub owner.
 - `exclude_projects`: keep an otherwise matching card out of named
   repositories. This is the project-identity equivalent of `ignore_when`.
+- A `global` card that also sets `project_key` or `project_keys` is a
+  contradiction: `ome doctor` reports it and runtime never matches, so a typo
+  cannot silently widen a scoped card to every repository.
 - `scope.project_keys`: several project identities with any-of semantics. Use it
   instead of `scope.project_key` when one lesson genuinely covers more than one
   repository. Setting both fields is a `ome doctor` error; recall reads
   `project_keys` and ignores the single value.
-- `scope.project_keys` with `scope.module_path` is rejected by `ome doctor` and
-  never matches at runtime: one relative module path cannot mean the same thing
-  in several repositories.
+- `scope.project_keys` cannot be combined with `scope.module_path`, even with a
+  single entry: `ome doctor` reports it and runtime never matches. Use
+  `scope.project_key` for one repository plus a module path, or drop the path.
 - `exclude_projects` is evaluated before any positive scope, so a card cannot
   re-include a project it excludes.
 

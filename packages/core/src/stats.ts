@@ -26,6 +26,9 @@ export function generateStats(dataDir: string, { persist = false }: { persist?: 
     .filter((event) => event.kind === "hook" || Array.isArray(event.matchedCards));
   const activeCards = listCards(dataDir, "active");
   const activeGlobalIds = new Set(activeCards.map((card) => card.id));
+  // Baseline cards never enter the matching channel, so they cannot be "stale"
+  // by recall count. Their delivery is tracked in the hook baseline block.
+  const matchableGlobalIds = new Set(activeCards.filter((card) => !card.baseline).map((card) => card.id));
   const globalCardSetFingerprint = buildCardSetFingerprint(activeCards);
   const configFingerprint = buildRetrievalConfigFingerprint(loadConfig(dataDir).retrieval);
   const currentEvents = events.filter((event) =>
@@ -37,14 +40,14 @@ export function generateStats(dataDir: string, { persist = false }: { persist?: 
   );
 
   const current = summarizeEvents(currentEvents, {
-    seedCardIds: activeGlobalIds,
+    seedCardIds: matchableGlobalIds,
     // The comparable snapshot is intentionally global-only. Project libraries
     // vary by cwd and remain available in the cumulative event view.
-    includeCard: (card) => card.libraryScope !== "project" && activeGlobalIds.has(card.id),
+    includeCard: (card) => card.libraryScope !== "project" && matchableGlobalIds.has(card.id),
   });
   const cumulative = summarizeEvents(events);
   const staleCards = current.eventCount
-    ? Array.from(activeGlobalIds).filter((id) => (current.cardRecallCount[id] || 0) === 0)
+    ? Array.from(matchableGlobalIds).filter((id) => (current.cardRecallCount[id] || 0) === 0)
     : [];
   const report = StatsReportSchema.parse({
     generatedAt: nowIso(),

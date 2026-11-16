@@ -7,7 +7,7 @@ import {
   DEFAULT_BASELINE_REFRESH_TURNS,
   DEFAULT_BASELINE_SET_MAX_CHARS,
 } from "./retrieval-contract.js";
-import { hashText, layout, nowIso, readJson, writeJsonAtomic } from "./storage.js";
+import { hashText, layout, nowIso, readJson, withLock, writeJsonAtomic } from "./storage.js";
 
 export interface BaselineOptions {
   enabled: boolean;
@@ -64,33 +64,100 @@ export function baselineOptionsFromConfig(retrieval: { baseline?: Partial<Baseli
 // re-reads indexes or duplicates library warnings. Order is project -> global
 // -> id, and a project card wins over a global card with the same id.
 export function readBaselineCards(stack: LibraryStack, entries: CardIndexEntry[]): BaselineCard[] {
-  const cards = new Map<string, BaselineCard>();
+  return resolveBaselineMembers(entries, (message) => stack.warnings.push(message));
+}
+
+interface BaselineCandidate {
+  entry: CardIndexEntry;
+  scope: "global" | "project";
+}
+
+// One id resolves once: project priority, then the first candidate that is
+// actually deliverable. An inactive or recall-off project card falls back to the
+// global card instead of silently dropping the reminder.
+function resolveBaselineMembers(
+  entries: CardIndexEntry[],
+  onReadError?: (message: string) => void,
+): BaselineCard[] {
+  const groups = new Map<string, BaselineCandidate[]>();
   for (const entry of entries) {
     if (!entry.baseline) continue;
-    const scope = entry.libraryScope || "global";
-    const existing = cards.get(entry.id);
-    if (existing && existing.libraryScope === "project") continue;
-    const file = entry.libraryPath ? path.join(entry.libraryPath, entry.path) : entry.path;
-    try {
-      const card = readCardFile(file);
-      if (card.status !== "active" || card.recallPolicy === "off") continue;
-      cards.set(card.id, {
-        id: card.id,
-        title: card.title,
-        rule: card.rule,
-        appliesTo: card.appliesTo,
-        libraryScope: scope,
-      });
-    } catch {
-      // An unreadable baseline card must not take down recall; `ome doctor`
-      // reports the schema error separately.
-      stack.warnings.push(`failed to read baseline card ${entry.id} in ${scope} library`);
+    const scope = (entry.libraryScope || "global") as "global" | "project";
+    const list = groups.get(entry.id) || [];
+    list.push({ entry, scope });
+    groups.set(entry.id, list);
+  }
+  const cards: BaselineCard[] = [];
+  for (const [id, candidates] of groups) {
+    candidates.sort((left, right) => libraryOrder(left.scope) - libraryOrder(right.scope));
+    for (const candidate of candidates) {
+      const file = candidate.entry.libraryPath
+        ? path.join(candidate.entry.libraryPath, candidate.entry.path)
+        : candidate.entry.path;
+      try {
+        const card = readCardFile(file);
+        if (card.status !== "active" || card.recallPolicy === "off") continue;
+        cards.push({
+          id: card.id,
+          title: card.title,
+          rule: card.rule,
+          appliesTo: card.appliesTo,
+          libraryScope: candidate.scope,
+        });
+        break;
+      } catch {
+        // An unreadable baseline card must not take down recall; `ome doctor`
+        // reports the schema error separately.
+        onReadError?.(`failed to read baseline card ${id} in ${candidate.scope} library`);
+      }
     }
   }
-  return [...cards.values()].sort((left, right) =>
+  return cards.sort((left, right) =>
     libraryOrder(left.libraryScope) - libraryOrder(right.libraryScope)
     || left.id.localeCompare(right.id)
   );
+}
+
+export function baselineBudgetWarnings(
+  cards: Array<{ id: string; title: string; rule: string; appliesTo: string[]; status: string; baseline: boolean; recallPolicy: string }>,
+  options: BaselineOptions,
+  libraryScope: "global" | "project" = "global",
+): string[] {
+  const members = cards
+    .filter((card) => card.status === "active" && card.baseline && card.recallPolicy !== "off")
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((card) => ({
+      id: card.id,
+      title: card.title,
+      rule: card.rule,
+      appliesTo: card.appliesTo,
+      libraryScope,
+    }));
+  return baselineWarningMessages(members, options);
+}
+
+// Doctor-level check for one resolved library stack: the same membership and
+// render order as delivery, so a warning always matches an actual omission.
+export function baselineStackWarnings(libraries: ExperienceLibrary[], options: BaselineOptions): string[] {
+  const entries = libraries.filter((library) => library.readable).flatMap((library) => readLibraryCards(library));
+  return baselineWarningMessages(resolveBaselineMembers(entries), options);
+}
+
+function baselineWarningMessages(members: BaselineCard[], options: BaselineOptions): string[] {
+  if (!options.enabled || !members.length) return [];
+  const warnings: string[] = [];
+  if (members.length > 5) {
+    warnings.push(`${members.length} baseline cards are always-on; keep the standing set small so it stays readable`);
+  }
+  for (const row of members) {
+    if (renderBaselineCardBlock(row).length > options.setMaxChars || renderBaselineCardBlock(row).length > options.maxChars) {
+      warnings.push(`baseline card is larger than the delivery budget on its own: ${row.id}`);
+    }
+  }
+  for (const omitted of renderBaselineContext(members, options).omittedCardIds) {
+    warnings.push(`baseline card never fits the delivery budget and is omitted whole: ${omitted}`);
+  }
+  return warnings;
 }
 
 export function baselineSetFingerprint(cards: BaselineCard[]): string {
@@ -191,45 +258,66 @@ export function deliverBaseline({
 }
 
 // Fail open in exactly one direction: when the counter is missing, unreadable,
-// or unwritable, deliver now. Never suppress baseline delivery because state
-// bookkeeping failed.
+// unwritable, or locked by a concurrent prompt, deliver now. Never suppress
+// baseline delivery because state bookkeeping failed.
 function baselineCadence(
   dataDir: string,
   sessionId: string,
   fingerprint: string,
   refreshEveryTurns: number,
-): { deliver: boolean; turns: number; skipReason: string | null } {
+): { deliver: boolean; turns: number | null; skipReason: string | null } {
   const statePath = layout(dataDir).baselineState;
-  const state = readBaselineState(statePath);
-  const previous = state.sessions?.[sessionId];
-  const setChanged = !previous || previous.fingerprint !== fingerprint;
-  const turns = setChanged ? 1 : (previous?.turns || 0) + 1;
-  const deliver = (turns - 1) % Math.max(1, refreshEveryTurns) === 0;
   try {
-    const now = nowIso();
-    const sessions = { ...(state.sessions || {}) };
-    sessions[sessionId] = { turns, fingerprint, updatedAt: now };
-    writeJsonAtomic(statePath, { version: 1, sessions: pruneSessions(sessions, now) }, dataDir);
+    return withLock(dataDir, "baseline-state", () => {
+      const state = readBaselineState(statePath);
+      const previous = normalizeSessionEntry(state.sessions?.[sessionId]);
+      const setChanged = !previous || previous.fingerprint !== fingerprint;
+      const turns = setChanged ? 1 : previous.turns + 1;
+      const deliver = (turns - 1) % Math.max(1, refreshEveryTurns) === 0;
+      const now = nowIso();
+      const sessions = { ...(state.sessions || {}), [sessionId]: { turns, fingerprint, updatedAt: now } };
+      writeJsonAtomic(statePath, { version: 1, sessions: pruneSessions(sessions, now) }, dataDir);
+      return { deliver, turns, skipReason: deliver ? null : "cadence" };
+    });
   } catch {
-    // Ignore: delivery is already decided, and the next turn may succeed.
+    // Read, lock, or write failure: deliver and repair on the next turn.
+    return { deliver: true, turns: null, skipReason: null };
   }
-  return { deliver, turns, skipReason: deliver ? null : "cadence" };
 }
 
 function readBaselineState(statePath: string): BaselineStateFile {
   try {
-    const parsed = readJson<BaselineStateFile | null>(statePath, null);
-    if (!parsed || typeof parsed !== "object" || !parsed.sessions || typeof parsed.sessions !== "object") {
-      return { version: 1, sessions: {} };
+    const parsed = readJson<Record<string, any> | null>(statePath, null);
+    const rawSessions = parsed && typeof parsed === "object" && parsed.sessions && typeof parsed.sessions === "object"
+      ? parsed.sessions as Record<string, unknown>
+      : {};
+    const sessions: NonNullable<BaselineStateFile["sessions"]> = {};
+    for (const [key, value] of Object.entries(rawSessions)) {
+      const entry = normalizeSessionEntry(value);
+      if (entry) sessions[key] = entry;
     }
-    return parsed;
+    return { version: 1, sessions };
   } catch {
     return { version: 1, sessions: {} };
   }
 }
 
+// Hand-edited or corrupted state is treated as missing, which delivers.
+function normalizeSessionEntry(value: unknown): { turns: number; fingerprint: string; updatedAt: string } | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const turns = record.turns;
+  if (typeof turns !== "number" || !Number.isSafeInteger(turns) || turns < 0) return null;
+  if (typeof record.fingerprint !== "string" || !record.fingerprint) return null;
+  return {
+    turns,
+    fingerprint: record.fingerprint,
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+  };
+}
+
 function pruneSessions(
-  sessions: Record<string, { turns: number; fingerprint: string; updatedAt: string }>,
+  sessions: NonNullable<BaselineStateFile["sessions"]>,
   now: string,
   retainDays = 30,
 ) {
@@ -259,28 +347,24 @@ export function baselineStatus(
   libraries: ExperienceLibrary[],
   options: BaselineOptions,
 ) {
-  const rows: Array<{ id: string; title: string; libraryScope: string; chars: number; appliesTo: string[] }> = [];
-  let totalChars = 0;
+  // Budget accounting must use the same membership rules as delivery, otherwise
+  // a recall-off card or a duplicated id reports a budget that never exists.
+  const entries = libraries.filter((library) => library.readable).flatMap((library) => readLibraryCards(library));
+  const members = resolveBaselineMembers(entries);
+  const rows = members.map((card) => ({
+    id: card.id,
+    title: card.title,
+    libraryScope: card.libraryScope,
+    chars: renderBaselineCardBlock(card).length,
+    appliesTo: card.appliesTo,
+  }));
   const perSetChars: Record<string, number> = {};
-  for (const library of libraries) {
-    if (!library.readable) continue;
-    for (const entry of readLibraryCards(library)) {
-      if (!entry.baseline) continue;
-      const file = path.isAbsolute(entry.path) ? entry.path : path.join(library.dataDir, entry.path);
-      const card = readCardFile(file);
-      if (card.status !== "active") continue;
-      const chars = renderBaselineCardBlock({
-        id: card.id,
-        title: card.title,
-        rule: card.rule,
-        appliesTo: card.appliesTo,
-        libraryScope: library.scope,
-      }).length;
-      rows.push({ id: card.id, title: card.title, libraryScope: library.scope, chars, appliesTo: card.appliesTo });
-      perSetChars[library.scope] = (perSetChars[library.scope] || 0) + chars;
-      totalChars += chars;
-    }
+  let totalChars = 0;
+  for (const row of rows) {
+    perSetChars[row.libraryScope] = (perSetChars[row.libraryScope] || 0) + row.chars;
+    totalChars += row.chars;
   }
+  const rendered = renderBaselineContext(members, options);
   return {
     ok: true,
     enabled: options.enabled,
@@ -288,13 +372,10 @@ export function baselineStatus(
     budgets: { maxChars: options.maxChars, setMaxChars: options.setMaxChars },
     totalChars,
     perSetChars,
-    cards: rows.sort((left, right) =>
-      libraryOrder(left.libraryScope) - libraryOrder(right.libraryScope)
-      || left.id.localeCompare(right.id)
-    ),
+    cards: rows,
     oversized: rows
       .filter((row) => row.chars > options.setMaxChars || row.chars > options.maxChars)
       .map((row) => row.id),
-    neverDelivered: rows.length > 0 && totalChars > options.maxChars,
+    neverDelivered: rendered.omittedCardIds,
   };
 }

@@ -7,11 +7,17 @@ import { ConfigSchema, type Config } from "./schema.js";
 import { validateSignalIds } from "./signal-registry.js";
 import { defaultDataDir, layout, readJson } from "./storage.js";
 import { validateTriggerSignalContract, type TriggerSignalContractViolation } from "./trigger-signal-contract.js";
-import { baselineOptionsFromConfig, renderBaselineCardBlock } from "./baseline.js";
+import {
+  baselineBudgetWarnings,
+  baselineOptionsFromConfig,
+  baselineStackWarnings,
+  type BaselineOptions,
+} from "./baseline.js";
+import { resolveLibraryStack } from "./library-stack.js";
 import { unknownOperationPhases } from "./operation-phases.js";
 
-type DoctorOptions = { codexHome?: string; claudeHome?: string; cursorHome?: string; ompHome?: string };
-type HookHomes = Required<Omit<DoctorOptions, "ompHome">> & Pick<DoctorOptions, "ompHome">;
+type DoctorOptions = { codexHome?: string; claudeHome?: string; cursorHome?: string; ompHome?: string; projectRoot?: string | null };
+type HookHomes = Required<Omit<DoctorOptions, "ompHome" | "projectRoot">> & Pick<DoctorOptions, "ompHome">;
 type HookFileFormat = "nested-user-prompt-submit" | "flat-before-submit-prompt";
 type HookEntry = { hooks?: Array<{ command?: string }>; command?: string };
 
@@ -20,6 +26,7 @@ export function runDoctor(dataDir: string, {
   claudeHome = path.join(os.homedir(), ".claude"),
   cursorHome = process.env.CURSOR_HOME || path.join(os.homedir(), ".cursor"),
   ompHome,
+  projectRoot = null,
 }: DoctorOptions = {}) {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -37,7 +44,7 @@ export function runDoctor(dataDir: string, {
   checkIndex(dataDir, errors);
   checkJsonl(l.events, "events", warnings);
   const config = checkConfig(dataDir, errors, warnings);
-  checkBaseline(config, cardInspection.cards, warnings);
+  checkBaseline(config, cardInspection.cards, warnings, { dataDir, projectRoot });
   checkHook(config, { codexHome, claudeHome, cursorHome, ompHome }, dataDir, errors, warnings);
   checkPackage(errors, warnings);
   return {
@@ -87,21 +94,9 @@ function checkCards(dataDir: string, errors: string[], warnings: string[]) {
     if (!card.triggers.length) errors.push(`card has no triggers: ${card.id}`);
     if (!card.topics.length) warnings.push(`card has no topics: ${card.id}`);
     if (card.status === "active" && card.recallPolicy === "off") warnings.push(`active card recall is off: ${card.id}`);
-    if (card.applicability.projectKey && card.applicability.projectKeys.length) {
-      errors.push(`card sets both scope.project_key and scope.project_keys: ${card.id}; keep one`);
-    }
-    const cardModulePath = String(card.applicability.modulePath || "").trim();
-    if (card.applicability.projectKeys.length > 1 && cardModulePath && cardModulePath !== ".") {
-      errors.push(`card combines scope.project_keys with scope.module_path: ${card.id}; one module path cannot span several repositories, so the card never applies`);
-    }
-    const unknownPhases = unknownOperationPhases(card.appliesTo);
-    if (unknownPhases.length) {
-      const message = `card uses unknown applies_to values: ${card.id}: ${unknownPhases.join(", ")}`;
-      if (card.status === "archived") warnings.push(message);
-      else errors.push(message);
-    }
-    if (card.appliesTo.length > 3) warnings.push(`card lists ${card.appliesTo.length} applies_to phases: ${card.id}; narrow it or split the card`);
-    if (card.baseline && card.status !== "active") warnings.push(`baseline flag on a ${card.status} card is ignored: ${card.id}`);
+    const semantics = cardSemanticFindings(card);
+    errors.push(...semantics.errors);
+    warnings.push(...semantics.warnings);
     const signalValidation = validateSignalIds([
       ...card.requiredSignals,
       ...card.requiredAllSignals,
@@ -132,32 +127,60 @@ function checkCards(dataDir: string, errors: string[], warnings: string[]) {
   };
 }
 
-function checkBaseline(config: Config | null, cards: Array<{ id: string; title: string; rule: string; appliesTo: string[]; status: string; baseline: boolean; recallPolicy: string }>, warnings: string[]): void {
+// Shared by the global doctor pass and project-library health so a project card
+// gets the same scope/phase checks as a global one.
+export function cardSemanticFindings(card: {
+  id: string;
+  status: string;
+  applicability: { level?: string; projectKey?: string | null; projectKeys?: string[]; modulePath?: string | null };
+  appliesTo: string[];
+  baseline: boolean;
+}): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const projectKeys = card.applicability.projectKeys || [];
+  if (card.applicability.projectKey && projectKeys.length) {
+    errors.push(`card sets both scope.project_key and scope.project_keys: ${card.id}; keep one`);
+  }
+  const modulePath = String(card.applicability.modulePath || "").trim();
+  if (projectKeys.length && modulePath && modulePath !== ".") {
+    errors.push(`card combines scope.project_keys with scope.module_path: ${card.id}; use scope.project_key for one repository or drop module_path, otherwise the card never applies`);
+  }
+  const level = card.applicability.level || "global";
+  if (level === "global" && (card.applicability.projectKey || projectKeys.length)) {
+    errors.push(`card declares a project scope on a global card: ${card.id}; set scope.level to project or drop the project key, otherwise the card never applies`);
+  }
+  const unknownPhases = unknownOperationPhases(card.appliesTo);
+  if (unknownPhases.length) {
+    const message = `card uses unknown applies_to values: ${card.id}: ${unknownPhases.join(", ")}`;
+    if (card.status === "archived") warnings.push(message);
+    else errors.push(message);
+  }
+  if (card.appliesTo.length > 3) {
+    warnings.push(`card lists ${card.appliesTo.length} applies_to phases: ${card.id}; narrow it or split the card`);
+  }
+  if (card.baseline && card.status !== "active") {
+    warnings.push(`baseline flag on a ${card.status} card is ignored: ${card.id}`);
+  }
+  return { errors, warnings };
+}
+
+function checkBaseline(
+  config: Config | null,
+  cards: Parameters<typeof baselineBudgetWarnings>[0],
+  warnings: string[],
+  { dataDir, projectRoot }: { dataDir: string; projectRoot: string | null },
+): void {
   if (!config) return;
-  const options = baselineOptionsFromConfig(config.retrieval);
+  const options: BaselineOptions = baselineOptionsFromConfig(config.retrieval);
   if (!options.enabled) return;
-  const baselineCards = cards.filter((card) => card.status === "active" && card.baseline && card.recallPolicy !== "off");
-  if (!baselineCards.length) return;
-  if (baselineCards.length > 5) {
-    warnings.push(`${baselineCards.length} baseline cards are always-on; keep the standing set small so it stays readable`);
+  if (projectRoot) {
+    // Evaluate the whole stack in delivery order: a project card overrides the
+    // global card with the same id, and both share the total budget.
+    warnings.push(...baselineStackWarnings(resolveLibraryStack(dataDir, projectRoot).libraries, options));
+    return;
   }
-  let total = 0;
-  for (const card of baselineCards) {
-    const chars = renderBaselineCardBlock({
-      id: card.id,
-      title: card.title,
-      rule: card.rule,
-      appliesTo: card.appliesTo,
-      libraryScope: "global",
-    }).length;
-    total += chars;
-    if (chars > options.setMaxChars || chars > options.maxChars) {
-      warnings.push(`baseline card exceeds the delivery budget and is never delivered: ${card.id} (${chars} chars)`);
-    }
-  }
-  if (total > options.maxChars) {
-    warnings.push(`baseline set uses ${total} chars, above maxChars ${options.maxChars}; later cards are omitted whole`);
-  }
+  warnings.push(...baselineBudgetWarnings(cards, options));
 }
 
 function formatTriggerContractViolation(status: string, violation: TriggerSignalContractViolation): string {
@@ -191,16 +214,19 @@ function checkIndex(dataDir: string, errors: string[]): void {
 }
 
 function checkConfig(dataDir: string, errors: string[], warnings: string[]): Config | null {
-  const raw = readJson(layout(dataDir).config, null);
-  if (!raw) {
-    errors.push("missing config.json");
-    return null;
-  }
-  let config: Config | null = null;
+  let config: Config;
   try {
+    const raw = readJson(layout(dataDir).config, null);
+    if (!raw) {
+      errors.push("missing config.json");
+      return null;
+    }
     config = ConfigSchema.parse(raw);
-  } catch (error: any) {
-    errors.push(`config schema invalid: ${error.message}`);
+  } catch (error) {
+    // Covers unreadable files, invalid JSON, and schema violations: doctor must
+    // keep reporting every other layer with whatever it can still inspect.
+    const message = error instanceof Error ? error.message : String(error);
+    errors.push(`config schema invalid: ${message}`);
     return null;
   }
   if (path.resolve(config.dataDir) !== path.resolve(dataDir)) {

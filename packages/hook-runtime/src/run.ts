@@ -82,7 +82,9 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
     // a match-heavy turn must never evict the standing reminders.
     const additionalContext = [matchedContext, baseline.text].filter(Boolean).join("\n\n");
     const selectedCards = matches.map((match) => scoredCardTelemetry(match));
-    const renderedCardIds = detectRenderedCardIds(matches, additionalContext);
+    // Only the matched block proves a matched card was rendered. A baseline rule
+    // may legitimately contain the same `ome experience show ...` command.
+    const renderedCardIds = detectRenderedCardIds(matches, matchedContext);
     const cardSetFingerprint = buildCardSetFingerprint(cards);
     const globalCardSetFingerprint = buildCardSetFingerprint(
       cards.filter((card) => (card.libraryScope || "global") === "global"),

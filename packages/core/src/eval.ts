@@ -248,6 +248,11 @@ function normalizeFixtureCard(card: Record<string, any>): Record<string, any> {
     applicability: {
       level: scope.level || "global",
       projectKey: scope.project_key || scope.projectKey || null,
+      projectKeys: Array.isArray(scope.project_keys)
+        ? scope.project_keys
+        : Array.isArray(scope.projectKeys)
+          ? scope.projectKeys
+          : [],
       modulePath: scope.module_path || scope.modulePath || null,
       excludeProjects: Array.isArray(scope.exclude_projects)
         ? scope.exclude_projects
@@ -260,6 +265,8 @@ function normalizeFixtureCard(card: Record<string, any>): Record<string, any> {
     recallPolicy: recall.policy || "should",
     risk: recall.risk || "medium",
     confidence: recall.confidence || "medium",
+    appliesTo: Array.isArray(card.applies_to) ? card.applies_to : Array.isArray(card.appliesTo) ? card.appliesTo : [],
+    baseline: card.baseline === true,
   };
 }
 

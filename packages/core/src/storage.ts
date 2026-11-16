@@ -176,6 +176,16 @@ function acquireLock(lockPath: string, lock: JsonRecord, staleMs: number): void 
 function recoverStaleLock(lockPath: string, staleMs: number): void {
   const marker = path.join(lockPath, "lock.json");
   if (!fs.existsSync(marker)) {
+    // A lock directory is created before its marker file lands. Treat a young
+    // marker-less directory as held, otherwise two processes can both enter the
+    // critical section during that window.
+    let ageMs = Infinity;
+    try {
+      ageMs = Date.now() - fs.statSync(lockPath).mtimeMs;
+    } catch {
+      return;
+    }
+    if (ageMs < staleMs) throw new Error(`resource is locked: ${lockPath}`);
     fs.rmSync(lockPath, { recursive: true, force: true });
     return;
   }

@@ -96,6 +96,9 @@ Recall suite 是确定性的，不调用 AI model。
 - `difficulty` 和 `tags`：只用于报告，不改变 retrieval 行为。
 - `threshold`：可选的 case-level threshold override。
 - `cwd`：可选 project context，用于验证 scoped cards。
+- Fixture 卡保留完整 scope 契约（`level`、`project_key`、`project_keys`、
+  `module_path`、`exclude_projects`）和 `baseline` 标记，隔离 eval 与真实库的
+  召回结果保持一致。
 
 默认情况下，未判定的 extra card 会让 case 失败。这样可以避免“找到了 expected card，
 同时注入了无关 context”却仍被报告为成功。

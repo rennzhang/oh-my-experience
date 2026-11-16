@@ -99,6 +99,9 @@ replays belong in a private evaluation suite outside the repository.
 - `difficulty` and `tags`: reporting metadata; they do not alter retrieval.
 - `threshold`: optional per-case threshold override.
 - `cwd`: optional project context used to exercise scoped cards.
+- Fixture cards keep the full scope contract (`level`, `project_key`,
+  `project_keys`, `module_path`, `exclude_projects`) and the `baseline` flag, so
+  isolated eval resolves cards exactly like the real library.
 
 Unjudged extras fail by default. This prevents a suite from reporting success
 merely because it found the expected card while also injecting unrelated

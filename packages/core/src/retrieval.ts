@@ -537,9 +537,10 @@ function libraryPriority(card: CardIndexEntry): number {
 function sameApplicabilityScope(left: CardIndexEntry, right: CardIndexEntry): boolean {
   const a = left.applicability || { level: "global" };
   const b = right.applicability || { level: "global" };
+  // Compare the effective repo targets, so `project_key: x` and
+  // `project_keys: [x]` are the same scope for near-duplicate collapse.
   return a.level === b.level
-    && (a.projectKey || "") === (b.projectKey || "")
-    && uniqueNonEmpty(a.projectKeys).sort().join("\0") === uniqueNonEmpty(b.projectKeys).sort().join("\0")
+    && effectiveProjectKeys(a).sort().join("\0") === effectiveProjectKeys(b).sort().join("\0")
     && (a.modulePath || "") === (b.modulePath || "")
     && uniqueNonEmpty(a.excludeProjects).sort().join("\0") === uniqueNonEmpty(b.excludeProjects).sort().join("\0");
 }
@@ -559,14 +560,19 @@ function isApplicable(card: CardIndexEntry, context: ProjectContext | null): boo
   const applicability = card.applicability || { level: "global" };
   // Exclusion always wins over any positive scope, including multi-repo targets.
   if (excludedProjectMatches(applicability.excludeProjects, context)) return false;
+  const declaredKeys = uniqueNonEmpty(applicability.projectKeys);
+  const hasModulePath = normalizeModulePath(applicability.modulePath) !== ".";
+  // A declared `project_keys` list and a module path are mutually exclusive: one
+  // relative path cannot be validated across a target list, even with one item.
+  // The legacy single `project_key` plus module path stays supported.
+  if (declaredKeys.length && hasModulePath) return false;
+  // Project identity on a global card is a contradiction; fail closed instead of
+  // silently widening it to every repository.
+  if (applicability.level === "global" && (declaredKeys.length || applicability.projectKey)) return false;
   if (applicability.level === "global") return true;
   if (!context?.projectKey) return false;
   const projectKeys = effectiveProjectKeys(applicability);
   if (!projectKeys.length) return false;
-  // One relative module path cannot mean the same thing across several repos, so
-  // the combination fails closed. `ome doctor` reports it as a card error.
-  const hasModulePath = normalizeModulePath(applicability.modulePath) !== ".";
-  if (projectKeys.length > 1 && hasModulePath) return false;
   if (applicability.level === "project") {
     return projectKeys.some((key) => context.projectKey === key)
       && modulePathMatches(applicability.modulePath, context.modulePath);
