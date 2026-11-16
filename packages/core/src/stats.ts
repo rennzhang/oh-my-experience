@@ -96,6 +96,7 @@ export function buildCardSetFingerprint(cards: Array<Record<string, any>>): stri
     recallPolicy: String(card.recallPolicy || "should"),
     risk: String(card.risk || "medium"),
     confidence: String(card.confidence || "medium"),
+    ...(card.baseline ? { baseline: true } : {}),
   })).sort((left, right) =>
     left.libraryScope.localeCompare(right.libraryScope) || left.id.localeCompare(right.id)
   );

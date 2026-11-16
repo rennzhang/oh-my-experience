@@ -6,6 +6,44 @@ This project uses concise release notes focused on behavior, packaging, docs, an
 compatibility. Internal refactors are listed only when they affect users,
 contributors, or release safety.
 
+## Unreleased
+
+### Added
+
+- `applies_to` on every card records which step of the work a lesson governs
+  (`inspect`, `edit`, `verify`, `deliver`, `communicate`). Matched context
+  renders it on the card header as `[applies: ...]`. It is an annotation, not a
+  recall gate: score and admission are unchanged, and it is not indexed for
+  lexical matching. Retrospective candidates can carry it through
+  `applies_to` or `ome reflect add --applies-to`.
+- Baseline cards: `baseline: true` moves an active card to a second delivery
+  channel that is scheduled instead of matched. Baseline cards leave the
+  candidate set before scoring, so matched, selection and precision metrics are
+  untouched. Delivery renders `rule` only, on turn 1 then every
+  `retrieval.baseline.refreshEveryTurns` (default 5), with separate per-library
+  and total character budgets, whole-card omission, project-over-global dedupe,
+  and a fail-open per-session counter in `state/baseline.json`.
+- `ome experience baseline` lists membership and budget usage, and sets or
+  clears the flag on an active card.
+- `scope.project_keys` lets one card target several repositories with any-of
+  semantics. `exclude_projects` still wins, and combining `project_keys` with
+  `module_path` fails closed.
+
+### Changed
+
+- `ome doctor` now reports unknown `applies_to` values, cards that set both
+  `scope.project_key` and `scope.project_keys`, the multi-repo plus
+  `module_path` combination, unlabeled active cards, and baseline sets that are
+  too large or can never fit their budget.
+- Hook telemetry gains an optional `baseline` block. `schemaVersion` stays `2`
+  because no existing field changed meaning.
+
+### Compatibility
+
+- Cards without the new fields keep working unchanged. Unknown frontmatter keys
+  are still dropped on rewrite, so upgrade the CLI before editing cards that use
+  `applies_to` or `baseline`.
+
 ## 0.5.1 — 2026-11-07
 
 ### Added

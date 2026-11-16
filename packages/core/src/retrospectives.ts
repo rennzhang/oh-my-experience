@@ -10,6 +10,7 @@ import {
   type RetrospectiveDecision,
 } from "./schema.js";
 import type { ExperienceCard } from "./schema.js";
+import { normalizeOperationPhases } from "./operation-phases.js";
 import { cardPath, createDraftFromCandidate, readCardFile, writeCard } from "./cards.js";
 import { inferCategory, normalizeCategory } from "./categories.js";
 import {
@@ -305,6 +306,7 @@ function mergeCandidateIntoCard(dataDir: string, candidate: RetrospectiveCandida
     negativeTriggers: Array.from(new Set([...card.negativeTriggers, ...candidate.negativeTriggers])),
     topics: Array.from(new Set([...card.topics, ...candidate.topics])),
     intentModes: mergeIntentModes(card.intentModes, candidate.intentModes),
+    appliesTo: Array.from(new Set([...card.appliesTo, ...candidate.appliesTo])),
     requiredSignals: Array.from(new Set([...card.requiredSignals, ...candidate.requiredSignals])),
     requiredAllSignals: Array.from(new Set([...card.requiredAllSignals, ...candidate.requiredAllSignals])),
     blockedSignals: Array.from(new Set([...card.blockedSignals, ...candidate.blockedSignals])),
@@ -349,6 +351,7 @@ export function candidateFromLesson(runId: string, lesson: JsonRecord): Retrospe
     negativeTriggers: firstFilledArray(criteria.ignore_when, lesson.negativeTriggers),
     topics: firstFilledArray(recall.topics, lesson.topics),
     intentModes: criteria.intent_modes || lesson.intentModes || {},
+    appliesTo: normalizeOperationPhases(lesson.applies_to ?? lesson.appliesTo),
     requiredSignals: toStringArray(engineHints.positive),
     requiredAllSignals: toStringArray(engineHints.required_all || engineHints.requiredAll),
     blockedSignals: toStringArray(engineHints.negative),
@@ -394,6 +397,7 @@ function normalizeScope(value: unknown): JsonRecord {
   return {
     ...input,
     projectKey: input.projectKey ?? input.project_key ?? null,
+    projectKeys: firstFilledArray(input.projectKeys, input.project_keys),
     modulePath: input.modulePath ?? input.module_path ?? null,
     excludeProjects: firstFilledArray(input.excludeProjects, input.exclude_projects),
   };

@@ -122,6 +122,15 @@ Hook 日志事件：
   "renderedCardIds": ["browser-validation"],
   "rendered": true,
   "contextTruncated": false,
+  "baseline": {
+    "enabled": true,
+    "available": true,
+    "deliveredCardIds": ["baseline-discipline"],
+    "omittedCardIds": [],
+    "chars": 96,
+    "setFingerprint": "sha256",
+    "skipReason": null
+  },
   "deliveryStatus": "unknown",
   "injected": true,
   "durationMs": 42,
@@ -130,6 +139,15 @@ Hook 日志事件：
   "createdAt": "2026-05-28T00:00:00.000Z"
 }
 ```
+
+`baseline` 是可选块，只在基线通道上线后产生的事件里出现。它把常驻通道和匹配通道
+分开记录：`deliveredCardIds` 是真正进入注入文本的卡，`omittedCardIds` 是因预算没放下
+的卡，`skipReason` 取值为 `disabled`、`empty`、`cadence` 或 `budget`，`chars` 只统计
+卡片块，不含框架提示。
+
+基线投递不改变 `matched`、`selectionStage`、`renderedCardIds`、`rendered` 和
+`contextTruncated`。只投基线卡的轮次仍然是 `matched: false`、`renderedCardIds` 为空：
+基线块不是命中，不能计入命中指标。
 
 规范化后的必需字段：
 

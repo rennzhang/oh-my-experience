@@ -537,6 +537,7 @@ Candidate recall fields must help the model decide whether to use a card.
 | `recall.topics` | Broad categories only; topics do not replace triggers. |
 | `engine_hints.positive` | Use only when hints clearly reduce false positives or misses. Routing hints are strict gates. |
 | `engine_hints.negative` | Use for known false-positive patterns. |
+| `applies_to` | Which work step the lesson governs: `inspect`, `edit`, `verify`, `deliver`, `communicate`. Derive it from the steps the session actually took; leave it empty when the evidence shows none. It is an annotation, never a recall gate, so never add a phase to make matching stronger. |
 | `rule` | Future-agent executable rule text only. |
 
 ### Triggers Must Be Attested, Not Paraphrased
@@ -694,7 +695,8 @@ Retrospective conclusions use a lightweight candidate format.
 | `criteria.ignore_when` | Non-trigger boundaries |
 | `recall.triggers` | Short anchors extracted from use criteria |
 | `engine_hints` | Only when they reduce false positives or misses |
-| `scope` | Applicability; project scope includes `level`, `project_key`, `module_path` |
+| `scope` | Applicability; project scope uses `level` with `project_key` or `project_keys`, plus optional `module_path` |
+| `applies_to` | Operation phases observed in the session, covered by the evidence |
 | `conflicts` | Adjacent cards, rejected interpretations, tradeoffs |
 
 ---

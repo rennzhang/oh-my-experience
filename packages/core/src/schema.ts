@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { INTENT_MODES } from "./intent-rules.js";
+import { OPERATION_PHASES } from "./operation-phases.js";
 import {
   DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS,
+  DEFAULT_BASELINE_MAX_CHARS,
+  DEFAULT_BASELINE_REFRESH_TURNS,
+  DEFAULT_BASELINE_SET_MAX_CHARS,
   DEFAULT_HOOK_TIMEOUT_MS,
   DEFAULT_RETRIEVAL_LIMIT,
   DEFAULT_RETRIEVAL_THRESHOLD,
@@ -12,6 +16,7 @@ export const RecallPolicySchema = z.enum(["must", "should", "summary", "off"]);
 export const RiskSchema = z.enum(["low", "medium", "high"]);
 export const ConfidenceSchema = z.enum(["low", "medium", "high"]);
 export const IntentModeSchema = z.enum(INTENT_MODES);
+export const OperationPhaseSchema = z.enum(OPERATION_PHASES);
 export const DecisionActionSchema = z.enum(["approve", "reject", "merge", "rewrite"]);
 export const DEFAULT_CATEGORY = "未分类";
 export const ApplicabilityLevelSchema = z.enum(["global", "project", "project-family"]);
@@ -34,6 +39,7 @@ export const ProjectContextSchema = z.object({
 export const ApplicabilitySchema = z.object({
   level: ApplicabilityLevelSchema.default("global"),
   projectKey: z.string().nullable().default(null),
+  projectKeys: z.array(z.string().min(1)).default([]),
   modulePath: z.string().nullable().default(null),
   excludeProjects: z.array(z.string().min(1)).default([]),
   confidence: ConfidenceSchema.default("medium"),
@@ -56,6 +62,12 @@ export const ConfigSchema = z.object({
     minScore: z.number().min(0).max(100).default(DEFAULT_RETRIEVAL_THRESHOLD),
     additionalContextMaxChars: z.number().int().positive().default(DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS),
     hookTimeoutMs: z.number().int().positive().default(DEFAULT_HOOK_TIMEOUT_MS),
+    baseline: z.object({
+      enabled: z.boolean().default(true),
+      maxChars: z.number().int().positive().default(DEFAULT_BASELINE_MAX_CHARS),
+      setMaxChars: z.number().int().positive().default(DEFAULT_BASELINE_SET_MAX_CHARS),
+      refreshEveryTurns: z.number().int().positive().default(DEFAULT_BASELINE_REFRESH_TURNS),
+    }).default({}),
   }).default({}),
   hooks: z.object({
     providers: z.object({
@@ -119,11 +131,13 @@ export const ExperienceCardSchema = z.object({
   topics: z.array(z.string()).default([]),
   applicability: ApplicabilitySchema,
   intentModes: IntentModeGateSchema,
+  appliesTo: z.array(z.string().min(1)).default([]),
   requiredSignals: z.array(z.string()).default([]),
   requiredAllSignals: z.array(z.string()).default([]),
   blockedSignals: z.array(z.string()).default([]),
   language: z.enum(["auto", "en", "zh", "mixed"]).default("auto"),
   recallPolicy: RecallPolicySchema.default("should"),
+  baseline: z.boolean().default(false),
   risk: RiskSchema.default("medium"),
   confidence: ConfidenceSchema.default("medium"),
   staleAfter: z.string().nullable().default(null),
@@ -148,6 +162,7 @@ export const RetrospectiveCandidateSchema = z.object({
   topics: z.array(z.string()).default([]),
   applicability: ApplicabilitySchema,
   intentModes: IntentModeGateSchema,
+  appliesTo: z.array(z.string().min(1)).default([]),
   requiredSignals: z.array(z.string()).default([]),
   requiredAllSignals: z.array(z.string()).default([]),
   blockedSignals: z.array(z.string()).default([]),
@@ -257,6 +272,16 @@ const HookSelectionStageSchema = z.object({
   cards: z.array(HookScoredCardSchema).default([]),
 }).default({});
 
+const HookBaselineStageSchema = z.object({
+  enabled: z.boolean().default(false),
+  available: z.boolean().default(false),
+  deliveredCardIds: z.array(z.string()).default([]),
+  omittedCardIds: z.array(z.string()).default([]),
+  chars: z.number().int().nonnegative().default(0),
+  setFingerprint: z.string().nullable().default(null),
+  skipReason: z.string().nullable().default(null),
+}).default({});
+
 export const HookEventSchema = z.object({
   id: z.string().min(1),
   kind: z.literal("hook").default("hook"),
@@ -288,6 +313,7 @@ export const HookEventSchema = z.object({
   // Deprecated compatibility alias. It means context was rendered, not that a
   // host or model consumed it.
   injected: z.boolean().default(false),
+  baseline: HookBaselineStageSchema.optional(),
   durationMs: z.number(),
   budgetUsedChars: z.number().default(0),
   error: z.string().nullable().default(null),

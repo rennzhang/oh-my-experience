@@ -59,6 +59,8 @@ export function layout(dataDir: string) {
     archivedExperiences: path.join(dataDir, "experiences", "archived"),
     retrospectives: path.join(dataDir, "retrospectives"),
     indexes: path.join(dataDir, "indexes"),
+    state: path.join(dataDir, "state"),
+    baselineState: path.join(dataDir, "state", "baseline.json"),
     experienceIndex: path.join(dataDir, "indexes", "experiences.json"),
     categoryIndex: path.join(dataDir, "indexes", "categories.json"),
     sourceIndex: path.join(dataDir, "indexes", "sources.json"),
@@ -80,6 +82,7 @@ export function ensureBaseDirs(dataDir: string): void {
     l.archivedExperiences,
     l.retrospectives,
     l.indexes,
+    l.state,
   ]) {
     fs.mkdirSync(dir, { recursive: true });
   }

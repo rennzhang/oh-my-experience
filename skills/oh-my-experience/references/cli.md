@@ -237,7 +237,15 @@ ome experience show <card-id> --scope project --section rule
 ome experience archive <card-id> --reason "superseded"
 ome experience migrate-legacy --scope project --dry-run
 ome experience migrate-legacy --scope project --backup
+ome experience baseline
+ome experience baseline <card-id>
+ome experience baseline <card-id> --off
 ```
+
+`experience baseline` lists the always-on set with per-library and total budget
+usage. Setting the flag requires an active card; it moves the card out of
+matching and into scheduled delivery, so use it only for standing discipline,
+never for a task-specific lesson.
 
 Categories come from candidates, approval comments, and card content. Do not ask
 users to maintain a separate category command. Starter lessons are installed by

@@ -47,10 +47,32 @@ Implementation:
   scoring, intent and signal gates, and positive/negative evidence.
 - `packages/core/src/retrieval-contract.ts`: retrieval version identifiers and
   shared default limits, thresholds, budgets, and score bounds.
+- `packages/core/src/baseline.ts`: the always-on channel, its per-library and
+  total budgets, session cadence, and the fail-open counter.
+- `packages/core/src/operation-phases.ts`: the closed `applies_to` vocabulary.
 - `packages/core/src/library-stack.ts`: global/project library discovery and
   active-card loading.
 - `packages/core/src/similarity.ts`: lightweight card/candidate similarity used
   for merge suggestions and duplicate suppression without external embeddings.
+
+## Two Delivery Channels
+
+Prompt-time recall has two independent channels that share card storage and
+telemetry shape, but not their delivery rules:
+
+| | Matched channel | Baseline channel |
+|---|---|---|
+| Membership | active, applicable, not `baseline` | active, `baseline: true` |
+| Trigger | triggers, scope, engine hints, admission contract | schedule only |
+| Content | compact card index | `rule` only |
+| Budget | `additionalContextMaxChars` | `maxChars` + per-library `setMaxChars` |
+| Cadence | every prompt | turn 1, then every `refreshEveryTurns` |
+
+Baseline cards are filtered out before scoring, so they cannot appear in
+`matched`, precision, or abstention metrics. The two budgets are separate, so a
+long baseline set cannot evict matched cards and a match-heavy turn cannot evict
+the standing reminders. The baseline counter is per-session state in the global
+data directory; any read or write failure delivers instead of suppressing.
 
 ## Requirements
 

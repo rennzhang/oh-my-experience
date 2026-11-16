@@ -12,6 +12,7 @@ import {
   RETRIEVAL_ENGINE_VERSION,
   RETRIEVAL_SCORER_VERSION,
 } from "./retrieval-contract.js";
+import { formatOperationPhases } from "./operation-phases.js";
 import { getSignalDefinition, isKnownSignalId } from "./signal-registry.js";
 import type { ProjectContext } from "./schema.js";
 import { cardSimilarity, type SimilarCardHint } from "./similarity.js";
@@ -56,6 +57,7 @@ export interface RetrievalDiagnostics {
   limit: number;
   inputCardCount: number;
   applicableCardCount: number;
+  baselineExcludedCardIds: string[];
   evaluatedCardCount: number;
   timedOut: boolean;
   complete: boolean;
@@ -132,9 +134,11 @@ export function matchCardEntriesDetailed(
   const limit = options.limit ?? DEFAULT_RETRIEVAL_LIMIT;
   const envelope = buildTaskEnvelope(prompt);
   const plan = buildQueryPlan(envelope);
+  const baselineCards = cardsInput.filter((card) => card.baseline && card.status === "active" && card.recallPolicy !== "off");
   const cards = cardsInput.filter((card) =>
     card.status === "active"
     && card.recallPolicy !== "off"
+    && !card.baseline
     && isApplicable(card, options.projectContext || null)
   );
   const corpus = buildScoringCorpus(cards);
@@ -195,6 +199,7 @@ export function matchCardEntriesDetailed(
       limit,
       inputCardCount: cardsInput.length,
       applicableCardCount: cards.length,
+      baselineExcludedCardIds: baselineCards.map((card) => card.id),
       evaluatedCardCount: evaluated.length,
       timedOut,
       complete: !timedOut && evaluated.length === cards.length,
@@ -534,6 +539,7 @@ function sameApplicabilityScope(left: CardIndexEntry, right: CardIndexEntry): bo
   const b = right.applicability || { level: "global" };
   return a.level === b.level
     && (a.projectKey || "") === (b.projectKey || "")
+    && uniqueNonEmpty(a.projectKeys).sort().join("\0") === uniqueNonEmpty(b.projectKeys).sort().join("\0")
     && (a.modulePath || "") === (b.modulePath || "")
     && uniqueNonEmpty(a.excludeProjects).sort().join("\0") === uniqueNonEmpty(b.excludeProjects).sort().join("\0");
 }
@@ -542,16 +548,31 @@ function primaryTopic(card: CardIndexEntry): string {
   return (card.topics || [])[0] || (card.triggers || [])[0] || card.id;
 }
 
+function effectiveProjectKeys(applicability: CardIndexEntry["applicability"] | undefined): string[] {
+  const keys = uniqueNonEmpty(applicability?.projectKeys);
+  if (keys.length) return keys;
+  const single = String(applicability?.projectKey || "").trim();
+  return single ? [single] : [];
+}
+
 function isApplicable(card: CardIndexEntry, context: ProjectContext | null): boolean {
   const applicability = card.applicability || { level: "global" };
+  // Exclusion always wins over any positive scope, including multi-repo targets.
   if (excludedProjectMatches(applicability.excludeProjects, context)) return false;
   if (applicability.level === "global") return true;
-  if (!context?.projectKey || !applicability.projectKey) return false;
+  if (!context?.projectKey) return false;
+  const projectKeys = effectiveProjectKeys(applicability);
+  if (!projectKeys.length) return false;
+  // One relative module path cannot mean the same thing across several repos, so
+  // the combination fails closed. `ome doctor` reports it as a card error.
+  const hasModulePath = normalizeModulePath(applicability.modulePath) !== ".";
+  if (projectKeys.length > 1 && hasModulePath) return false;
   if (applicability.level === "project") {
-    return context.projectKey === applicability.projectKey && modulePathMatches(applicability.modulePath, context.modulePath);
+    return projectKeys.some((key) => context.projectKey === key)
+      && modulePathMatches(applicability.modulePath, context.modulePath);
   }
   if (applicability.level === "project-family") {
-    return projectFamilyKey(context.projectKey) === projectFamilyKey(applicability.projectKey)
+    return projectKeys.some((key) => projectFamilyKey(context.projectKey) === projectFamilyKey(key))
       && modulePathMatches(applicability.modulePath, context.modulePath);
   }
   return false;
@@ -626,6 +647,7 @@ function primaryContextReason(reasons: MatchReason[]): MatchReason | undefined {
 function contextBlock(result: MatchResult, index: number, copy: ContextCopy): string {
   const card = result.card;
   const marker = `[${card.risk || "medium"} risk][${card.recallPolicy || "should"}]`;
+  const applies = card.appliesTo?.length ? `[applies: ${formatOperationPhases(card.appliesTo)}]` : "";
   const summary = card.summary || copy.noSummary;
   const useWhen = compactList(card.triggers, 3) || compactList(card.topics, 3) || copy.defaultUse;
   const notWhen = compactList(card.negativeTriggers, 2) || copy.defaultIgnore;
@@ -637,7 +659,7 @@ function contextBlock(result: MatchResult, index: number, copy: ContextCopy): st
     ? `\n   ${copy.similar}: ${result.similarCards.map((item) => `${item.title} (${item.id})`).join(", ")}`
     : "";
   return [
-    `${index}. ${marker} ${card.title} (${card.id})`,
+    `${index}. ${marker}${applies} ${card.title} (${card.id})`,
     `   ${copy.summary}: ${oneLine(summary, 220)}`,
     `   ${copy.scope}: ${formatCardScope(card)}`,
     `   ${copy.useWhen}: ${useWhen}`,
@@ -676,7 +698,11 @@ function formatCardScope(card: CardIndexEntry): string {
     return `${base}${exclusionSuffix}`;
   }
   const parts: string[] = [level];
-  if (applicability.projectKey) parts.push(applicability.projectKey);
+  const projectTargets = uniqueNonEmpty([
+    applicability.projectKey,
+    ...(applicability.projectKeys || []),
+  ]);
+  if (projectTargets.length) parts.push(projectTargets.join(", "));
   if (applicability.modulePath) parts.push(applicability.modulePath);
   return `${parts.join(" / ")}${exclusionSuffix}`;
 }

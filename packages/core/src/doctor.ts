@@ -7,6 +7,8 @@ import { ConfigSchema, type Config } from "./schema.js";
 import { validateSignalIds } from "./signal-registry.js";
 import { defaultDataDir, layout, readJson } from "./storage.js";
 import { validateTriggerSignalContract, type TriggerSignalContractViolation } from "./trigger-signal-contract.js";
+import { baselineOptionsFromConfig, renderBaselineCardBlock } from "./baseline.js";
+import { unknownOperationPhases } from "./operation-phases.js";
 
 type DoctorOptions = { codexHome?: string; claudeHome?: string; cursorHome?: string; ompHome?: string };
 type HookHomes = Required<Omit<DoctorOptions, "ompHome">> & Pick<DoctorOptions, "ompHome">;
@@ -35,6 +37,7 @@ export function runDoctor(dataDir: string, {
   checkIndex(dataDir, errors);
   checkJsonl(l.events, "events", warnings);
   const config = checkConfig(dataDir, errors, warnings);
+  checkBaseline(config, cardInspection.cards, warnings);
   checkHook(config, { codexHome, claudeHome, cursorHome, ompHome }, dataDir, errors, warnings);
   checkPackage(errors, warnings);
   return {
@@ -84,6 +87,21 @@ function checkCards(dataDir: string, errors: string[], warnings: string[]) {
     if (!card.triggers.length) errors.push(`card has no triggers: ${card.id}`);
     if (!card.topics.length) warnings.push(`card has no topics: ${card.id}`);
     if (card.status === "active" && card.recallPolicy === "off") warnings.push(`active card recall is off: ${card.id}`);
+    if (card.applicability.projectKey && card.applicability.projectKeys.length) {
+      errors.push(`card sets both scope.project_key and scope.project_keys: ${card.id}; keep one`);
+    }
+    const cardModulePath = String(card.applicability.modulePath || "").trim();
+    if (card.applicability.projectKeys.length > 1 && cardModulePath && cardModulePath !== ".") {
+      errors.push(`card combines scope.project_keys with scope.module_path: ${card.id}; one module path cannot span several repositories, so the card never applies`);
+    }
+    const unknownPhases = unknownOperationPhases(card.appliesTo);
+    if (unknownPhases.length) {
+      const message = `card uses unknown applies_to values: ${card.id}: ${unknownPhases.join(", ")}`;
+      if (card.status === "archived") warnings.push(message);
+      else errors.push(message);
+    }
+    if (card.appliesTo.length > 3) warnings.push(`card lists ${card.appliesTo.length} applies_to phases: ${card.id}; narrow it or split the card`);
+    if (card.baseline && card.status !== "active") warnings.push(`baseline flag on a ${card.status} card is ignored: ${card.id}`);
     const signalValidation = validateSignalIds([
       ...card.requiredSignals,
       ...card.requiredAllSignals,
@@ -103,10 +121,43 @@ function checkCards(dataDir: string, errors: string[], warnings: string[]) {
       else errors.push(message);
     }
   }
+  const activeCards = inspection.cards.filter((card) => card.status === "active");
+  const unlabeled = activeCards.filter((card) => !card.appliesTo.length);
+  if (unlabeled.length) {
+    warnings.push(`${unlabeled.length}/${activeCards.length} active cards have no applies_to; the model cannot tell which step they govern`);
+  }
   return {
     ...inspection,
     triggerContractViolations,
   };
+}
+
+function checkBaseline(config: Config | null, cards: Array<{ id: string; title: string; rule: string; appliesTo: string[]; status: string; baseline: boolean; recallPolicy: string }>, warnings: string[]): void {
+  if (!config) return;
+  const options = baselineOptionsFromConfig(config.retrieval);
+  if (!options.enabled) return;
+  const baselineCards = cards.filter((card) => card.status === "active" && card.baseline && card.recallPolicy !== "off");
+  if (!baselineCards.length) return;
+  if (baselineCards.length > 5) {
+    warnings.push(`${baselineCards.length} baseline cards are always-on; keep the standing set small so it stays readable`);
+  }
+  let total = 0;
+  for (const card of baselineCards) {
+    const chars = renderBaselineCardBlock({
+      id: card.id,
+      title: card.title,
+      rule: card.rule,
+      appliesTo: card.appliesTo,
+      libraryScope: "global",
+    }).length;
+    total += chars;
+    if (chars > options.setMaxChars || chars > options.maxChars) {
+      warnings.push(`baseline card exceeds the delivery budget and is never delivered: ${card.id} (${chars} chars)`);
+    }
+  }
+  if (total > options.maxChars) {
+    warnings.push(`baseline set uses ${total} chars, above maxChars ${options.maxChars}; later cards are omitted whole`);
+  }
 }
 
 function formatTriggerContractViolation(status: string, violation: TriggerSignalContractViolation): string {

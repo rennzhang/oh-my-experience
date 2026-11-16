@@ -191,11 +191,21 @@ ome experience enable <card-id> --scope project
 ome experience archive <card-id> --reason "superseded"
 ome experience migrate-legacy --scope project --dry-run
 ome experience migrate-legacy --scope project --backup
+ome experience baseline
+ome experience baseline --scope project
+ome experience baseline <card-id>
+ome experience baseline <card-id> --off
 ```
 
 The lifecycle stays explicit: `candidate -> draft -> active -> archived`.
 `list --json` returns full cards by default. Add `--compact` or `--index` when
 a script only needs the title index (`id`, `title`, `status`, `category`).
+
+`experience baseline` without an id lists the always-on set, per-library and
+total character usage against the configured budgets, and any card that can
+never fit. With an id it sets or clears `baseline: true` on an active card.
+`ome reflect add ... --applies-to edit,verify` records operation phases on a
+candidate.
 
 After enabling a draft, agents and maintainers should run a recall smoke with
 realistic future task wording:

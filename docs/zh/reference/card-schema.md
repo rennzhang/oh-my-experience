@@ -41,6 +41,7 @@ scope:
   level: project
   project_key: github.com/example/app
   module_path: apps/web
+applies_to: [inspect, verify]
 language: zh
 ```
 
@@ -203,6 +204,64 @@ Active 卡片保持卡面克制。日期、原始来源、`origin`、`source_ref
 - `project-family`：项目族匹配时召回，例如同一个 GitHub owner。
 - `exclude_projects`：把本来会命中的卡从指定仓库里拿掉。这是项目身份版的
   `ignore_when`。
+- `scope.project_keys`：多个项目身份，任一命中即可。一张卡确实覆盖多个仓库时用它，
+  不要同时写 `scope.project_key`；两者同时出现是 `ome doctor` 错误，召回只读
+  `project_keys`。
+- `scope.project_keys` 与 `scope.module_path` 组合会被 `ome doctor` 报错，运行时永不
+  命中：同一个相对模块路径在多个仓库里不代表同一个东西。
+- `exclude_projects` 先于任何正向 scope 判断，被排除的项目不能被其它字段重新纳入。
 
 Hook 会在提示词阶段使用这些信息，让通用卡片保持通用，让范围明确的卡片只在
 合适场景出现。
+
+## 适用阶段
+
+`applies_to` 记录一条经验主要作用在工作的哪一步。它是给模型看的标注，不是召回
+门槛：匹配仍然只依赖 triggers、scope 和 engine hints。
+
+```yaml
+applies_to: [edit, verify]   # 第一项是主要阶段
+```
+
+闭集取值：
+
+| 值 | 含义 |
+|---|---|
+| `inspect` | 读取、调查、确认真源 |
+| `edit` | 改文件、重构、删除 |
+| `verify` | 运行、测试、走真实入口验收 |
+| `deliver` | 收尾、提交、汇报产物 |
+| `communicate` | 回答、解释、文档表达 |
+
+规则：
+
+- 留空表示未标注，不表示“任何阶段都不适用”。未标注的卡照常投递，只是少一个标签，
+  `ome doctor` 仅做 info 级提示。
+- 未知取值是 `ome doctor` 错误，处理方式与未知 signal id 一致。
+- 超过 3 个取值会给警告：这张卡想覆盖太多。各阶段触发器不同就拆卡；同一组触发器
+  横跨多个阶段时保留多值。
+- `applies_to` 不改变分数和准入，也不进入词法索引。
+- 复盘应从会话里实际发生的步骤推导它；证据看不出步骤就留空。
+
+匹配通道把它渲染在卡片首行 `[applies: edit, verify]`，基线通道渲染在 scope 标签后。
+
+## 基线卡
+
+`baseline: true` 把 active 卡放进第二条投递通道：按轮次投递，不参与匹配竞争。
+
+```yaml
+baseline: true
+```
+
+- 基线卡在打分前就退出候选集，因此不会出现在 `matched`、`selectionStage`、
+  precision 和 abstention 里。
+- 成员资格跟着卡走：全局库里的卡始终生效；项目库里的卡只在该项目内始终生效。
+  同一个 id 同时存在时只投一次，项目版本胜出。
+- 投递节奏由全局配置 `retrieval.baseline.refreshEveryTurns` 和宿主提供的 session id
+  决定。首轮必投，默认 5 时是第 1、6、11 轮；没有 session id 时每轮都投。
+- 只渲染 `title`、`id`、`applies_to` 和 `rule`；summary 与使用标准属于匹配通道，
+  这里忽略。
+- `recallPolicy: off` 同样停用基线投递；`recall.triggers`、`engine_hints`、
+  `intent_modes` 不参与。
+- 每个库有自己的字符预算，另有一个总预算。放不下的卡整张省略，不会在规则中间截断。
+- draft 或 archived 卡上的 `baseline: true` 会被忽略，并在 doctor 里给出警告。

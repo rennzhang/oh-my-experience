@@ -28,7 +28,13 @@ status: active
     "maxCards": 4,
     "minScore": 40,
     "additionalContextMaxChars": 6000,
-    "hookTimeoutMs": 4000
+    "hookTimeoutMs": 4000,
+    "baseline": {
+      "enabled": true,
+      "maxChars": 800,
+      "setMaxChars": 500,
+      "refreshEveryTurns": 5
+    }
   },
   "hooks": {
     "providers": {
@@ -60,6 +66,17 @@ status: active
 
 修改 store mode 不会创建 transcript cache。普通用户不需要单独的存储维护命令；
 诊断经验库健康时使用 `ome doctor`。
+
+`retrieval.baseline` 控制常驻投递通道（`baseline: true` 的卡）：
+
+- `enabled`：整条通道的开关，不需要改卡。
+- `maxChars`：基线卡渲染后的总字符预算；框架提示不计入。
+- `setMaxChars`：单个经验库的预算，避免项目库的长集合把全局集合整套挤掉（反之亦然）。
+- `refreshEveryTurns`：首轮投递，之后每 N 轮一次，按 session 计数。投递集合变化时
+  计数重置；宿主不给 session id 时每轮投递。计数状态保存在全局 dataDir 的
+  `state/baseline.json`；状态文件缺失或损坏时按“投递”处理（fail open）。
+
+放不进预算的卡整张省略。`ome experience baseline` 会列出成员和当前预算占用。
 
 ## 编辑规则
 

@@ -3,6 +3,7 @@ import path from "node:path";
 import matter from "gray-matter";
 import { ExperienceCardSchema, SourceRefSchema, type CardStatus, type ExperienceCard, type RetrospectiveCandidate } from "./schema.js";
 import { validateSignalIds } from "./signal-registry.js";
+import { formatOperationPhases, normalizeOperationPhases } from "./operation-phases.js";
 import { TriggerSignalContractError, validateTriggerSignalContract } from "./trigger-signal-contract.js";
 import {
   backupFile,
@@ -28,6 +29,8 @@ export interface CardIndexEntry {
   topics: string[];
   applicability: ExperienceCard["applicability"];
   intentModes: ExperienceCard["intentModes"];
+  appliesTo: string[];
+  baseline: boolean;
   requiredSignals: string[];
   requiredAllSignals: string[];
   blockedSignals: string[];
@@ -106,6 +109,8 @@ export function serializeCard(card: ExperienceCard): string {
     }),
     ...(Object.keys(parsed.aliases || {}).length ? { aliases: parsed.aliases } : {}),
     scope: compactApplicability(parsed.applicability),
+    ...(parsed.appliesTo.length ? { applies_to: [...parsed.appliesTo] } : {}),
+    ...(parsed.baseline ? { baseline: true } : {}),
     ...(parsed.sources.length ? { sources: [...parsed.sources] } : {}),
     ...(parsed.origin && parsed.origin.createdBy !== "manual" ? { origin: parsed.origin } : {}),
     ...(parsed.sourceRefs.length ? { source_refs: parsed.sourceRefs } : {}),
@@ -138,11 +143,13 @@ export function parseCardMarkdown(text: string): ExperienceCard {
     topics: toArray(recall.topics),
     applicability: normalizeApplicabilityInput(scope),
     intentModes: criteria.intent_modes,
+    appliesTo: normalizeOperationPhases(data.applies_to ?? data.appliesTo),
     requiredSignals: toArray(engineHints.positive),
     requiredAllSignals: toArray(engineHints.required_all || engineHints.requiredAll),
     blockedSignals: toArray(engineHints.negative),
     language: data.language || "auto",
     recallPolicy: recall.policy || "should",
+    baseline: data.baseline === true,
     risk: recall.risk || "medium",
     confidence: recall.confidence || "medium",
     staleAfter: null,
@@ -335,6 +342,7 @@ export function createDraftFromCandidate(dataDir: string, candidate: Retrospecti
     topics: candidate.topics,
     applicability: candidate.applicability,
     intentModes: candidate.intentModes,
+    appliesTo: candidate.appliesTo,
     requiredSignals: candidate.requiredSignals,
     requiredAllSignals: candidate.requiredAllSignals,
     blockedSignals: candidate.blockedSignals,
@@ -394,7 +402,7 @@ export function removeStarterCards(dataDir: string): { ok: true; removed: string
 function starterCardDefinitions(): ExperienceCard[] {
   const now = nowIso();
   const base: Pick<ExperienceCard,
-    "status" | "language" | "confidence" | "staleAfter" | "sources" | "origin" | "sourceRefs" | "intentModes" | "requiredSignals" | "requiredAllSignals" | "blockedSignals" | "createdAt" | "updatedAt"
+    "status" | "language" | "confidence" | "staleAfter" | "sources" | "origin" | "sourceRefs" | "intentModes" | "requiredSignals" | "requiredAllSignals" | "blockedSignals" | "baseline" | "createdAt" | "updatedAt"
   > = {
     status: "active" as const,
     language: "en" as const,
@@ -414,6 +422,7 @@ function starterCardDefinitions(): ExperienceCard[] {
     requiredSignals: [],
     requiredAllSignals: [],
     blockedSignals: [],
+    baseline: false,
     createdAt: now,
     updatedAt: now,
   };
@@ -448,8 +457,9 @@ function starterCardDefinitions(): ExperienceCard[] {
       negativeTriggers: ["goal docs example", "explain goal", "discuss goal", "business goal", "OKR"],
       aliases: {},
       topics: ["goal", "execution", "delivery", "validation"],
-      applicability: { level: "global", projectKey: null, modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
+      applicability: { level: "global", projectKey: null, projectKeys: [], modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
       intentModes: { include: ["execute"], exclude: ["discuss", "explain"] },
+      appliesTo: ["edit", "verify", "deliver"],
       requiredSignals: ["goal_execute"],
       blockedSignals: ["goal_example_discussion", "business_goal_discussion", "explain_only"],
       recallPolicy: "must",
@@ -467,8 +477,9 @@ function starterCardDefinitions(): ExperienceCard[] {
       negativeTriggers: ["unit-only helper change", "static copy edit"],
       aliases: {},
       topics: ["validation", "e2e", "delivery"],
-      applicability: { level: "global", projectKey: null, modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
+      applicability: { level: "global", projectKey: null, projectKeys: [], modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
       recallPolicy: "should",
+      appliesTo: ["verify", "deliver"],
       risk: "high",
       body: "",
     },
@@ -490,9 +501,10 @@ function starterCardDefinitions(): ExperienceCard[] {
       negativeTriggers: ["temporary local experiment", "throwaway script"],
       aliases: {},
       topics: ["kiss", "architecture", "maintenance"],
-      applicability: { level: "global", projectKey: null, modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
+      applicability: { level: "global", projectKey: null, projectKeys: [], modulePath: null, excludeProjects: [], confidence: "medium", rationale: "Starter lesson for OME recall." },
       requiredSignals: ["architecture_quality"],
       recallPolicy: "should",
+      appliesTo: ["edit"],
       risk: "medium",
       body: "",
     },
@@ -562,6 +574,8 @@ export function buildCardIndex(dataDir: string): CardIndex {
     topics: card.topics,
     applicability: card.applicability,
     intentModes: card.intentModes,
+    appliesTo: card.appliesTo,
+    baseline: card.baseline,
     requiredSignals: card.requiredSignals,
     requiredAllSignals: card.requiredAllSignals,
     blockedSignals: card.blockedSignals,
@@ -592,6 +606,9 @@ function pickCardPatch(patch: Record<string, any> = {}): Record<string, any> {
   for (const key of ["title", "category", "summary", "rule", "triggers", "negativeTriggers", "aliases", "topics", "intentModes", "requiredSignals", "requiredAllSignals", "blockedSignals", "language", "recallPolicy", "risk", "confidence", "archivedReason"]) {
     if (Object.hasOwn(patch, key)) allowed[key] = patch[key];
   }
+  if (Object.hasOwn(patch, "appliesTo")) allowed.appliesTo = normalizeOperationPhases(patch.appliesTo);
+  if (Object.hasOwn(patch, "applies_to")) allowed.appliesTo = normalizeOperationPhases(patch.applies_to);
+  if (Object.hasOwn(patch, "baseline")) allowed.baseline = Boolean(patch.baseline);
   return allowed;
 }
 
@@ -609,6 +626,7 @@ function renderCardBody(card: ExperienceCard): string {
     "不要使用：",
     ...listItems(card.negativeTriggers, "当前任务只是概念讨论、文档举例，或与这张卡的工作流无关。"),
     "",
+    ...(card.appliesTo.length ? [`适用阶段：${formatOperationPhases(card.appliesTo)}。`, ""] : []),
     `召回策略：${card.recallPolicy}。`,
     `风险级别：${card.risk}。`,
     "",
@@ -639,6 +657,7 @@ function compactApplicability(applicability: ExperienceCard["applicability"]) {
   return compactObject({
     level: applicability.level,
     ...(applicability.projectKey ? { project_key: applicability.projectKey } : {}),
+    ...(applicability.projectKeys?.length ? { project_keys: [...applicability.projectKeys] } : {}),
     ...(applicability.modulePath ? { module_path: applicability.modulePath } : {}),
     ...(applicability.excludeProjects?.length ? { exclude_projects: [...applicability.excludeProjects] } : {}),
   });
@@ -650,6 +669,7 @@ function normalizeApplicabilityInput(value: unknown): unknown {
   return {
     ...input,
     projectKey: input.projectKey ?? input.project_key ?? null,
+    projectKeys: firstArray(input.projectKeys, input.project_keys).map((item) => item.trim()).filter(Boolean),
     modulePath: input.modulePath ?? input.module_path ?? null,
     excludeProjects: firstArray(input.excludeProjects, input.exclude_projects).map((item) => item.trim()).filter(Boolean),
   };

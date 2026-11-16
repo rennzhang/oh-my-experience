@@ -47,9 +47,27 @@ matcher.normalize
   scoring、intent/signal gates，以及正负向证据。
 - `packages/core/src/retrieval-contract.ts`：召回版本标识，以及共享的默认
   limit、threshold、budget 和 score bounds。
+- `packages/core/src/baseline.ts`：常驻通道、各库与总预算、session 节奏和 fail-open 计数。
+- `packages/core/src/operation-phases.ts`：`applies_to` 的闭集词表。
 - `packages/core/src/library-stack.ts`：全局/项目经验库发现和 active-card loading。
 - `packages/core/src/similarity.ts`：轻量 card/candidate similarity，用于 merge
   suggestions 和 duplicate suppression，不依赖外部 embeddings。
+
+## 两条投递通道
+
+提示词召回有两条互不干扰的通道，它们共用卡片存储和遥测结构，但投递规则不同：
+
+| | 匹配通道 | 基线通道 |
+|---|---|---|
+| 成员 | active、适用、且 `baseline` 为假 | active 且 `baseline: true` |
+| 触发 | triggers、scope、engine hints、准入契约 | 只看轮次 |
+| 内容 | 紧凑卡片索引 | 只有 `rule` |
+| 预算 | `additionalContextMaxChars` | `maxChars` + 每库 `setMaxChars` |
+| 节奏 | 每次提示词 | 第 1 轮，之后每 `refreshEveryTurns` 轮 |
+
+基线卡在打分前就被过滤，因此不会进入 `matched`、precision 或 abstention。两条预算彼此
+独立：长的基线集合挤不掉命中卡，命中很多的轮次也挤不掉常驻提醒。基线计数是全局 dataDir
+里的 per-session 状态；读写失败时选择投递而不是抑制。
 
 ## 要求
 

@@ -9,6 +9,8 @@ import {
   archiveCard,
   auditStorage,
   compareRecallReports,
+  baselineOptionsFromConfig,
+  baselineStatus,
   compactSessionIndex,
   createRetrospectiveRun,
   DEFAULT_RETRIEVAL_LIMIT,
@@ -46,6 +48,7 @@ import {
   saveConfig,
   buildUserMessageIndex,
   recordScannedSessions,
+  setBaselineFlag,
   findPainpointMarkers,
   setConfigValue,
   searchUserMessageIndex,
@@ -916,7 +919,7 @@ function reflectCommand(dataDir: string, subcommand: string | undefined, args: P
   }
   if (subcommand === "add") {
     const runId = args.positionals[2];
-    if (!runId || !args.flags.title || !args.flags.summary || !args.flags.rule) throw new Error("usage: ome reflect add <runId> --title <title> --summary <summary> --rule <markdown> --triggers <text>");
+    if (!runId || !args.flags.title || !args.flags.summary || !args.flags.rule) throw new Error("usage: ome reflect add <runId> --title <title> --summary <summary> --rule <markdown> --triggers <text> [--applies-to <phases>]");
     const existing = getRetrospectiveRun(dataDir, runId).candidates;
     const audit = readReflectAuditInput(args);
     const candidate = candidateFromLesson(runId, {
@@ -940,6 +943,7 @@ function reflectCommand(dataDir: string, subcommand: string | undefined, args: P
         topics: splitList(args.flags.topics || args.flags.topic || ""),
       },
       scope: parseApplicability(args),
+      applies_to: splitList(args.flags["applies-to"] || args.flags.appliesTo || ""),
       evidence: splitList(args.flags.evidence || ""),
     });
     return print(withReviewPaths(dataDir, {
@@ -1332,7 +1336,17 @@ function experienceCommand(dataDir: string, subcommand: string | undefined, args
       status: args.flags.status || null,
     }), args);
   }
-  throw new Error("usage: ome experience list|show|enable|archive|migrate-legacy");
+  if (subcommand === "baseline") {
+    const id = args.positionals[2];
+    if (id) return print(setBaselineFlag(targetDataDir, id, !args.flags.off), args);
+    const cwd = args.flags.cwd ? path.resolve(args.flags.cwd) : process.cwd();
+    const stack = resolveLibraryStack(dataDir, cwd);
+    const libraries = targetDataDir === dataDir
+      ? stack.libraries
+      : stack.libraries.filter((library) => library.scope === "project");
+    return print(baselineStatus(libraries, baselineOptionsFromConfig(loadConfig(dataDir).retrieval)), args);
+  }
+  throw new Error("usage: ome experience list|show|enable|archive|baseline|migrate-legacy");
 }
 
 function scopedExperienceDataDir(dataDir: string, args: ParsedArgs): string {
@@ -1361,7 +1375,8 @@ function cardSection(card: ReturnType<typeof getCard>, section: unknown): string
   if (["rule", "可复用规则"].includes(name)) return card.rule;
   if (["triggers", "trigger", "触发时机"].includes(name)) return card.triggers.map((trigger) => `- ${trigger}`).join("\n");
   if (["negative-triggers", "negative", "不触发"].includes(name)) return card.negativeTriggers.map((trigger) => `- ${trigger}`).join("\n");
-  throw new Error("unknown card section: use summary|rule|triggers|negative-triggers");
+  if (["applies-to", "applies_to", "phase", "适用阶段"].includes(name)) return card.appliesTo.map((phase) => `- ${phase}`).join("\n");
+  throw new Error("unknown card section: use summary|rule|triggers|negative-triggers|applies-to");
 }
 
 function matchCommand(dataDir: string, args: ParsedArgs) {
@@ -2097,7 +2112,7 @@ Core commands:
   ome source status|user-index build|user-index search|user-index show|user-index markers|scan codex|scan spool|clean|connect spool
   ome reflect start [--focus <text>]
   ome reflect list|show|add|candidates|decide|apply|resume|verify-evidence
-  ome experience list|show|enable|archive|migrate-legacy
+  ome experience list|show|enable|archive|baseline|migrate-legacy
   ome project init|status
   ome eval recall --suite <file>
   ome hook run|status

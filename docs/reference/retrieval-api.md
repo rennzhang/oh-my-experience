@@ -104,6 +104,7 @@ ome match "Fix UI and validate in browser" --explain --json
     "limit": 4,
     "inputCardCount": 1,
     "applicableCardCount": 1,
+    "baselineExcludedCardIds": [],
     "evaluatedCardCount": 1,
     "timedOut": false,
     "complete": true,
@@ -211,6 +212,17 @@ state the number of OME experience cards used and include only the rendered
 `Final link if used` values.
 Card titles are rendered as Markdown links to the relevant experience card
 paths.
+When a card declares `applies_to`, its header carries the phase label:
+
+```text
+1. [high risk][must][applies: edit, verify] Browser Validation (browser-validation)
+```
+
+The label is informational. It does not affect score, ranking, or eligibility.
+
+Baseline cards never enter this channel. `diagnostics.baselineExcludedCardIds`
+lists the active `baseline: true` cards that were removed before scoring, so a
+missing match for such a card is explainable.
 
 ## Budgeted Context
 

@@ -103,6 +103,7 @@ ome match "Fix UI and validate in browser" --explain --json
     "limit": 4,
     "inputCardCount": 1,
     "applicableCardCount": 1,
+    "baselineExcludedCardIds": [],
     "evaluatedCardCount": 1,
     "timedOut": false,
     "complete": true,
@@ -200,6 +201,16 @@ evidence 或 routing gate；负向 hint 只压制其声明的 targets。它们�
 说明实际使用了几张 OME 经验卡，并且只包含已采用卡片的 `Final link if used` 链接。复盘或
 来源扫描任务中，命中的主题旧卡是 active overlap 信号，不是来源证据，应写入复盘审计而不是
 披露为 used card。卡片标题会渲染为指向相关经验卡路径的 Markdown 链接。
+卡片声明 `applies_to` 时，首行会带阶段标签：
+
+```text
+1. [high risk][must][applies: edit, verify] Browser Validation (browser-validation)
+```
+
+这个标签只是信息，不改变分数、排序或准入。
+
+基线卡不会进入这条通道。`diagnostics.baselineExcludedCardIds` 列出打分前被移除的
+`baseline: true` active 卡，便于解释“为什么它没有命中”。
 
 ## Budgeted Context
 

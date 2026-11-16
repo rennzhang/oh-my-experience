@@ -154,11 +154,19 @@ ome experience enable <card-id> --scope project
 ome experience archive <card-id> --reason "superseded"
 ome experience migrate-legacy --scope project --dry-run
 ome experience migrate-legacy --scope project --backup
+ome experience baseline
+ome experience baseline --scope project
+ome experience baseline <card-id>
+ome experience baseline <card-id> --off
 ```
 
 生命周期保持显式：`candidate -> draft -> active -> archived`。
 `list --json` 默认返回完整卡片；脚本只需要标题索引时用
 `--compact` 或 `--index`，只返回 `id`、`title`、`status`、`category`。
+
+`experience baseline` 不带 id 时列出常驻集合、各库与总预算占用，以及永远放不进预算
+的卡；带 id 时对 active 卡设置或清除 `baseline: true`。
+`ome reflect add ... --applies-to edit,verify` 可在候选卡上记录适用阶段。
 
 启用 draft 后，Agent 和维护者应使用真实未来任务话术做一次召回冒烟：
 

@@ -123,6 +123,15 @@ Hook log event:
   "renderedCardIds": ["browser-validation"],
   "rendered": true,
   "contextTruncated": false,
+  "baseline": {
+    "enabled": true,
+    "available": true,
+    "deliveredCardIds": ["baseline-discipline"],
+    "omittedCardIds": [],
+    "chars": 96,
+    "setFingerprint": "sha256",
+    "skipReason": null
+  },
   "deliveryStatus": "unknown",
   "injected": true,
   "durationMs": 42,
@@ -131,6 +140,18 @@ Hook log event:
   "createdAt": "2026-05-28T00:00:00.000Z"
 }
 ```
+
+`baseline` is optional and only present for events produced after the baseline
+channel shipped. It records the always-on channel separately from matching:
+`deliveredCardIds` are the cards that actually made it into the rendered block,
+`omittedCardIds` are the cards that did not fit the budget, `skipReason` is
+`disabled`, `empty`, `cadence`, or `budget`, and `chars` counts card blocks only,
+not the framing paragraph.
+
+Baseline delivery never changes `matched`, `selectionStage`, `renderedCardIds`,
+`rendered`, or `contextTruncated`. A turn that only delivers baseline cards
+reports `matched: false` and an empty `renderedCardIds`; the baseline block is
+not a match and must not be counted as one.
 
 Required fields after normalization:
 

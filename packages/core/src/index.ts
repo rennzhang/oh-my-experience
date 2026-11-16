@@ -1,3 +1,4 @@
+export * from "./baseline.js";
 export * from "./cards.js";
 export * from "./categories.js";
 export * from "./config.js";
@@ -7,6 +8,7 @@ export { detectIntentModes, detectRuleSignals } from "./intent-rules.js";
 export * from "./library-stack.js";
 export * from "./matcher.js";
 export * from "./maintenance.js";
+export * from "./operation-phases.js";
 export * from "./project-context.js";
 export * from "./retrieval.js";
 export * from "./retrieval-contract.js";

@@ -4,6 +4,9 @@ import { ConfigSchema, type Config } from "./schema.js";
 import { ensureStarterCards } from "./cards.js";
 import {
   DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS,
+  DEFAULT_BASELINE_MAX_CHARS,
+  DEFAULT_BASELINE_REFRESH_TURNS,
+  DEFAULT_BASELINE_SET_MAX_CHARS,
   DEFAULT_HOOK_TIMEOUT_MS,
   DEFAULT_RETRIEVAL_LIMIT,
   DEFAULT_RETRIEVAL_THRESHOLD,
@@ -38,6 +41,12 @@ export function createDefaultConfig(dataDir: string): Config {
       minScore: DEFAULT_RETRIEVAL_THRESHOLD,
       additionalContextMaxChars: DEFAULT_ADDITIONAL_CONTEXT_MAX_CHARS,
       hookTimeoutMs: DEFAULT_HOOK_TIMEOUT_MS,
+      baseline: {
+        enabled: true,
+        maxChars: DEFAULT_BASELINE_MAX_CHARS,
+        setMaxChars: DEFAULT_BASELINE_SET_MAX_CHARS,
+        refreshEveryTurns: DEFAULT_BASELINE_REFRESH_TURNS,
+      },
     },
     hooks: {
       providers: {

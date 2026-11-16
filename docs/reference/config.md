@@ -28,7 +28,13 @@ Default path:
     "maxCards": 4,
     "minScore": 40,
     "additionalContextMaxChars": 6000,
-    "hookTimeoutMs": 4000
+    "hookTimeoutMs": 4000,
+    "baseline": {
+      "enabled": true,
+      "maxChars": 800,
+      "setMaxChars": 500,
+      "refreshEveryTurns": 5
+    }
   },
   "hooks": {
     "providers": {
@@ -52,6 +58,23 @@ Default path:
 prompt as a plaintext `rawPrompt` field. It is disabled by default. When it is
 enabled, the raw prompt is written to the same global `events.jsonl` record as
 the retrieval telemetry.
+
+`retrieval.baseline` controls the always-on delivery channel (cards with
+`baseline: true`):
+
+- `enabled`: turn the channel off without editing cards.
+- `maxChars`: total character budget for the rendered baseline cards. The
+  framing paragraph is not counted.
+- `setMaxChars`: per-library budget, so a long project set cannot evict the
+  global set (or the other way around).
+- `refreshEveryTurns`: deliver on turn 1, then every N turns per session. The
+  counter resets when the delivered set changes, and a host without a session id
+  receives the baseline every turn. Counter state lives in
+  `state/baseline.json` under the global data directory; a missing or broken
+  state file fails open by delivering.
+
+Cards that do not fit the budget are omitted whole. `ome experience baseline`
+lists membership and current budget usage.
 
 `sessions.store` controls the retention posture for scanned source sessions:
 

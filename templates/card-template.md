@@ -25,6 +25,8 @@ recall:
     - module or workflow
 scope:
   level: global
+applies_to: [edit, verify] # inspect|edit|verify|deliver|communicate
+# baseline: true # 常驻卡：按轮次投递，不参与匹配；只投 title + rule
 ---
 
 # Example Experience Card

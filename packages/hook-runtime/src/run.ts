@@ -23,6 +23,11 @@ import {
   renderAdditionalContext,
   type RetrievalCandidateDiagnostic,
 } from "../../core/src/retrieval.js";
+import {
+  baselineOptionsFromConfig,
+  deliverBaseline,
+  readBaselineCards,
+} from "../../core/src/baseline.js";
 import { HOOK_TELEMETRY_SCHEMA_VERSION } from "../../core/src/schema.js";
 import {
   RETRIEVAL_ENGINE_VERSION,
@@ -55,6 +60,13 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
     const envelope = buildTaskEnvelope(prompt);
     const queryVariants = buildQueryVariants(prompt);
     const cards = safeReadLibraryStackCards(stack);
+    const baselineCards = readBaselineCards(stack, cards);
+    const baseline = deliverBaseline({
+      dataDir,
+      cards: baselineCards,
+      options: baselineOptionsFromConfig(config.retrieval),
+      sessionId: normalized.sessionId,
+    });
     const retrieval = matchCardEntriesDetailed(cards, prompt, {
       limit: config.retrieval.maxCards,
       threshold: config.retrieval.minScore,
@@ -63,9 +75,12 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
       projectContext,
     });
     const matches = retrieval.matches;
-    const additionalContext = renderAdditionalContext(matches, {
+    const matchedContext = renderAdditionalContext(matches, {
       maxChars: config.retrieval.additionalContextMaxChars,
     });
+    // Separate budgets: a long baseline set must never evict matched cards, and
+    // a match-heavy turn must never evict the standing reminders.
+    const additionalContext = [matchedContext, baseline.text].filter(Boolean).join("\n\n");
     const selectedCards = matches.map((match) => scoredCardTelemetry(match));
     const renderedCardIds = detectRenderedCardIds(matches, additionalContext);
     const cardSetFingerprint = buildCardSetFingerprint(cards);
@@ -124,6 +139,15 @@ export async function runHook({ dataDir = defaultDataDir(), input = null }: { da
       renderedCardIds,
       rendered: renderedCardIds.length > 0,
       contextTruncated: renderedCardIds.length < selectedCards.length,
+      baseline: {
+        enabled: baseline.enabled,
+        available: baseline.available,
+        deliveredCardIds: baseline.cardIds,
+        omittedCardIds: baseline.omittedCardIds,
+        chars: baseline.chars,
+        setFingerprint: baseline.setFingerprint,
+        skipReason: baseline.skipReason,
+      },
       deliveryStatus: "unknown",
       // Compatibility only: this never means the host or model consumed it.
       injected: renderedCardIds.length > 0,

@@ -211,7 +211,11 @@ Each active card should satisfy:
 - `recall.triggers` generalize into ordinary-task pollution.
 - `engine_hints` lack known negative signals, or natural-language boundaries are overfit into program fields.
 - Project-scoped cards lack `scope.level`, `project_key`, or `module_path`, causing global over-recall.
+- Project-scoped cards use both `scope.project_key` and `scope.project_keys`, or combine `project_keys` with `module_path`; both combinations are doctor errors and the second never matches.
+- `applies_to` is missing on a large share of active cards, contains unknown values, or claims more than three phases without a split reason.
+- Cards marked `baseline: true` grow past the standing budget, or a card that is clearly task-specific sits in the baseline set.
 - Global cards that should stay out of a named repo lack `scope.exclude_projects`.
+- An always-on reminder is marked `baseline: true` but its `rule` is long enough to be omitted whole by the budget; `ome experience baseline` shows the per-card size.
 
 ### P2: Schedule Later
 

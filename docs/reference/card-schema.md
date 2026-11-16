@@ -41,6 +41,7 @@ scope:
   level: project
   project_key: github.com/example/app
   module_path: apps/web
+applies_to: [inspect, verify]
 language: en
 ```
 
@@ -250,6 +251,77 @@ or `review`. They are used for matching and filtering.
   GitHub owner.
 - `exclude_projects`: keep an otherwise matching card out of named
   repositories. This is the project-identity equivalent of `ignore_when`.
+- `scope.project_keys`: several project identities with any-of semantics. Use it
+  instead of `scope.project_key` when one lesson genuinely covers more than one
+  repository. Setting both fields is a `ome doctor` error; recall reads
+  `project_keys` and ignores the single value.
+- `scope.project_keys` with `scope.module_path` is rejected by `ome doctor` and
+  never matches at runtime: one relative module path cannot mean the same thing
+  in several repositories.
+- `exclude_projects` is evaluated before any positive scope, so a card cannot
+  re-include a project it excludes.
 
 The hook uses this metadata at prompt time to keep broad cards broad and scoped
 cards scoped.
+
+## Operation Phases
+
+`applies_to` records which step of the work a lesson governs. It is an
+annotation for the model, not a recall gate: matching still uses triggers,
+scope, and engine hints.
+
+```yaml
+applies_to: [edit, verify]   # first entry is the primary phase
+```
+
+Closed vocabulary:
+
+| Value | Meaning |
+|---|---|
+| `inspect` | reading, investigating, confirming the source of truth |
+| `edit` | writing files, refactoring, deleting |
+| `verify` | running, testing, validating through the real entry |
+| `deliver` | finishing, committing, reporting the artifact |
+| `communicate` | answering, explaining, document wording |
+
+Rules:
+
+- Empty means unlabeled, not "applies nowhere". Unlabeled cards are delivered
+  without the label and are only an informational `ome doctor` warning.
+- Unknown values are a `ome doctor` error, the same way unknown signal ids are.
+- More than three values is a warning: the card is probably trying to cover too
+  much. Split it when the triggers differ per phase, keep it multi-valued when
+  one trigger set governs every listed step.
+- `applies_to` never changes score or eligibility, and it is not indexed for
+  lexical matching.
+- Retrospectives should set it from the steps the session actually performed,
+  and leave it empty when the evidence does not show a step.
+
+Matched context renders it on the card header as
+`[applies: edit, verify]`; the baseline block renders it after the scope tag.
+
+## Baseline Cards
+
+`baseline: true` moves an active card to the second delivery channel: it is
+injected on a schedule instead of competing for a match.
+
+```yaml
+baseline: true
+```
+
+- Baseline cards are removed from the matching candidate set before scoring, so
+  they never appear in `matched`, `selectionStage`, precision, or abstention.
+- Membership follows the card: a card in the global library is always-on; a
+  card in a project library is always-on inside that project. The same id in
+  both places is delivered once, and the project card wins.
+- Delivery cadence follows `retrieval.baseline.refreshEveryTurns` in the global
+  config and the session id from the host. Turn 1 always delivers, then 1, 6,
+  11 with the default `5`. Without a session id OME delivers every turn.
+- Only `title`, `id`, `applies_to`, and `rule` are rendered. Summary and usage
+  criteria are matching-only fields and are ignored here.
+- `recallPolicy: off` disables baseline delivery too. `recall.triggers`,
+  `engine_hints`, and `intent_modes` do not participate.
+- Each library has its own character budget, plus one total budget. A card that
+  does not fit is omitted whole, never truncated mid-rule.
+- A draft or archived card with `baseline: true` is ignored and reported as a
+  doctor warning.
