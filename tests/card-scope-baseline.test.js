@@ -29,7 +29,6 @@ import {
   resolveLibraryStack,
   runDoctor,
   saveConfig,
-  setConfigValue,
   updateCard,
   withLock,
   writeCard,
@@ -38,6 +37,14 @@ import { runHook } from "../dist/packages/hook-runtime/src/run.js";
 
 function tmpDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `ome-${name}-`));
+}
+
+function setRefreshTurns(dataDir, turns) {
+  const config = loadConfig(dataDir);
+  saveConfig(dataDir, {
+    ...config,
+    retrieval: { ...config.retrieval, baseline: { ...config.retrieval.baseline, refreshEveryTurns: turns } },
+  });
 }
 
 function context(projectKey, modulePath = ".") {
@@ -220,7 +227,9 @@ test("baseline cards leave the matching set and deliver on turn 1, 6, 11", async
   const dataDir = tmpDir("baseline-cadence");
   initializeDataDir({ dataDir });
   removeStarterCards(dataDir);
-  setConfigValue(dataDir, "retrieval.baseline.refreshEveryTurns", "5");
+  // saveConfig, not setConfigValue: the latter also repoints the global config
+  // pointer, which would overwrite the user's real config during tests.
+  setRefreshTurns(dataDir, 5);
   writeCard(dataDir, baseCard("baseline-rule", {
     triggers: ["baseline-only-trigger"],
     rule: "Keep the change minimal and explain what changed.",
@@ -254,7 +263,7 @@ test("baseline cadence resets when the set changes and skips counting without a 
   const dataDir = tmpDir("baseline-reset");
   initializeDataDir({ dataDir });
   removeStarterCards(dataDir);
-  setConfigValue(dataDir, "retrieval.baseline.refreshEveryTurns", "5");
+  setRefreshTurns(dataDir, 5);
   writeCard(dataDir, baseCard("baseline-a", { rule: "First rule.", baseline: true }));
 
   await runHook({ dataDir, input: { prompt: "hello", session_id: "reset-session" } });
